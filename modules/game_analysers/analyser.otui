@@ -13,7 +13,7 @@ AnalyticsSelectorButton < Button
 
 MiniWindow
   id: analyserMiniWindow
-  height: 230
+  height: 276
   @onClose: modules.game_analysers.hideAnalyser();
   @onOpen: modules.game_analysers.onOpenAnalyser();
   &save: true
@@ -117,6 +117,20 @@ MiniWindow
       anchors.left: parent.left
       margin-top: 3
 
+    AnalyticsSelectorButton
+      id: miscButton
+      !text: tr('Misc Analyser')
+      anchors.top: prev.bottom
+      anchors.left: parent.left
+      margin-top: 3
+
+    AnalyticsSelectorButton
+      id: helperStatsButton
+      !text: tr('Helper Stats')
+      anchors.top: prev.bottom
+      anchors.left: parent.left
+      margin-top: 3
+
   UIWidget
     id: miniborder
     anchors.bottom: parent.bottom
@@ -133,6 +147,6 @@ MiniWindow
     anchors.right: parent.right
     height: 3
     minimum: 79
-    maximum: 230
+    maximum: 276
     margin-left: 3
     margin-right: 3

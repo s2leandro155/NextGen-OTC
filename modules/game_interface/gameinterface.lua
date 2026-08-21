@@ -61,6 +61,8 @@ local VERTICAL_COLUMNS_UNDER_HORIZONTAL = 2
 local pendingSidebarLayoutEvent
 local lastStopAction = 0
 local supplyStashMenuEnabled = false
+local attackTargetOutlineEvent
+local outlinedAttackCreature
 local mobileConfig = {
 	mobileHeightShortcuts = 0,
 	mobileHeightJoystick = 0,
@@ -68,16 +70,50 @@ local mobileConfig = {
 	mobileWidthJoystick = 0
 }
 
+local function updateAttackTargetOutline()
+	attackTargetOutlineEvent = nil
+
+	local creature = g_game.isOnline() and g_game.getAttackingCreature() or nil
+
+	if outlinedAttackCreature and outlinedAttackCreature ~= creature and outlinedAttackCreature.hideStaticSquare then
+		outlinedAttackCreature:hideStaticSquare()
+	end
+
+	outlinedAttackCreature = creature
+
+	if creature and creature.showStaticSquare then
+		-- Reapply it because creature-mark packets from the server can clear the
+		-- static square even though the attack itself is still active.
+		creature:showStaticSquare("#ff0000")
+	end
+
+	attackTargetOutlineEvent = scheduleEvent(updateAttackTargetOutline, 100)
+end
+
+function onAttackingCreatureChange(creature, oldCreature)
+	if oldCreature and oldCreature ~= creature and oldCreature.hideStaticSquare then
+		oldCreature:hideStaticSquare()
+	end
+
+	outlinedAttackCreature = creature
+
+	if creature and creature.showStaticSquare then
+		creature:showStaticSquare("#ff0000")
+	end
+end
+
 function init()
 	g_ui.importStyle("styles/countwindow")
 	g_ui.importStyle("styles/stowContainerConfirmWindow")
 	connect(g_game, {
 		onGameStart = onGameStart,
 		onGameEnd = onGameEnd,
+		onAttackingCreatureChange = onAttackingCreatureChange,
 		onLoginAdvice = onLoginAdvice,
 		onInspectionState = onInspectionState,
 		onSpecialContainer = onSpecialContainer
 	}, true)
+	updateAttackTargetOutline()
 	connect(Container, {
 		onOpen = onDepotContainerOpen
 	})
@@ -331,6 +367,14 @@ function bindKeys()
 end
 
 function terminate()
+	if attackTargetOutlineEvent then
+		removeEvent(attackTargetOutlineEvent)
+		attackTargetOutlineEvent = nil
+	end
+	if outlinedAttackCreature and outlinedAttackCreature.hideStaticSquare then
+		outlinedAttackCreature:hideStaticSquare()
+	end
+	outlinedAttackCreature = nil
 	StatsBar.terminate()
 	hide()
 	disconnect(g_app, {
@@ -345,6 +389,7 @@ function terminate()
 	disconnect(g_game, {
 		onGameStart = onGameStart,
 		onGameEnd = onGameEnd,
+		onAttackingCreatureChange = onAttackingCreatureChange,
 		onLoginAdvice = onLoginAdvice,
 		onInspectionState = onInspectionState,
 		onSpecialContainer = onSpecialContainer
@@ -1636,7 +1681,7 @@ function createBattleListCreatureMenu(menuPosition, creature)
 	if sameFloor then
 		if creature:isNpc() then
 			menu:addOption(tr("Talk"), function()
-				g_game.talk("hi")
+				g_game.attack(creature)
 			end, talkShortcut)
 		elseif g_game.getAttackingCreature() ~= creature then
 			menu:addOption(tr("Attack"), function()
@@ -2477,7 +2522,7 @@ function createThingMenu(menuPosition, lookThing, useThing, creatureThing, mapTi
 
 			if isHireling then
 				menu:addOption(tr("Talk"), function()
-					g_game.talk("hi")
+					g_game.attack(creatureThing)
 				end, talkShortcut)
 				menu:addSeparator()
 				menu:addOption(tr(g_game.getClientVersion() >= 1000 and "Customise Character" or "Set Outfit"), function()
@@ -2502,7 +2547,7 @@ function createThingMenu(menuPosition, lookThing, useThing, creatureThing, mapTi
 			elseif creatureThing:getPosition().z == localPosition.z then
 				if creatureThing:isNpc() then
 					menu:addOption(tr("Talk"), function()
-						g_game.talk("hi")
+						g_game.attack(creatureThing)
 					end, talkShortcut)
 				elseif g_game.getAttackingCreature() ~= creatureThing then
 					menu:addOption(tr("Attack"), function()
@@ -2758,29 +2803,14 @@ local function handleUseThing(thing, quickLootContainers)
 	end
 end
 
-local function greetNpc(creature)
-	if not creature or not creature.isNpc or not creature:isNpc() then
-		return false
-	end
-
-	g_game.talk("hi")
-
-	return true
-end
-
 local function tryClassicAttack(player, attackCreature, creatureThing, autoWalkPos)
-	-- NPCs must be greeted, not attacked (attack is blocked in protection zones).
-	if greetNpc(creatureThing) or greetNpc(attackCreature) then
-		return true
-	end
-
 	if attackCreature and attackCreature ~= player then
 		g_game.attack(attackCreature)
 
 		return true
 	end
 
-	if creatureThing and creatureThing ~= player and autoWalkPos and creatureThing:getPosition().z == autoWalkPos.z then
+	if creatureThing and creatureThing ~= player and creatureThing:getPosition().z == autoWalkPos.z then
 		g_game.attack(creatureThing)
 
 		return true
@@ -2843,11 +2873,7 @@ function processMouseAction(menuPosition, mouseButton, autoWalkPos, lookThing, u
 
 			return true
 		elseif shortcut == "attack" then
-			if greetNpc(creatureThing) or greetNpc(attackCreature) then
-				modules.game_shortcuts.resetShortcuts()
-
-				return true
-			elseif attackCreature and attackCreature ~= player then
+			if attackCreature and attackCreature ~= player then
 				modules.game_shortcuts.resetShortcuts()
 				g_game.attack(attackCreature)
 
@@ -2948,11 +2974,11 @@ function processMouseAction(menuPosition, mouseButton, autoWalkPos, lookThing, u
 			g_game.open(useThing)
 
 			return true
-		elseif attackCreature and not attackCreature:isNpc() and g_keyboard.isAltPressed() and (mouseButton == MouseLeftButton or mouseButton == MouseRightButton) then
+		elseif attackCreature and g_keyboard.isAltPressed() and (mouseButton == MouseLeftButton or mouseButton == MouseRightButton) then
 			g_game.attack(attackCreature)
 
 			return true
-		elseif creatureThing and not creatureThing:isNpc() and creatureThing:getPosition().z == autoWalkPos.z and g_keyboard.isAltPressed() and (mouseButton == MouseLeftButton or mouseButton == MouseRightButton) then
+		elseif creatureThing and creatureThing:getPosition().z == autoWalkPos.z and g_keyboard.isAltPressed() and (mouseButton == MouseLeftButton or mouseButton == MouseRightButton) then
 			g_game.attack(creatureThing)
 
 			return true
@@ -3028,11 +3054,11 @@ function processMouseAction(menuPosition, mouseButton, autoWalkPos, lookThing, u
 			createThingMenu(menuPosition, lookThing, useThing, creatureThing, autoWalkPos)
 
 			return true
-		elseif attackCreature and not attackCreature:isNpc() and g_keyboard.isAltPressed() and (mouseButton == MouseLeftButton or mouseButton == MouseRightButton) then
+		elseif attackCreature and g_keyboard.isAltPressed() and (mouseButton == MouseLeftButton or mouseButton == MouseRightButton) then
 			g_game.attack(attackCreature)
 
 			return true
-		elseif creatureThing and not creatureThing:isNpc() and creatureThing:getPosition().z == autoWalkPos.z and g_keyboard.isAltPressed() and (mouseButton == MouseLeftButton or mouseButton == MouseRightButton) then
+		elseif creatureThing and creatureThing:getPosition().z == autoWalkPos.z and g_keyboard.isAltPressed() and (mouseButton == MouseLeftButton or mouseButton == MouseRightButton) then
 			g_game.attack(creatureThing)
 
 			return true

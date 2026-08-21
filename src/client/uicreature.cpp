@@ -41,12 +41,9 @@ void UICreature::drawSelf(const DrawPoolType drawPane)
         // category ThingInvalidCategory (4) and id/auxId 0; drawing it makes
         // Creature::canDraw()->getThingType() spam "invalid thing type client id 0 in
         // category 4" every frame (worst on the Cyclopedia Map tab, whose animated minimap
-        // forces the foreground pool to repaint continuously). Also require a resolved
-        // client id and a valid category - a half-initialized preview creature (setOutfit
-        // rejected the outfit) otherwise reaches getThingType() with the same error spam.
+        // forces the foreground pool to repaint continuously).
         const auto& outfit = m_creature->getOutfit();
-        if ((outfit.isCreature() ? outfit.getId() : outfit.getAuxId()) != 0
-            && outfit.getCategory() < ThingInvalidCategory) {
+        if ((outfit.isCreature() ? outfit.getId() : outfit.getAuxId()) != 0) {
             m_creature->setMarked(m_imageColor);
             m_creature->draw(getPaddingRect(), m_creatureSize, m_center, m_autoFit);
         }

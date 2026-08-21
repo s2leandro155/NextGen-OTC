@@ -1717,13 +1717,6 @@ void Game::setAttackingCreature(const CreaturePtr& creature)
     const CreaturePtr oldCreature = m_attackingCreature;
     m_attackingCreature = creature;
 
-    // The ported modules expect the engine to mark the attack target on the map (their
-    // original exe did it in C++ via markTargetVisually): classic red static square.
-    if (oldCreature)
-        oldCreature->hideStaticSquare();
-    if (creature)
-        creature->showStaticSquare(Color::red);
-
     g_lua.callGlobalField("g_game", "onAttackingCreatureChange", creature, oldCreature);
 }
 
@@ -1734,12 +1727,6 @@ void Game::setFollowingCreature(const CreaturePtr& creature)
 
     const CreaturePtr oldCreature = m_followingCreature;
     m_followingCreature = creature;
-
-    // Same engine-side marking as for the attack target: classic green square on follow.
-    if (oldCreature)
-        oldCreature->hideStaticSquare();
-    if (creature)
-        creature->showStaticSquare(Color::green);
 
     g_lua.callGlobalField("g_game", "onFollowingCreatureChange", creature, oldCreature);
 }
@@ -1803,6 +1790,19 @@ void Game::browseMarket(const uint8_t browseId, const uint16_t browseType, const
     m_protocolGame->sendMarketBrowse(browseId, browseType, tier);
 }
 
+void Game::sendMarketAction(const uint8_t action, const uint16_t itemId, const uint8_t tier)
+{
+    browseMarket(action, itemId, tier);
+}
+
+void Game::sendResourceBalance(const uint8_t resourceType)
+{
+    if (!canPerformGameAction())
+        return;
+
+    m_protocolGame->sendResourceBalance(resourceType);
+}
+
 void Game::createMarketOffer(const uint8_t type, const uint16_t itemId, const uint8_t itemTier, const uint16_t amount, const uint64_t price, const uint8_t anonymous)
 {
     if (!canPerformGameAction())
@@ -1825,14 +1825,6 @@ void Game::acceptMarketOffer(const uint32_t timestamp, const uint16_t counter, c
         return;
 
     m_protocolGame->sendMarketAcceptOffer(timestamp, counter, amount);
-}
-
-void Game::sendResourceBalance(uint8_t resourceType)
-{
-    if (!canPerformGameAction())
-        return;
-
-    m_protocolGame->sendResourceBalance(resourceType);
 }
 
 void Game::preyAction(const uint8_t slot, const uint8_t actionType, const uint16_t index)

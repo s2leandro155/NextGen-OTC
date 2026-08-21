@@ -16,19 +16,20 @@ KillSlots < Panel
     margin-top: 26
     margin-left: 8
     size: 66 66
+
     fixed-creature-size: true
     phantom: true
     image-source: /images/ui/item
     image-border: 10
 
-    UIWidget
-      id: anyCreatureIcon
-      anchors.centerIn: parent
-      size: 64 64
-      image-source: /images/icons_big/icon-arbitrarymonster64x64
-      phantom: true
-      visible: false
-
+  UIWidget
+    id: anyCreatureIcon
+    anchors.centerIn: outfitIcon
+    size: 64 64
+    image-source: /images/icons_big/icon-arbitrarymonster64x64
+    phantom: true
+    visible: false
+  
   Label
     id: killAnyMonstersLabel
     text: 0

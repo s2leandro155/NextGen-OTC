@@ -8,6 +8,8 @@ creatureEntries = {}
 podiumProtocolData = nil
 
 local previewPodiumWidget, previewCreatureWidget, previewRow, previewFloor
+local podiumRequestEvent
+local podiumRequestPending = false
 local previewFloorTiles = {}
 local previewDirection = Directions.South
 local previewOutfit, previewItem
@@ -741,8 +743,57 @@ function requestConfigurePodium(thing)
 	end
 
 	currentThing = thing
+	podiumRequestPending = true
 
-	g_game.requestConfigurePodium(thing)
+	-- Client opcode 0x86: configure show-off socket (podium).
+	-- O build nao expoe Game.requestConfigurePodium no C++, portanto enviamos
+	-- o mesmo pacote diretamente pelo ProtocolGame.
+	if podiumRequestEvent then
+		removeEvent(podiumRequestEvent)
+	end
+
+	podiumRequestEvent = scheduleEvent(function()
+		podiumRequestEvent = nil
+
+		if g_game.isOnline() and currentThing == thing then
+			local protocolGame = g_game.getProtocolGame()
+
+			if not protocolGame then
+				return
+			end
+
+			local message = OutputMessage.create()
+			message:addByte(0x86)
+			message:addPosition(thing:getPosition())
+			message:addU16(thing:getId())
+			message:addByte(thing:getStackPos())
+			protocolGame:send(message)
+		end
+	end, 350)
+end
+
+function consumePendingOutfitWindow(player, outfitList, creatureMount, mountList)
+	if not podiumRequestPending or not currentThing then
+		return false
+	end
+
+	podiumRequestPending = false
+
+	local data = {
+		position = currentThing:getPosition(),
+		itemClientId = currentThing:getId(),
+		stackpos = currentThing:getStackPos(),
+		direction = currentThing.getPodiumDirection and currentThing:getPodiumDirection() or Directions.South,
+		showPlatform = currentThing.isPodiumShowPlatform and currentThing:isPodiumShowPlatform() or true,
+		showCreature = true,
+		showMount = true
+	}
+
+	if modules.game_outfit and modules.game_outfit.onOpenPlayerPodiumWindow then
+		modules.game_outfit.onOpenPlayerPodiumWindow(player, outfitList, creatureMount, mountList, data)
+	end
+
+	return true
 end
 
 function init()
@@ -762,6 +813,13 @@ function terminate()
 end
 
 function destroy()
+	if podiumRequestEvent then
+		removeEvent(podiumRequestEvent)
+		podiumRequestEvent = nil
+	end
+
+	podiumRequestPending = false
+
 	if customisePodiumWindow and not customisePodiumWindow:isDestroyed() then
 		if g_modalManager then
 			g_modalManager.hide(customisePodiumWindow)

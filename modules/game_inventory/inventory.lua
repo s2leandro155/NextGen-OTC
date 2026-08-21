@@ -443,6 +443,11 @@ local BLESSING_BUTTON_IMAGES = {
 	[3] = "/images/inventory/button_blessings_green"
 }
 
+-- Last authoritative visual state received in protocol 0x9C. Inventory
+-- refreshes call onBlessingsChange without the visual argument and must not
+-- overwrite a valid gold/green state with grey.
+local lastBlessingVisualStatus = nil
+
 local function buildBlessingsTooltip(blessings)
 	local tooltip = "You are protected by the following blessings:"
 
@@ -499,7 +504,9 @@ local function applyBlessingsIcon(status, tooltip)
 	end
 end
 
-local function onBlessingsChange(player, blessings, iconColor)
+-- LocalPlayer::setBlessings emits (blessings, oldBlessings, blessVisualState).
+-- Keep oldBlessings in the signature so the visual state is not mistaken for it.
+local function onBlessingsChange(player, blessings, oldBlessings, iconColor)
 	if not player then
 		return
 	end
@@ -508,11 +515,29 @@ local function onBlessingsChange(player, blessings, iconColor)
 
 	toggleAdventurerStyle(hasAdventurerBlessing)
 
-	local status = iconColor
-
-	if not status or status == 0 then
-		status = player:getBlessingsIconColor()
+	-- Different OTC engine revisions expose this event with either
+	-- (blessings, color) or (blessings, oldBlessings, color). Accept both.
+	local status = tonumber(iconColor)
+	local oldValue = tonumber(oldBlessings)
+	if (not status or status < 1 or status > 3) and oldValue and oldValue >= 1 and oldValue <= 3 then
+		status = oldValue
 	end
+	if status and status >= 1 and status <= 3 and (iconColor ~= nil or oldBlessings ~= nil) then
+		lastBlessingVisualStatus = status
+	end
+	if (not status or status < 1 or status > 3) and lastBlessingVisualStatus then
+		status = lastBlessingVisualStatus
+	end
+	if not status or status < 1 or status > 3 then
+		local storedStatus = player.getBlessingsIconColor and tonumber(player:getBlessingsIconColor()) or nil
+		status = storedStatus and storedStatus >= 1 and storedStatus <= 3 and storedStatus or nil
+	end
+	if not status then
+		status = tonumber(blessings) and tonumber(blessings) ~= 0 and 3 or 1
+	end
+
+	g_logger.info(string.format("[bless-icon] blessings=%s old=%s visual=%s resolved=%d",
+		tostring(blessings), tostring(oldBlessings), tostring(iconColor), status))
 
 	applyBlessingsIcon(status, buildBlessingsTooltip(blessings))
 end

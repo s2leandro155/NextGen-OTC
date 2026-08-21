@@ -3950,6 +3950,104 @@ PainelTools < Panel
       margin-right: 3
       !tooltip: tr('Auto Ammo:<br><li>Left-click the slot to select arrows, bolts or stackable distance ammunition; right-click to clear it.</li><li>Every 20 seconds, when the amount is below Target, performs up to three moves one second apart into an equipped open quiver.</li><li>Stops the cycle early when Target is reached. Stackable hand ammunition is equipped directly from inventory or accessible containers.</li>')
 
+    HelperPopupSection
+      id: toolsAutoSSASection
+      !text: tr('Auto SSA')
+      anchors.top: toolsReconnectSection.bottom
+      anchors.left: parent.left
+      width: 218
+      height: 73
+      margin-top: 10
+      margin-left: 2
+
+      UIItem
+        id: toolsAutoSSAIcon
+        size: 32 32
+        image-size: 32 32
+        item-id: 3081
+        show-count: false
+        always-show-count: false
+        anchors.left: parent.left
+        anchors.verticalCenter: parent.verticalCenter
+        margin-left: 8
+        margin-top: 6
+        virtual: true
+        phantom: true
+
+      OptionCheckBox
+        id: toolsAutoSSACheckBox
+        anchors.left: toolsAutoSSAIcon.right
+        anchors.verticalCenter: parent.verticalCenter
+        margin-left: 13
+        margin-top: 6
+        @onCheckChange: modules.game_helper.onToolsAutoSSAChange(self, self:isChecked())
+
+      Label
+        !text: tr('Enabled')
+        font: $var-cip-font
+        color: #c0c0c0
+        anchors.left: parent.left
+        anchors.verticalCenter: parent.verticalCenter
+        margin-left: 63
+        margin-top: 6
+        text-auto-resize: true
+
+    HelperSectionHelpIcon
+      id: toolsAutoSSAHelp
+      anchors.top: toolsAutoSSASection.top
+      anchors.right: toolsAutoSSASection.right
+      margin-right: 3
+      !tooltip: tr('Auto SSA:<br><li>Swaps the currently equipped amulet for a Stone Skin Amulet.</li><li>The amulet must be available in your inventory or an accessible container.</li>')
+
+    HelperPopupSection
+      id: toolsAutoMightRingSection
+      !text: tr('Auto Might Ring')
+      anchors.top: toolsAutoSSASection.top
+      anchors.left: toolsAutoSSASection.right
+      anchors.right: parent.right
+      height: 73
+      margin-left: 10
+      margin-right: 2
+
+      UIItem
+        id: toolsAutoMightRingIcon
+        size: 32 32
+        image-size: 32 32
+        item-id: 3048
+        show-count: false
+        always-show-count: false
+        anchors.left: parent.left
+        anchors.verticalCenter: parent.verticalCenter
+        margin-left: 8
+        margin-top: 6
+        virtual: true
+        phantom: true
+
+      OptionCheckBox
+        id: toolsAutoMightRingCheckBox
+        anchors.left: toolsAutoMightRingIcon.right
+        anchors.verticalCenter: parent.verticalCenter
+        margin-left: 13
+        margin-top: 6
+        @onCheckChange: modules.game_helper.onToolsAutoMightRingChange(self, self:isChecked())
+
+      Label
+        !text: tr('Enabled')
+        font: $var-cip-font
+        color: #c0c0c0
+        anchors.left: parent.left
+        anchors.verticalCenter: parent.verticalCenter
+        margin-left: 63
+        margin-top: 6
+        text-auto-resize: true
+
+    HelperSectionHelpIcon
+      id: toolsAutoMightRingHelp
+      anchors.top: toolsAutoMightRingSection.top
+      anchors.right: toolsAutoMightRingSection.right
+      margin-right: 3
+      !tooltip: tr('Auto Might Ring:<br><li>Swaps the currently equipped ring for a Might Ring.</li><li>The ring must be available in your inventory or an accessible container.</li>')
+
 PainelConfigs < Panel
   anchors.top: presetBar.bottom
   anchors.left: MainMenuLeft.right
@@ -3968,6 +4066,7 @@ PainelConfigs < Panel
     anchors.bottom: parent.bottom
 
     OnePixelDownFrame
+
       id: configsSharedHotkeyFrame
       height: 28
       anchors.top: parent.top
@@ -4087,6 +4186,369 @@ PainelConfigs < Panel
         !tooltip: tr('Auto-Switch Hotkey Preset:<br><li>On login, selects the client hotkey preset and Helper preset whose name exactly matches the character name.</li><li>All Helper tabs, profiles and hotkeys are always stored separately for each character.</li><li>If there is no matching preset, each system keeps its current preset.</li>')
 
 // Janela do Helper
+PainelCavebot < Panel
+  anchors.top: presetBar.bottom
+  anchors.left: MainMenuLeft.right
+  anchors.right: parent.right
+  anchors.bottom: botSeparator.top
+  margin-top: 5
+  margin-left: 10
+  margin-bottom: 10
+
+  HelperPopupSection
+    id: cavebotRouteSection
+    !text: tr('Waypoints')
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: cavebotScriptsSection.left
+    anchors.bottom: cavebotControls.top
+    margin-right: 7
+    margin-bottom: 7
+
+    Label
+      id: cavebotHint
+      anchors.top: parent.top
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 8
+      margin-left: 9
+      margin-right: 9
+      height: 28
+      text: Waypoints
+      font: $var-cip-font
+      color: #a0a0a0
+      text-wrap: true
+      text-auto-resize: false
+
+    Panel
+      id: cavebotWaypointHeader
+      height: 18
+      anchors.top: cavebotHint.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 3
+      margin-left: 8
+      margin-right: 20
+      background-color: #363636
+
+      Label
+        width: 28
+        anchors.left: parent.left
+        anchors.verticalCenter: parent.verticalCenter
+        margin-left: 5
+        text: ID
+        font: $var-cip-font
+        color: #c0c0c0
+
+      Label
+        width: 62
+        anchors.left: prev.right
+        anchors.verticalCenter: parent.verticalCenter
+        text: Type
+        font: $var-cip-font
+        color: #c0c0c0
+
+      Label
+        anchors.left: prev.right
+        anchors.right: parent.right
+        anchors.verticalCenter: parent.verticalCenter
+        text: Coordinates
+        font: $var-cip-font
+        color: #c0c0c0
+
+    TextList
+      id: cavebotWaypointList
+      anchors.top: cavebotWaypointHeader.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.bottom: cavebotWaypointButtons.top
+      margin-top: 5
+      margin-left: 8
+      margin-right: 20
+      margin-bottom: 6
+      padding: 1
+      focusable: true
+      background-color: #414141
+      vertical-scrollbar: cavebotWaypointScroll
+
+    VerticalScrollBar
+      id: cavebotWaypointScroll
+      anchors.top: cavebotWaypointList.top
+      anchors.right: parent.right
+      anchors.bottom: cavebotWaypointList.bottom
+      margin-right: 8
+      width: 12
+      step: 19
+      pixels-scroll: true
+
+    Panel
+      id: cavebotWaypointButtons
+      height: 47
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.bottom: cavebotWaypointCount.top
+      margin-left: 8
+      margin-right: 8
+      margin-bottom: 5
+
+      Button
+        id: cavebotAddButton
+        size: 48 20
+        anchors.left: parent.left
+        anchors.top: parent.top
+        text: Walk
+        @onClick: modules.game_helper.cavebotAddCurrentPosition('Walk')
+
+      Button
+        id: cavebotStandButton
+        size: 48 20
+        anchors.left: prev.right
+        anchors.top: parent.top
+        margin-left: 5
+        text: Stand
+        @onClick: modules.game_helper.cavebotAddCurrentPosition('Stand')
+
+      Button
+        id: cavebotNodeButton
+        size: 48 20
+        anchors.left: prev.right
+        anchors.top: parent.top
+        margin-left: 5
+        text: Node
+        @onClick: modules.game_helper.cavebotAddCurrentPosition('Node')
+
+      Button
+        id: cavebotUseButton
+        size: 48 20
+        anchors.left: prev.right
+        anchors.top: parent.top
+        margin-left: 5
+        text: Use
+        @onClick: modules.game_helper.cavebotAddCurrentPosition('Use')
+
+      Button
+        id: cavebotRopeButton
+        size: 48 20
+        anchors.left: parent.left
+        anchors.top: parent.top
+        margin-top: 23
+        text: Rope
+        @onClick: modules.game_helper.cavebotAddCurrentPosition('Rope')
+
+      Button
+        id: cavebotShovelButton
+        size: 48 20
+        anchors.left: prev.right
+        anchors.top: prev.top
+        margin-left: 5
+        text: Shovel
+        @onClick: modules.game_helper.cavebotAddCurrentPosition('Shovel')
+
+      Button
+        id: cavebotActionButton
+        size: 48 20
+        anchors.left: prev.right
+        anchors.top: prev.top
+        margin-left: 5
+        text: Action
+        @onClick: modules.game_helper.cavebotAddCurrentPosition('Action')
+
+      Button
+        id: cavebotClearButton
+        size: 48 20
+        anchors.left: prev.right
+        anchors.top: prev.top
+        margin-left: 5
+        text: Clear
+        @onClick: modules.game_helper.cavebotClear()
+
+    Label
+      id: cavebotWaypointCount
+      height: 16
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.bottom: parent.bottom
+      margin-left: 9
+      margin-bottom: 6
+      text: 0 waypoints
+      font: $var-cip-font
+      color: #a0a0a0
+      text-auto-resize: false
+
+  HelperPopupSection
+    id: cavebotScriptsSection
+    width: 145
+    !text: tr('Scripts')
+    anchors.top: parent.top
+    anchors.right: parent.right
+    anchors.bottom: cavebotControls.top
+    margin-bottom: 7
+
+    TextList
+      id: cavebotScriptList
+      anchors.top: parent.top
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.bottom: cavebotSaveScriptButton.top
+      margin-top: 8
+      margin-left: 7
+      margin-right: 19
+      margin-bottom: 7
+      background-color: #414141
+      vertical-scrollbar: cavebotScriptScroll
+
+    VerticalScrollBar
+      id: cavebotScriptScroll
+      anchors.top: cavebotScriptList.top
+      anchors.right: parent.right
+      anchors.bottom: cavebotScriptList.bottom
+      margin-right: 7
+      width: 12
+      step: 19
+
+    Button
+      id: cavebotSaveScriptButton
+      height: 20
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.bottom: cavebotLoadScriptButton.top
+      margin-left: 7
+      margin-right: 7
+      margin-bottom: 4
+      text: Save
+      @onClick: modules.game_helper.cavebotSaveScript()
+
+    Button
+      id: cavebotLoadScriptButton
+      width: 61
+      height: 20
+      anchors.left: parent.left
+      anchors.bottom: parent.bottom
+      margin-left: 7
+      margin-bottom: 7
+      text: Load
+      @onClick: modules.game_helper.cavebotLoadScript()
+
+    Button
+      id: cavebotDeleteScriptButton
+      width: 61
+      height: 20
+      anchors.right: parent.right
+      anchors.bottom: parent.bottom
+      margin-right: 7
+      margin-bottom: 7
+      text: Delete
+      @onClick: modules.game_helper.cavebotDeleteScript()
+
+  OnePixelDownFrame
+    id: cavebotControls
+    height: 55
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: cavebotStatusFrame.top
+    margin-bottom: 7
+
+    Label
+      id: cavebotHelperStatusTitle
+      anchors.left: parent.left
+      anchors.top: parent.top
+      margin-left: 10
+      margin-top: 8
+      text: "Helper Status:"
+      font: $var-cip-font
+      color: #c0c0c0
+      text-auto-resize: true
+
+    Label
+      id: cavebotHelperStatusValue
+      anchors.left: cavebotHelperStatusTitle.left
+      anchors.top: cavebotHelperStatusTitle.bottom
+      margin-top: 2
+      text: Enabled
+      font: $var-cip-font
+      color: #42d742
+      text-auto-resize: true
+
+    Label
+      id: cavebotToggleTitle
+      anchors.left: parent.left
+      anchors.verticalCenter: parent.verticalCenter
+      margin-left: 190
+      text: "Cavebot:"
+      font: $var-cip-font
+      color: #c0c0c0
+      text-auto-resize: true
+
+    Label
+      id: cavebotToggleValue
+      anchors.left: cavebotToggleTitle.right
+      anchors.verticalCenter: parent.verticalCenter
+      margin-left: 4
+      text: "Off"
+      font: $var-cip-font
+      color: #ff3030
+      text-auto-resize: true
+
+    OptionCheckBox
+      id: cavebotEnableCheckBox
+      anchors.left: cavebotToggleValue.right
+      anchors.verticalCenter: parent.verticalCenter
+      margin-left: 8
+      @onCheckChange: modules.game_helper.onCavebotEnableChange(self:isChecked())
+
+    OptionCheckBox
+      id: cavebotLoopCheckBox
+      anchors.left: parent.left
+      anchors.verticalCenter: parent.verticalCenter
+      margin-left: 300
+      checked: true
+      @onCheckChange: modules.game_helper.onCavebotLoopChange(self:isChecked())
+
+    Label
+      anchors.left: cavebotLoopCheckBox.right
+      anchors.verticalCenter: parent.verticalCenter
+      margin-left: 5
+      text: Shortcuts
+      font: $var-cip-font
+      color: #c0c0c0
+      text-auto-resize: true
+
+    OptionCheckBox
+      id: cavebotRecordingCheckBox
+      anchors.left: parent.left
+      anchors.verticalCenter: parent.verticalCenter
+      margin-left: 375
+      @onCheckChange: modules.game_helper.onCavebotRecordingChange(self:isChecked())
+
+    Label
+      id: cavebotRecordingValue
+      anchors.left: cavebotRecordingCheckBox.right
+      anchors.verticalCenter: parent.verticalCenter
+      margin-left: 5
+      text: Not Recording
+      font: $var-cip-font
+      color: #c0c0c0
+      text-auto-resize: true
+
+  OnePixelDownFrame
+    id: cavebotStatusFrame
+    height: 35
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+
+    Label
+      id: cavebotStatus
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      margin-left: 10
+      margin-right: 10
+      text: Parado
+      font: $var-cip-font
+      color: #c0c0c0
+      text-auto-resize: false
+
 HelperWindow < MainLogoWindow
   id: helperWindow
   !text: tr('Helper')
@@ -4212,9 +4674,23 @@ HelperWindow < MainLogoWindow
         icon-offset: 8 5
         @onClick: modules.game_helper.showTab('configs')
 
+    HelperMenuButtonFrame
+      id: cavebotButtonFrame
+      anchors.top: prev.bottom
+
+      HelperSideMenuButton
+        id: cavebotButton
+        text: Cavebot
+        icon: /modules/game_helper/images/icon-speed
+        icon-align: left
+        icon-width: 13
+        icon-height: 13
+        icon-offset: 8 6
+        @onClick: modules.game_helper.showTab('cavebot')
+
     Panel
       id: helperCharacterCard
-      anchors.top: configsButtonFrame.bottom
+      anchors.top: cavebotButtonFrame.bottom
       anchors.left: parent.left
       anchors.right: parent.right
       anchors.bottom: parent.bottom
@@ -4500,6 +4976,9 @@ HelperWindow < MainLogoWindow
     visible: false
   PainelConfigs
     id: configsPanel
+    visible: false
+  PainelCavebot
+    id: cavebotPanel
     visible: false
   // Bottom Configuration Panel
   HorizontalSeparator

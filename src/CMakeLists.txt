@@ -593,11 +593,11 @@ target_compile_definitions(otclient_core PRIVATE ENABLE_DISCORD_RPC=${OTCLIENT_E
 # *****************************************************************************
 if(MSVC)
 
-  # Newer cpp-httplib refuses to build below Windows 10, so target Windows 10.
+  # Set variables to have Windows Vista Value so httplib will build 'inet_pton'
   target_compile_definitions(otclient_core
           PUBLIC
-          NTDDI_VERSION=0x0A000000
-          _WIN32_WINNT=0x0A00
+          NTDDI_VERSION=0x06000000
+          _WIN32_WINNT=0x0600
   )
 
   target_compile_definitions(otclient_core PRIVATE CRASH_HANDLER)
@@ -677,7 +677,7 @@ if(MSVC)
           LibLZMA::LibLZMA
           winmm.lib
           pugixml::pugixml
-          fmt::fmt
+          fmt::fmt-header-only
           utf8cpp::utf8cpp
           Freetype::Freetype
   )
@@ -734,7 +734,7 @@ elseif(ANDROID)
           log
           Freetype::Freetype
           pugixml::pugixml
-          fmt::fmt
+          fmt::fmt-header-only
           utf8cpp::utf8cpp
   )
 
@@ -926,7 +926,7 @@ else() # Linux
           OpenSSL::SSL
           OpenSSL::Crypto
           httplib::httplib
-          fmt::fmt
+          fmt::fmt-header-only
           utf8cpp::utf8cpp
           Ogg::ogg
           Vorbis::vorbisfile

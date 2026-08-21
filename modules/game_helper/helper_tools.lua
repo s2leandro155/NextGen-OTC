@@ -13,6 +13,8 @@ local TOOLS_HELP_TEXT = {
 		reconnect = "Reconnect:<br><li>Enables the client native auto-reconnect setting.</li><li>Attempts to log the same character back in after recoverable connection errors.</li><li>A recent manual logout is respected and does not trigger an immediate reconnect.</li>",
 		autoTraining = "Auto Training:<br><li>Left-click the slot to select an exercise weapon; right-click to clear it.</li><li>Uses the selected weapon every 10 seconds on the nearest visible exercise dummy within 5 tiles.</li><li>The weapon must be available in your inventory or accessible containers.</li>",
 		autoAmmo = "Auto Ammo:<br><li>Left-click the slot to select arrows, bolts or stackable distance ammunition; right-click to clear it.</li><li>Every 20 seconds, when the amount is below Target, performs up to three moves one second apart into an equipped open quiver.</li><li>Stops the cycle early when Target is reached. Stackable hand ammunition is equipped directly from inventory or accessible containers.</li>",
+		autoSSA = "Auto SSA:<br><li>Swaps the currently equipped amulet for a Stone Skin Amulet.</li><li>The amulet must be available in your inventory or an accessible container.</li>",
+		autoMightRing = "Auto Might Ring:<br><li>Swaps the currently equipped ring for a Might Ring.</li><li>The ring must be available in your inventory or an accessible container.</li>",
 		haste = "Haste:<br><li>Left-click the action slot to select a learned haste spell; right-click to clear it.</li><li>Recasts the spell when its duration and cooldown allow it.</li><li>PZ Cast allows the spell to be cast inside protection zones.</li>"
 	},
 	pt = {
@@ -23,6 +25,8 @@ local TOOLS_HELP_TEXT = {
 		reconnect = "Reconectar:<br><li>Ativa a reconexao automatica nativa do cliente.</li><li>Tenta conectar novamente o mesmo personagem apos erros de conexao recuperaveis.</li><li>Um logout manual recente e respeitado e nao dispara uma reconexao imediata.</li>",
 		autoTraining = "Treino Automatico:<br><li>Clique esquerdo no slot para selecionar uma arma de exercicio; clique direito para limpar.</li><li>Usa a arma a cada 10 segundos no boneco de treino visivel mais proximo em ate 5 sqm.</li><li>A arma deve estar no inventario ou em containers acessiveis.</li>",
 		autoAmmo = "Municao Automatica:<br><li>Clique esquerdo no slot para selecionar flechas, bolts ou municao de distancia empilhavel; clique direito para limpar.</li><li>A cada 20 segundos, quando a quantidade fica abaixo do Alvo, faz ate tres movimentos com intervalo de um segundo para o quiver equipado e aberto.</li><li>Interrompe o ciclo ao atingir o Alvo. Municao de mao empilhavel e equipada diretamente do inventario ou de containers acessiveis.</li>",
+		autoSSA = "Auto SSA:<br><li>Troca o amuleto equipado por um Stone Skin Amulet.</li><li>O amuleto deve estar no inventario ou em um container acessivel.</li>",
+		autoMightRing = "Auto Might Ring:<br><li>Troca o anel equipado por um Might Ring.</li><li>O anel deve estar no inventario ou em um container acessivel.</li>",
 		haste = "Acelerar:<br><li>Clique esquerdo no slot para selecionar uma magia de velocidade aprendida; clique direito para limpar.</li><li>Conjura novamente quando a duracao e o cooldown permitirem.</li><li>Conjurar em PZ permite usar a magia dentro de zonas de protecao.</li>"
 	}
 }
@@ -34,6 +38,8 @@ local TOOLS_HELP_WIDGETS = {
 	toolsAutoTrainingHelp = "autoTraining",
 	toolsHasteHelp = "haste",
 	toolsAutoAmmoHelp = "autoAmmo",
+	toolsAutoSSAHelp = "autoSSA",
+	toolsAutoMightRingHelp = "autoMightRing",
 	toolsReconnectHelp = "reconnect"
 }
 local TOOLS_UI_TEXT = {
@@ -72,6 +78,7 @@ local lastEatFoodMs = 0
 local lastExerciseMs = 0
 local lastExerciseDummyMsgMs = 0
 local lastAutoAmmoMs = 0
+local lastAutoEquipMs = 0
 local autoAmmoBurstEvent, toolsTickEvent, antiIdleOutfitEvent
 local antiIdleOutfitDirectionIndex = 1
 local changeGoldIconEvent
@@ -83,6 +90,8 @@ local trainingSlot, configuredTrainingItemId
 local autoTrainingEnabled = false
 local ammoSlot, configuredAmmoItemId
 local autoAmmoEnabled = false
+local autoSSAEnabled = false
+local autoMightRingEnabled = false
 local autoAmmoTargetCount = 100
 local cachedMainCheck, cachedExerciseDummy, cachedExerciseDummyKey
 local cachedExerciseDummyAt = 0
@@ -101,6 +110,10 @@ local AUTO_AMMO_DEFAULT_TARGET_COUNT = 100
 local AUTO_AMMO_COUNT_STEP = 10
 local AUTO_AMMO_MAX_COUNT = 1000
 local AMMO_STACK_MAX_COUNT = 100
+local AUTO_EQUIP_INTERVAL_MS = 1000
+local STONE_SKIN_AMULET_ID = 3081
+local MIGHT_RING_ID = 3048
+local ACTIVE_MIGHT_RING_ID = 3049
 local GOLD_COIN_ID = 3031
 local PLATINUM_COIN_ID = 3035
 local CRYSTAL_COIN_ID = 3043
@@ -1357,6 +1370,59 @@ local function findAmmoSource(player, itemId, excludedContainer, excludedItems)
 	return nil
 end
 
+local function runAutoEquipment()
+	if not g_game.isOnline() then
+		return
+	end
+
+	local now = g_clock.millis()
+
+	if now < lastAutoEquipMs + AUTO_EQUIP_INTERVAL_MS then
+		return
+	end
+
+	local player = g_game.getLocalPlayer()
+
+	if not player then
+		return
+	end
+
+	local source
+	local requestedItemId
+	local destinationSlot
+
+	local equippedAmulet = player:getInventoryItem(InventorySlotNeck)
+	local equippedRing = player:getInventoryItem(InventorySlotFinger)
+	local hasSSAEquipped = itemMatchesId(equippedAmulet, STONE_SKIN_AMULET_ID)
+	local hasMightRingEquipped = itemMatchesId(equippedRing, MIGHT_RING_ID) or itemMatchesId(equippedRing, ACTIVE_MIGHT_RING_ID)
+
+	if autoSSAEnabled and isEnabled("toolsAutoSSACheckBox") and not hasSSAEquipped then
+		requestedItemId = STONE_SKIN_AMULET_ID
+		source = findAmmoSource(player, STONE_SKIN_AMULET_ID)
+		destinationSlot = InventorySlotNeck
+	end
+
+	if not requestedItemId and autoMightRingEnabled and isEnabled("toolsAutoMightRingCheckBox") and not hasMightRingEquipped then
+		requestedItemId = MIGHT_RING_ID
+		source = findAmmoSource(player, MIGHT_RING_ID)
+		destinationSlot = InventorySlotFinger
+	end
+
+	if requestedItemId and destinationSlot then
+		lastAutoEquipMs = now
+
+		if source then
+			g_game.move(source, {
+				x = 65535,
+				y = destinationSlot,
+				z = 0
+			}, 1)
+		else
+			g_game.equipItemId(requestedItemId, 0)
+		end
+	end
+end
+
 local function runQuiverAutoAmmo(player, itemId, targetCount)
 	local _, quiverContainer = findOpenEquippedQuiver(player)
 
@@ -1732,6 +1798,7 @@ function HelperTools.init(pctx)
 				runEatFood()
 				runAutoTraining()
 				runAutoAmmo()
+				runAutoEquipment()
 			end)
 
 			if not ok and g_logger then
@@ -1881,6 +1948,18 @@ function HelperTools.onAutoAmmoTargetChange()
 	autoSave()
 end
 
+function HelperTools.onAutoSSAChange(_, on)
+	autoSSAEnabled = on == true
+	lastAutoEquipMs = 0
+	autoSave()
+end
+
+function HelperTools.onAutoMightRingChange(_, on)
+	autoMightRingEnabled = on == true
+	lastAutoEquipMs = 0
+	autoSave()
+end
+
 function HelperTools.isToolsItemAssignActive()
 	return toolsItemAssignWindow and not toolsItemAssignWindow:isDestroyed()
 end
@@ -1962,6 +2041,8 @@ function HelperTools.collectConfig(config)
 	config.tools.autoAmmo = autoAmmoEnabled
 	config.tools.autoAmmoMinCount = nil
 	config.tools.autoAmmoTargetCount = autoAmmoTargetCount
+	config.tools.autoSSA = autoSSAEnabled
+	config.tools.autoMightRing = autoMightRingEnabled
 
 	local itemId = getTrainingItemId()
 
@@ -1992,6 +2073,8 @@ function HelperTools.loadFromConfig(config)
 	local eatFoodCheck = ctx.getWidget("toolsEatFoodCheckBox")
 	local autoTrainingCheck = ctx.getWidget("toolsAutoTrainingCheckBox")
 	local autoAmmoCheck = ctx.getWidget("toolsAutoAmmoCheckBox")
+	local autoSSACheck = ctx.getWidget("toolsAutoSSACheckBox")
+	local autoMightRingCheck = ctx.getWidget("toolsAutoMightRingCheckBox")
 
 	if idleCheck then
 		idleCheck:setChecked(data.antiIdle == true)
@@ -2045,6 +2128,18 @@ function HelperTools.loadFromConfig(config)
 	end
 
 	lastAutoAmmoMs = 0
+	autoSSAEnabled = data.autoSSA == true
+	autoMightRingEnabled = data.autoMightRing == true
+
+	if autoSSACheck then
+		autoSSACheck:setChecked(autoSSAEnabled)
+	end
+
+	if autoMightRingCheck then
+		autoMightRingCheck:setChecked(autoMightRingEnabled)
+	end
+
+	lastAutoEquipMs = 0
 end
 
 function HelperTools:onReconnectChange(on)

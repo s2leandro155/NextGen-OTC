@@ -369,7 +369,6 @@ function init()
 		onPreyInactive = onPreyInactive,
 		onPreyActive = onPreyActive,
 		onPreySelection = onPreySelection,
-		onPreyListSelection = onPreyListSelection,
 		onPreySelectionChangeMonster = onPreySelectionChangeMonster
 	})
 
@@ -697,7 +696,6 @@ function terminate()
 		onPreyInactive = onPreyInactive,
 		onPreyActive = onPreyActive,
 		onPreySelection = onPreySelection,
-		onPreyListSelection = onPreyListSelection,
 		onPreySelectionChangeMonster = onPreySelectionChangeMonster
 	})
 
@@ -730,8 +728,11 @@ function setUnsupportedSettings()
 		"slot3"
 	}
 
-	for i, slot in pairs(t) do
+	for i, slot in ipairs(t) do
 		local panel = preyWindow[slot]
+		-- Capture a stable value for callbacks. Using the loop variable `i`
+		-- directly makes every delayed click target the last slot (slot 3).
+		local slotIndex = i - 1
 
 		for j, state in pairs({
 			panel.active,
@@ -760,10 +761,10 @@ function setUnsupportedSettings()
 						return
 					end
 
-					onConfirmUsingWildcard(i - 1, 5, PREY_ACTION_REQUEST_ALL_MONSTERS)
+					onConfirmUsingWildcard(slotIndex, 5, PREY_ACTION_REQUEST_ALL_MONSTERS)
 				end
 
-				local preySlot = i - 1
+				local preySlot = slotIndex
 				local rerollPricePanel = row.reroll.price
 
 				setRerollPriceDisplay(rerollPricePanel, isFreeRerollAvailable(preySlot))
@@ -772,17 +773,6 @@ function setUnsupportedSettings()
 				if getPreyTotalGold() < rerollPrice and not isFreeRerollAvailable(preySlot) then
 					rerollPricePanel.text:setColor("#d33c3c")
 					row.reroll.button.rerollButton:setOn(false)
-				end
-
-				-- Wire the List Reroll ("Free"/gold) button here as well. It used to be set
-				-- only in onPreyFreeRolls, which may not fire for a selection slot - leaving
-				-- the "Free" button dead. setUnsupportedSettings runs on every prey update.
-				function row.reroll.button.rerollButton.onClick()
-					if not row.reroll.button.rerollButton:isOn() then
-						return
-					end
-
-					onRerollButtonAction(preySlot, isFreeRerollAvailable(preySlot))
 				end
 
 				local progressBar = row.reroll.button.time
@@ -803,7 +793,7 @@ function setUnsupportedSettings()
 					return
 				end
 
-				onConfirmUsingWildcard(i - 1, 1, PREY_ACTION_BONUSREROLL)
+				onConfirmUsingWildcard(slotIndex, 1, PREY_ACTION_BONUSREROLL)
 			end
 
 			if bonusRerolls < 1 then
@@ -832,17 +822,17 @@ function setUnsupportedSettings()
 
 			function state.buttonsPanel.autoReroll.autoRerollCheck.onClick()
 				if state.buttonsPanel.autoReroll.autoRerollCheck:isChecked() then
-					g_game.preyAction(i - 1, PREY_ACTION_LOCK_PREY, 0)
+					g_game.preyAction(slotIndex, PREY_ACTION_LOCK_PREY, 0)
 				else
-					onEnableAutoReroll(i - 1)
+					onEnableAutoReroll(slotIndex)
 				end
 			end
 
 			function state.buttonsPanel.lockPrey.lockPreyCheck.onClick()
 				if state.buttonsPanel.lockPrey.lockPreyCheck:isChecked() then
-					g_game.preyAction(i - 1, PREY_ACTION_LOCK_PREY, 0)
+					g_game.preyAction(slotIndex, PREY_ACTION_LOCK_PREY, 0)
 				else
-					onEnableLockPrey(i - 1)
+					onEnableLockPrey(slotIndex)
 				end
 			end
 
@@ -1597,11 +1587,10 @@ function updatePreyWidget(slot, state)
 	if state == SLOT_STATE_ACTIVE then
 		local creatureAndBonus = preySlot.active.creatureAndBonus
 
-		-- UICreature:getOutfit() is not bound to Lua in this client; read the outfit from the
-		-- inner Creature (getCreature() IS bound) instead, guarded in case it is not set yet.
-		local activeCreature = creatureAndBonus.creature:getCreature()
-		if activeCreature then
-			preyTrackerSlot.creature:setOutfit(activeCreature:getOutfit())
+		-- UICreature::getOutfit exists in C++ but is not exposed to Lua in this
+		-- build. Reuse the outfit received in onPreyActive instead.
+		if preySlot.currentHolderOutfit then
+			preyTrackerSlot.creature:setOutfit(preySlot.currentHolderOutfit)
 		end
 		preyTrackerSlot.creature:getCreature():setStaticWalking(1000)
 		preyTrackerSlot.creatureName:setText(formatKillTrackerCreatureName(preySlot.title:getText()))
@@ -1834,6 +1823,7 @@ function onPreyActive(slot, currentHolderName, currentHolderOutfit, bonusType, b
 	configurePreyButtonsPanel(prey.active.buttonsPanel, true)
 	prey.active:show()
 	prey.title:setText(capitalFormatStr(currentHolderName))
+	prey.currentHolderOutfit = currentHolderOutfit
 
 	local creatureAndBonus = prey.active.creatureAndBonus
 
@@ -1968,14 +1958,18 @@ function onPreySelection(slot, names, outfits, timeUntilFreeReroll, wildcards)
 	updatePreyWidget(slot, SLOT_STATE_SELECTION)
 end
 
+-- State 4 uses the same creature grid as the normal selection state, but
+-- keeps the already rolled bonus. This event was parsed by C++ and never
+-- connected by the Lua module, leaving the panel blank after a list reroll.
 function onPreySelectionChangeMonster(slot, names, outfits, bonusType, bonusValue, bonusGrade, timeUntilFreeReroll, wildcards)
-	-- A List Reroll on an ACTIVE prey moves the slot to PreyDataState_SelectionChangeMonster:
-	-- a fresh list of creatures to pick from while the existing bonus is kept server-side.
-	-- This client port shipped without the handler, so the reroll charged gold but the new
-	-- list never appeared ("takes money, doesn't change the monster"). Reuse the normal
-	-- selection UI - picking a creature sends PREY_ACTION_MONSTERSELECTION, which the server
-	-- accepts in this state (canSelect() is true; the slot is not occupied after eraseBonus).
-	return onPreySelection(slot, names, outfits, timeUntilFreeReroll, wildcards)
+	onPreySelection(slot, names, outfits, timeUntilFreeReroll, wildcards)
+
+	local prey = preyWindow and preyWindow["slot" .. slot + 1]
+	if prey then
+		prey.bonusType = bonusType
+		prey.bonusValue = bonusValue
+		prey.bonusGrade = bonusGrade
+	end
 end
 
 function updateSearchWildcard(prey)
@@ -2318,14 +2312,6 @@ function onPreyWildcard(slot, races, _, lockType, bonusType, bonusValue, bonusGr
 	setUnsupportedSettings()
 	updatePreyWidget(slot, SLOT_STATE_WILDCARD)
 	updateWildCardWindow()
-end
-
-function onPreyListSelection(slot, races, timeUntilFreeReroll, wildcards)
-	-- "Pick a creature from all available" (Prey Wildcard) list. The server sends it as
-	-- PREY_STATE_LIST_SELECTION with no attached bonus; reuse the wildcard-selection UI
-	-- (zeroed bonus) so the monster picker actually opens. Without this handler the 5
-	-- Prey Wildcards were consumed server-side but no selection window ever appeared.
-	return onPreyWildcard(slot, races, timeUntilFreeReroll, wildcards, 0, 0, 0)
 end
 
 function onPreyLocked(slot, unlockState, timeUntilFreeReroll, lockType)

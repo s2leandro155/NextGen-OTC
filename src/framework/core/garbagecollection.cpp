@@ -33,7 +33,6 @@
 #include "framework/graphics/animatedtexture.h"
 #include "framework/graphics/drawpoolmanager.h"
 #include "framework/luaengine/luainterface.h"
-#include "framework/core/configmanager.h"
 #include "framework/core/eventdispatcher.h"
 
 #include <shared_mutex>
@@ -89,7 +88,7 @@ void GarbageCollection::spriteSheets() {
 #endif
     }
 
-    if (loadedBefore > 0 && g_configs.getPublicConfig().debug.memoryLog) {
+    if (loadedBefore > 0) {
         g_logger.info("[gc] sprite sheets: {} loaded, freed {}, {} remain (~{} MB)",
                       loadedBefore, freed, loadedBefore - freed,
                       ((loadedBefore - freed) * 576) / 1024);
@@ -114,9 +113,6 @@ void GarbageCollection::trimHeap() {
 }
 
 void GarbageCollection::logBootStage(const std::string& stage) {
-    if (!g_configs.getPublicConfig().debug.memoryLog)
-        return;
-
     // Memory usage on the login screen (800 MB) is much larger than the sum of what we can
     // name (textures + Lua + sheets = ~170 MB). We measure the growth in stages to point at the culprit.
     // Next to private also the sum of live Images - the difference of the two is NON-pixel memory
@@ -126,9 +122,6 @@ void GarbageCollection::logBootStage(const std::string& stage) {
 }
 
 void GarbageCollection::reportMemory() {
-    if (!g_configs.getPublicConfig().debug.memoryLog)
-        return;
-
     // Measurement instead of estimation: breaks usage down into categories so it's visible which one grows.
     // Sprite sheets measured separately turned out small (~40 MB), so the gigabyte sits elsewhere.
     size_t texturesWithImage = 0;   // textures that still hold a CPU-side copy of the pixels
@@ -314,10 +307,8 @@ void GarbageCollection::pendingImages() {
         _heapmin();
 #endif
 
-        if (g_configs.getPublicConfig().debug.memoryLog) {
-            g_logger.info("[gc] freed pixel copies of {} unused textures (~{} MB)",
-                          freed, bytes / (1024 * 1024));
-        }
+        g_logger.info("[gc] freed pixel copies of {} unused textures (~{} MB)",
+                      freed, bytes / (1024 * 1024));
     });
 }
 

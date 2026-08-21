@@ -236,6 +236,25 @@ local function isFamiliar(creature)
 	return familiarNames[name:lower()] == true
 end
 
+local function refreshVisibleSpectators(position)
+	if not position then
+		return
+	end
+
+	for _, creature in ipairs(g_map.getSpectators(position, false) or {}) do
+		if creature and creature.isMonster and creature:isMonster() and not creature:isDead() and not isFamiliar(creature) then
+			local creatureId = creature:getId()
+
+			if not spectators[creatureId] then
+				spectatorAgeCounter = spectatorAgeCounter + 1
+				spectatorMeta[creatureId] = { age = spectatorAgeCounter }
+			end
+
+			spectators[creatureId] = creature
+		end
+	end
+end
+
 local function isWithinReach(playerPos, targetPos)
 	if not playerPos or not targetPos or playerPos.x == nil or targetPos.x == nil then
 		return false
@@ -1295,6 +1314,7 @@ local function checkAutoTarget()
 	end
 
 	local position = myCharacter:getPosition()
+	refreshVisibleSpectators(position)
 	local minDist, maxDist = readDistanceRange()
 	local allCreatures = allCreaturesEnabled
 
@@ -1304,11 +1324,8 @@ local function checkAutoTarget()
 
 	if not allCreatures and not next(getPriorityRaceOrder()) then
 		currentLockedTargetId = 0
-
-		if g_game.getAttackingCreature() then
-			g_game.cancelAttack()
-		end
-
+		-- An empty auto-target list means there is nothing for the helper to manage.
+		-- Preserve attacks selected manually instead of cancelling them every tick.
 		return
 	end
 

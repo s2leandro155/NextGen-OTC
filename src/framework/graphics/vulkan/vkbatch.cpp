@@ -5,7 +5,6 @@
 #ifdef WIN32
 #include "vkbatch.h"
 
-#include <framework/core/configmanager.h>
 #include <framework/core/logger.h>
 #include <framework/core/resourcemanager.h>
 #include <framework/graphics/image.h>
@@ -1012,9 +1011,9 @@ void VkSpriteBatch::record(VkCommandBuffer cmd, const VkExtent2D& extent, const 
 
     ++m_frameCounter;
 
-    // Diagnostics: the first frame (confirmation the batch started) and then every ~10 seconds -
-    // the periodic part only with [debug] memoryLog, so the console stays clean by default.
-    if (m_frameCounter == 1 || ((m_frameCounter % 600) == 0 && g_configs.getPublicConfig().debug.memoryLog)) {
+    // Diagnostics: the first frame (confirmation the batch started) and then every ~10 seconds,
+    // so the log does not bloat at 60 frames per second.
+    if (m_frameCounter == 1 || (m_frameCounter % 600) == 0) {
         g_logger.info("[vulkan] frame {}: atlas tiles {}, layers {}, atlas VRAM {:.2f} MB, "
                       "occupancy {:.1f}%, tiles in frame {}, draw calls {}",
                       m_frameCounter, m_atlas.getTileCount(), m_atlas.getLayerCount(),
@@ -1090,7 +1089,7 @@ void VkSpriteBatch::recordExternal(VkCommandBuffer cmd, const VkExtent2D& extent
 
     ++m_frameCounter;
 
-    if (m_frameCounter == 1 || ((m_frameCounter % 600) == 0 && g_configs.getPublicConfig().debug.memoryLog)) {
+    if (m_frameCounter == 1 || (m_frameCounter % 600) == 0) {
         g_logger.info("[vulkan] frame {} (game queue): vertices {}, segments {}, draw calls {}, "
                       "atlas tiles {}, layers {}, atlas VRAM {:.2f} MB, occupancy {:.1f}%{}",
                       m_frameCounter, vertexCount, m_segments.size(), m_drawCalls,

@@ -10,7 +10,7 @@ NewMainWindow
   !text: tr('Wheel Of Destiny')
   anchors.horizontalCenter: parent.horizontalCenter
   size: 1000 645
-  @onEscape: modules.game_wheel.hide()
+  @onEscape: hide()
   @onEnter: modules.game_wheel.onWheelOfDestinyApply(true)
 
   Panel
@@ -40,7 +40,6 @@ NewMainWindow
         image-clip: 0 34 322 34
       $checked:
         image-clip: 0 34 322 34
-      @onClick: modules.game_wheel.loadMenu('wheelMenu')
 
     UIButton
       id: gemMenu
@@ -57,7 +56,6 @@ NewMainWindow
         image-clip: 0 34 322 34
       $checked:
         image-clip: 0 34 322 34
-      @onClick: modules.game_wheel.loadMenu('gemMenu')
 
     UIButton
       id: fragmentMenu
@@ -74,7 +72,6 @@ NewMainWindow
         image-clip: 0 34 322 34
       $checked:
         image-clip: 0 34 322 34
-      @onClick: modules.game_wheel.loadMenu('fragmentMenu')
 
   Panel
     id: mainPanel

@@ -37,12 +37,6 @@ public:
     void drawSelf(DrawPoolType drawPane) override;
     void draw(DrawPoolType drawPane);
 
-    // Login fade-in support (client_background): "ready" once the map view has actually
-    // rendered a few frames. Without this the Lua poll could never succeed and every
-    // login silently burned the full 3 s timeout behind the background curtain.
-    bool isReadyToDisplay() const { return m_mapFramesDrawn >= 3; }
-    void resetReadyToDisplay() { m_mapFramesDrawn = 0; }
-
     void movePixels(int x, int y);
     void followCreature(const CreaturePtr& creature);
     void setCameraPosition(const Position& pos);
@@ -134,7 +128,6 @@ private:
     MapViewPtr m_mapView;
     Rect m_mapRect;
     Rect m_mapviewRect;
-    uint16_t m_mapFramesDrawn{ 0 };
 
     float m_aspectRatio;
 

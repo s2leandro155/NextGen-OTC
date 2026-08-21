@@ -1,0 +1,172 @@
+MiscSectionTitle < Label
+  height: 17
+  font: Verdana Bold-11px
+  color: #d8d8d8
+  text-auto-resize: false
+  text-align: left
+
+MiscEntries < Panel
+  height: 27
+  layout:
+    type: verticalBox
+
+MiscEntryRow < Panel
+  height: 20
+
+  UIWidget
+    id: entryIcon
+    size: 16 16
+    image-size: 16 16
+    anchors.left: parent.left
+    anchors.verticalCenter: parent.verticalCenter
+    margin-left: 5
+    phantom: true
+
+  UIItem
+    id: entryItem
+    size: 16 16
+    anchors.left: parent.left
+    anchors.verticalCenter: parent.verticalCenter
+    margin-left: 5
+    virtual: true
+    draggable: false
+    visible: false
+
+  Label
+    id: entryName
+    anchors.left: entryIcon.right
+    anchors.right: entryValue.left
+    anchors.verticalCenter: parent.verticalCenter
+    margin-left: 5
+    margin-right: 3
+    font: verdana-11px-monochrome
+    color: #c0c0c0
+    text-auto-resize: false
+
+  Label
+    id: entryValue
+    width: 55
+    anchors.right: parent.right
+    anchors.verticalCenter: parent.verticalCenter
+    margin-right: 4
+    font: verdana-11px-monochrome
+    color: #c0c0c0
+    text-align: right
+
+MiscSectionSeparator < HorizontalSeparator
+  height: 2
+  margin-top: 1
+  margin-bottom: 2
+
+MiniWindow
+  id: miscAnalyserMiniWindow
+  height: 395
+  &save: true
+  @onSetup: |
+    do
+      for _, id in ipairs({ 'newWindowButton', 'toggleFilterButton', 'contextMenuButton' }) do
+        local w = self:recursiveGetChildById(id)
+        if w then
+          w:setVisible(false)
+          w:setOn(false)
+        end
+      end
+    end
+
+  Label
+    id: miniwindowTitle
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 1
+    margin-left: 5
+    height: 13
+    font: verdana-11px-monochrome
+    !text: tr('Misc Analyser')
+    color: #c0c0c0
+
+  ScrollablePanel
+    id: contentsPanel
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: miniwindowScrollBar.left
+    anchors.bottom: parent.bottom
+    margin-top: 17
+    margin-left: 4
+    margin-right: 1
+    margin-bottom: 5
+    step: 20
+    vertical-scrollbar: miniwindowScrollBar
+    layout:
+      type: verticalBox
+
+    Panel
+      height: 18
+
+      Label
+        anchors.left: parent.left
+        anchors.verticalCenter: parent.verticalCenter
+        font: verdana-11px-monochrome
+        !text: tr('Session:')
+        color: #c0c0c0
+
+      Label
+        id: sessionValue
+        anchors.right: parent.right
+        anchors.verticalCenter: parent.verticalCenter
+        margin-right: 3
+        font: verdana-11px-monochrome
+        text: 00:00h
+        color: #c0c0c0
+
+    MiscSectionTitle
+      !text: tr('Charm')
+      margin-top: 2
+
+    MiscEntries
+      id: charmEntries
+
+    MiscSectionSeparator
+
+    MiscSectionTitle
+      !text: tr('Imbuement')
+
+    MiscEntries
+      id: imbuementEntries
+
+    MiscSectionSeparator
+
+    MiscSectionTitle
+      !text: tr('Item Upgrade')
+
+    MiscEntries
+      id: itemUpgradeEntries
+
+    MiscSectionSeparator
+
+    MiscSectionTitle
+      !text: tr('Awakened Procs')
+
+    MiscEntries
+      id: awakenedProcsEntries
+
+    MiscSectionSeparator
+
+  UIWidget
+    id: miniborder
+    anchors.bottom: parent.bottom
+    anchors.left: parent.left
+    image-source: /images/ui/miniborder-bottom-left
+    size: 14 14
+    margin-left: 3
+    margin-bottom: 3
+
+  ResizeBorder
+    id: bottomResizeBorder
+    anchors.bottom: parent.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    height: 3
+    minimum: 145
+    margin-left: 3
+    margin-right: 3

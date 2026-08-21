@@ -450,6 +450,11 @@ local TABS = {
 		panelId = "configsPanel",
 		buttonId = "configsButton",
 		module = "config"
+	},
+	cavebot = {
+		panelId = "cavebotPanel",
+		buttonId = "cavebotButton",
+		module = "cavebot"
 	}
 }
 local HELPER_STATS_ITEMS = {
@@ -958,6 +963,9 @@ local function setupHelperStatsWindow()
 
 	function helperStatsWindow.onVisibilityChange()
 		syncButton()
+		if modules.game_analysers and modules.game_analysers.onHelperStatsVisibilityChange then
+			modules.game_analysers.onHelperStatsVisibilityChange()
+		end
 	end
 
 	helperStatsWindow:hide()
@@ -2416,6 +2424,7 @@ local function initModules()
 	modulesByTab.conditions = HelperConditions
 	modulesByTab.tools = HelperTools
 	modulesByTab.autoparty = HelperAutoParty
+	modulesByTab.cavebot = HelperCavebot
 	modulesByTab.config = HelperConfigTab
 
 	local ctx = {
@@ -2747,6 +2756,10 @@ function closeHelperStatsWindow()
 	syncButton()
 end
 
+function isHelperStatsWindowOpen()
+	return helperStatsWindow ~= nil and not helperStatsWindow:isDestroyed() and not helperStatsWindow:isHidden()
+end
+
 function toggleHelperStatsWindow()
 	if not helperStatsWindow or helperStatsWindow:isDestroyed() then
 		return
@@ -2900,7 +2913,11 @@ local function validateHelperRuntime()
 			"toolsAutoAmmoSection",
 			"toolsAutoAmmoSlot",
 			"toolsAutoAmmoCheckBox",
-			"toolsAutoAmmoTargetCombo"
+			"toolsAutoAmmoTargetCombo",
+			"toolsAutoSSASection",
+			"toolsAutoSSACheckBox",
+			"toolsAutoMightRingSection",
+			"toolsAutoMightRingCheckBox"
 		}) do
 			if not getWidget(id) then
 				table.insert(warnings, "Helper UI widget missing: " .. id)
@@ -3270,6 +3287,46 @@ function onConfigsAutoSwitchHotkeyPresetChange(_, checked)
 		applyAutoSwitchHotkeyPresetToCheckbox(isAutoSwitchHotkeyPresetEnabled())
 		helperLog("error", "Auto-switch hotkey preset preference was not changed.")
 	end
+end
+
+function cavebotAddCurrentPosition(waypointType)
+	if HelperCavebot then HelperCavebot.addCurrentPosition(waypointType or "Walk") end
+end
+
+function cavebotRemoveSelected()
+	if HelperCavebot then HelperCavebot.removeSelected() end
+end
+
+function cavebotMoveSelected(delta)
+	if HelperCavebot then HelperCavebot.moveSelected(tonumber(delta) or 0) end
+end
+
+function cavebotClear()
+	if HelperCavebot then HelperCavebot.clear() end
+end
+
+function onCavebotEnableChange(checked)
+	if HelperCavebot then HelperCavebot.onEnableChange(checked == true) end
+end
+
+function onCavebotLoopChange(checked)
+	if HelperCavebot then HelperCavebot.onLoopChange(checked == true) end
+end
+
+function cavebotSaveScript()
+	if HelperCavebot then HelperCavebot.saveScript() end
+end
+
+function cavebotLoadScript()
+	if HelperCavebot then HelperCavebot.loadScript() end
+end
+
+function cavebotDeleteScript()
+	if HelperCavebot then HelperCavebot.deleteScript() end
+end
+
+function onCavebotRecordingChange(checked)
+	if HelperCavebot then HelperCavebot.onRecordingChange(checked == true) end
 end
 
 function onEnableTargetChange(self, checked)
@@ -4109,5 +4166,25 @@ function onToolsAutoAmmoTargetChange()
 
 	if HelperTools and HelperTools.onAutoAmmoTargetChange then
 		HelperTools.onAutoAmmoTargetChange()
+	end
+end
+
+function onToolsAutoSSAChange(self, on)
+	if loadingConfig then
+		return
+	end
+
+	if HelperTools and HelperTools.onAutoSSAChange then
+		HelperTools.onAutoSSAChange(self, on)
+	end
+end
+
+function onToolsAutoMightRingChange(self, on)
+	if loadingConfig then
+		return
+	end
+
+	if HelperTools and HelperTools.onAutoMightRingChange then
+		HelperTools.onAutoMightRingChange(self, on)
 	end
 end

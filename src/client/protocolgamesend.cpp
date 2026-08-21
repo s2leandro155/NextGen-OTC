@@ -1465,6 +1465,14 @@ void ProtocolGame::sendMarketBrowse(const uint8_t browseId, const uint16_t brows
     send(msg);
 }
 
+void ProtocolGame::sendResourceBalance(const uint8_t resourceType)
+{
+    const auto& msg = std::make_shared<OutputMessage>();
+    msg->addU8(Proto::ClientSendResourceBalance);
+    msg->addU8(resourceType);
+    send(msg);
+}
+
 void ProtocolGame::sendMarketCreateOffer(const uint8_t type, const uint16_t itemId, const uint8_t itemTier, const uint16_t amount, const uint64_t price, const uint8_t anonymous)
 {
     const auto& msg = std::make_shared<OutputMessage>();
@@ -1477,7 +1485,10 @@ void ProtocolGame::sendMarketCreateOffer(const uint8_t type, const uint16_t item
         }
     }
     msg->addU16(amount);
-    msg->addU64(price);
+    if (g_game.getClientVersion() >= 1281)
+        msg->addU64(price);
+    else
+        msg->addU32(static_cast<uint32_t>(std::min<uint64_t>(price, std::numeric_limits<uint32_t>::max())));
     msg->addU8(anonymous);
     send(msg);
 }
@@ -1518,21 +1529,13 @@ void ProtocolGame::sendPreyAction(const uint8_t slot, const uint8_t actionType, 
 void ProtocolGame::sendPreyRequest()
 {
     const auto& msg = std::make_shared<OutputMessage>();
-    msg->addU8(Proto::ClientResourceBalance);
+    msg->addU8(Proto::ClientPreyRequest);
     send(msg);
 }
 
 void ProtocolGame::sendOpenPortableForge() {
     const auto& msg = std::make_shared<OutputMessage>();
-    msg->addU8(Proto::ClientResourceBalance);
-    send(msg);
-}
-
-void ProtocolGame::sendResourceBalance(uint8_t resourceType)
-{
-    const auto& msg = std::make_shared<OutputMessage>();
-    msg->addU8(Proto::ClientResourceBalance);
-    msg->addU8(resourceType);
+    msg->addU8(Proto::ClientPreyRequest);
     send(msg);
 }
 

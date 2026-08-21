@@ -2,7 +2,7 @@ Module
   name: game_helper
   description: Helper
   author: CrystalOTC
-  scripts: [ helper_healer, helper_heal_friend, helper_target, helper_posture, helper_shooter, helper_tools, helper_conditions, helper_autoparty, helper_config, game_helper ]
+  scripts: [ helper_healer, helper_heal_friend, helper_target, helper_posture, helper_shooter, helper_tools, helper_conditions, helper_autoparty, helper_cavebot, helper_config, game_helper ]
   dependencies:
     - game_actionbar
     - game_cyclopedia

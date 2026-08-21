@@ -29,6 +29,7 @@ function ControllerAnalyser:startEvent()
 	ControllerAnalyser.event250 = cycleEvent(function()
 		if g_game.isOnline() then
 			BossCooldown:checkTicks()
+			MiscAnalyser:checkTicks()
 		end
 	end, 250)
 	ControllerAnalyser.event1000 = cycleEvent(function()

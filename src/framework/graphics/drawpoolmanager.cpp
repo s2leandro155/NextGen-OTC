@@ -49,17 +49,6 @@ void DrawPoolManager::init(const uint16_t spriteSize)
     if (foregroundAtlasSize == 0)
         foregroundAtlasSize = g_graphics.getMaxTextureSize();
 
-    // The CPU-side texture atlases must stay OFF under the Vulkan backend. The VK feeder
-    // snapshots a texture's pixels ONCE (then frees them), while these atlases keep
-    // repacking NEW textures into the same growing image - everything packed after the
-    // snapshot renders as stale pixels of the old snapshot (e.g. cyclopedia satellite
-    // tiles bleeding into UI panels after fast tab switching). The feeder keeps its own
-    // array atlas on the GPU, so CPU-side double-atlasing buys nothing in Vulkan mode.
-    if (g_configs.getPublicConfig().graphics.renderBackend == "vulkan") {
-        mapAtlasSize = -1;
-        foregroundAtlasSize = -1;
-    }
-
     auto atlasMap = mapAtlasSize > 0 ? std::make_shared<TextureAtlas>(Fw::TextureAtlasType::MAP, mapAtlasSize) : nullptr;
     auto atlasForeground = foregroundAtlasSize > 0 ? std::make_shared<TextureAtlas>(Fw::TextureAtlasType::FOREGROUND, foregroundAtlasSize, true) : nullptr;
 

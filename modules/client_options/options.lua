@@ -2324,33 +2324,12 @@ local function commitRenderBackendChange()
 	end
 
 	if g_game.isOnline() then
-		-- while in game we do not kick the player without asking - a restart breaks the server connection.
-		-- NOTE: this corelib's message box does NOT auto-close on button clicks - every
-		-- callback has to destroy the box itself, otherwise the button appears dead.
-		local messageBox
-
-		local function closeBox()
-			if messageBox and not messageBox:isDestroyed() then
-				messageBox:destroy()
-			end
-
-			messageBox = nil
-		end
-
-		messageBox = displayGeneralBox(tr("Restart required"),
+		-- while in game we do not kick the player without asking - a restart breaks the server connection
+		displayGeneralBox(tr("Restart required"),
 			tr("Changing the graphics engine requires a client restart.\nYou are currently logged in - restart now?"), {
-				{
-					text = tr("Restart"),
-					callback = function()
-						closeBox()
-						doRestart()
-					end
-				},
-				{ text = tr("Later"), callback = closeBox }
-			}, function()
-				closeBox()
-				doRestart()
-			end, closeBox)
+				{ text = tr("Restart"), callback = doRestart },
+				{ text = tr("Later"), callback = function() end }
+			}, doRestart, function() end)
 	else
 		scheduleEvent(doRestart, 200)
 	end

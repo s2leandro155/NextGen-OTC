@@ -426,6 +426,21 @@ function Cyclopedia.refreshBestiaryCharmUI()
 		return
 	end
 
+	-- The creature detail used to start with neither slot selected, leaving the
+	-- selector empty and the Assign Charm button disabled. Select the most
+	-- useful slot automatically: an assigned slot first, then an assignable one.
+	if not Cyclopedia.Bestiary.SelectedCharmCategory then
+		if findCharmOnCreature(raceId, BESTIARY_CHARM_SLOT.major) then
+			Cyclopedia.Bestiary.SelectedCharmCategory = BESTIARY_CHARM_SLOT.major
+		elseif findCharmOnCreature(raceId, BESTIARY_CHARM_SLOT.minor) then
+			Cyclopedia.Bestiary.SelectedCharmCategory = BESTIARY_CHARM_SLOT.minor
+		elseif Cyclopedia.isCreatureCharmAssignable(raceId, BESTIARY_CHARM_SLOT.major) then
+			Cyclopedia.Bestiary.SelectedCharmCategory = BESTIARY_CHARM_SLOT.major
+		elseif Cyclopedia.isCreatureCharmAssignable(raceId, BESTIARY_CHARM_SLOT.minor) then
+			Cyclopedia.Bestiary.SelectedCharmCategory = BESTIARY_CHARM_SLOT.minor
+		end
+	end
+
 	setBestiaryCharmSlotDisplay(info.MajorCharm, findCharmOnCreature(raceId, BESTIARY_CHARM_SLOT.major))
 	setBestiaryCharmSlotDisplay(info.MinorCharm, findCharmOnCreature(raceId, BESTIARY_CHARM_SLOT.minor))
 	updateBestiaryCharmControls()
@@ -701,11 +716,9 @@ local function isBestiaryCreatureUnlocked(creature)
 end
 
 local function sendBestiaryOverviewSearch(raceIds)
-	if not g_game.requestBestiaryOverviewSearch then
-		return false
-	end
-
-	g_game.requestBestiaryOverviewSearch(raceIds)
+	-- The overview packet already supports search mode and a list of race ids.
+	-- Use the long-standing binding directly so this works with older binaries too.
+	g_game.requestBestiaryOverview("", true, raceIds)
 
 	return true
 end

@@ -55,8 +55,6 @@ void UIMap::draw(const DrawPoolType drawPane) {
     if (drawPane == DrawPoolType::MAP) {
         g_drawPool.preDraw(drawPane, [this] {
             m_mapView->drawFloor();
-            if (m_mapFramesDrawn < 3)
-                ++m_mapFramesDrawn;
         }, [this] {
             m_mapView->registerEvents();
         }, m_mapView->m_posInfo.rect, m_mapView->m_posInfo.srcRect, Color::black);

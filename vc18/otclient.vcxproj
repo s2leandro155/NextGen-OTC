@@ -335,6 +335,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\src\framework\stdext\msvc_rotate_compat.cpp" />
     <ClCompile Include="..\src\framework\graphics\vulkan\vkatlas.cpp" />
     <ClCompile Include="..\src\framework\graphics\vulkan\vkbatch.cpp" />
     <ClCompile Include="..\src\framework\graphics\vulkan\vkfeeder.cpp" />

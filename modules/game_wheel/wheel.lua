@@ -46,6 +46,21 @@ function ensureWheelWindows()
 
 	wheelWindow = g_ui.displayUI("wheel")
 	mainPanel = wheelWindow:getChildById("mainPanel")
+
+	-- The module is sandboxed, so callbacks declared inside wheel.otui cannot
+	-- resolve this module's loadMenu function through the global environment.
+	-- Bind the tab callbacks here, inside the module environment.
+	local optionsTabBar = wheelWindow:getChildById("optionsTabBar")
+	optionsTabBar:getChildById("wheelMenu").onClick = function()
+		loadMenu("wheelMenu")
+	end
+	optionsTabBar:getChildById("gemMenu").onClick = function()
+		loadMenu("gemMenu")
+	end
+	optionsTabBar:getChildById("fragmentMenu").onClick = function()
+		loadMenu("fragmentMenu")
+	end
+
 	wheelOfDestinyWindow = g_ui.loadUI("styles/wheelMenu", mainPanel)
 
 	wheelOfDestinyWindow:hide()

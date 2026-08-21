@@ -2292,6 +2292,14 @@ function closeSellAllWindow()
 end
 
 function openSellAllWindow()
+	-- This server does not append the optional loot-pouch contents to the
+	-- PlayerGoods packet. In that case there is nothing useful to display in
+	-- this modal, so perform the server-side "sell pouch" action immediately.
+	if next(lootPouchItems) == nil then
+		sendSellAll()
+		return
+	end
+
 	mainNpcModal:hide()
 	npcOutfit:hide()
 	multiNpc:hide()
@@ -2310,42 +2318,42 @@ function openSellAllWindow()
 end
 
 function sendSellAll()
-	local protocolGame = g_game.getProtocolGame()
-
-	if not protocolGame then
+	if not g_game.isOnline() then
 		return
 	end
 
-	local tempSellAllItems = {}
+	-- The server handles selling the loot pouch as a special NPC trade item and
+	-- recursively sells every eligible item inside it.  This client does not
+	-- receive the optional lootPouch list in onPlayerGoods, and the custom
+	-- PARSE_SELL_ALL opcode is not supported by the server, so sending the
+	-- regular shop sell request is the compatible path.
+	local pouch = nil
 
-	for itemId, _ in pairs(lootPouchItems) do
-		if sellAllIgnoredItems[itemId] == nil or sellAllIgnoredItems[itemId] == false then
-			tempSellAllItems[itemId] = lootPouchItems[itemId]
+	if g_game.findPlayerItem then
+		pouch = g_game.findPlayerItem(LOOT_POUCH_ITEM_ID, -1, 0)
+	end
+
+	if not pouch then
+		local player = g_game.getLocalPlayer()
+
+		if player then
+			for slot = InventorySlotFirst or 1, InventorySlotLast or 10 do
+				local inventoryItem = player:getInventoryItem(slot)
+
+				if inventoryItem and inventoryItem:getId() == LOOT_POUCH_ITEM_ID then
+					pouch = inventoryItem
+					break
+				end
+			end
 		end
 	end
 
-	local count = 0
-
-	for itemId, _ in pairs(tempSellAllItems) do
-		count = count + 1
-	end
-
-	if count == 0 then
+	if not pouch then
 		return
 	end
 
-	local msg = OutputMessage.create()
+	g_game.sellItem(pouch, 1, true)
 
-	msg:addByte(ClientOpcodes.ClientOtcOpCodes)
-	msg:addByte(OtcOpCode.PARSE_SELL_ALL)
-	msg:addU16(count)
-
-	for itemId, amount in pairs(tempSellAllItems) do
-		msg:addU16(itemId)
-		msg:addU32(amount)
-	end
-
-	protocolGame:send(msg)
 	addEvent(function()
 		closeSellAllWindow()
 	end, 100)

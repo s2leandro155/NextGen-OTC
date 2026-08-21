@@ -8,11 +8,14 @@ end
 
 openedWindows = {}
 
+local MISC_PROC_OPCODE = 204
+
 local ANALYSER_CHAR_MINIWINDOW_IDS = {
 	lootAnalyserMiniWindow = true,
 	huntingAnalyserMiniWindow = true,
 	analyserMiniWindow = true,
 	bossCdAnalyserMiniWindow = true,
+	miscAnalyserMiniWindow = true,
 	phAnalyserMiniWindow = true,
 	dropTrackerMiniWindow = true,
 	xpAnalyserMiniWindow = true,
@@ -279,6 +282,7 @@ end
 local analyserWindows = {
 	damageButton = "menus/InputAnalyser",
 	bossButton = "menus/BossCooldown",
+	miscButton = "menus/MiscAnalyser",
 	impactButton = "menus/ImpactAnalyser",
 	supplyButton = "menus/SupplyAnalyser",
 	lootButton = "menus/LootAnalyser",
@@ -659,7 +663,17 @@ local function syncAnalyticsSelectorRowButtons()
 		end
 	end
 
+	local helperStatsButton = analyserMiniWindow:recursiveGetChildById("helperStatsButton")
+	if helperStatsButton and helperStatsButton.setOn then
+		local helperOpen = modules.game_helper and modules.game_helper.isHelperStatsWindowOpen and modules.game_helper.isHelperStatsWindowOpen()
+		helperStatsButton:setOn(helperOpen == true)
+	end
+
 	refreshAnalyserMainPanelButtonFromWindows()
+end
+
+function onHelperStatsVisibilityChange()
+	syncAnalyticsSelectorRowButtons()
 end
 
 local function closeAnyVisibleAnalyser(excludedButtonId)
@@ -797,6 +811,16 @@ function init()
 	dropButton = analyserMiniWindow:recursiveGetChildById("dropButton")
 	partyButton = analyserMiniWindow:recursiveGetChildById("partyButton")
 	bossButton = analyserMiniWindow:recursiveGetChildById("bossButton")
+	miscButton = analyserMiniWindow:recursiveGetChildById("miscButton")
+	local helperStatsButton = analyserMiniWindow:recursiveGetChildById("helperStatsButton")
+	if helperStatsButton then
+		function helperStatsButton.onClick()
+			if modules.game_helper and modules.game_helper.toggleHelperStatsWindow then
+				modules.game_helper.toggleHelperStatsWindow()
+			end
+			syncAnalyticsSelectorRowButtons()
+		end
+	end
 
 	for id, style in pairs(analyserWindows) do
 		openedWindows[id] = g_ui.loadUI(style, modules.game_interface.getRightPanel())
@@ -856,6 +880,12 @@ function init()
 	PartyHuntAnalyser:updateWindow(false, true)
 	BossCooldown:create()
 	BossCooldown:updateWindow()
+	MiscAnalyser:create()
+	MiscAnalyser:updateWindow()
+	pcall(function()
+		ProtocolGame.unregisterExtendedOpcode(MISC_PROC_OPCODE)
+	end)
+	ProtocolGame.registerExtendedOpcode(MISC_PROC_OPCODE, onMiscProcTracker)
 	analyserConfigureGraphWidgets()
 	connect(g_game, {
 		onGameStart = onlineAnalyser,
@@ -886,6 +916,10 @@ function init()
 end
 
 function terminate()
+	pcall(function()
+		ProtocolGame.unregisterExtendedOpcode(MISC_PROC_OPCODE)
+	end)
+
 	if ControllerAnalyser then
 		removeEvent(ControllerAnalyser.event250)
 		removeEvent(ControllerAnalyser.event1000)
@@ -984,6 +1018,7 @@ function startNewSession(login)
 	DropTrackerAnalyser:updateWindow(true)
 	PartyHuntAnalyser:reset()
 	PartyHuntAnalyser:updateWindow(true, true)
+	MiscAnalyser:reset()
 	ControllerAnalyser:startEvent()
 end
 
@@ -1006,6 +1041,21 @@ function offlineAnalyser()
 	DropTrackerAnalyser:saveConfigJson()
 	saveGainAndWastConfigJson()
 	BossCooldown:reset()
+	MiscAnalyser:reset()
+end
+
+-- Public entry point used by protocol/custom modules that know the proc source.
+-- category: charm, imbuement, itemUpgrade or awakenedProcs
+function onMiscAnalyserEvent(category, name, amount)
+	if MiscAnalyser then
+		MiscAnalyser:add(category, name, amount)
+	end
+end
+
+function onMiscProcTracker(protocol, opcode, buffer)
+	if MiscAnalyser then
+		MiscAnalyser:onProtocolBuffer(buffer)
+	end
 end
 
 function toggleAnalyserWindow()
@@ -1053,7 +1103,7 @@ function onOpenAnalyser()
 	local isOn = analyserMiniWindow.isOn and analyserMiniWindow:isOn()
 
 	if not isOn then
-		analyserMiniWindow:setHeight(230)
+		analyserMiniWindow:setHeight(276)
 	end
 
 	analyserMiniWindow.isOpen = true

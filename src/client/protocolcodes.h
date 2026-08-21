@@ -375,7 +375,8 @@ namespace Proto
         ClientWheelGemAction = 231, // 0xE7 usado em gemas, desabilitado para ClientRuleViolation = 231
         ClientDebugReport = 232,
         ClientPreyAction = 235,
-        ClientResourceBalance = 237, // 0xED - empty opens the portable forge; with a resource byte it polls that resource's balance
+        ClientPreyRequest = 237,
+        ClientSendResourceBalance = 237,
         ClientTransferCoins = 239,
         ClientRequestQuestLog = 240,
         ClientRequestQuestLine = 241,

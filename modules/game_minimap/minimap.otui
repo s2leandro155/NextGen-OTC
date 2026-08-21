@@ -30,15 +30,15 @@ PhantomMiniWindow
         anchors.fill: parent
         margin: 1
 
-        Button
-          id: downloadMapButton
-          !text: tr('Download Map')
-          anchors.horizontalCenter: parent.horizontalCenter
-          anchors.bottom: parent.bottom
-          margin-bottom: 5
-          width: 80
-          height: 18
-          @onClick: modules.game_minimap.downloadFullMap()
+    Button
+      id: downloadMapButton
+      !text: tr('Download Map')
+      anchors.horizontalCenter: parent.horizontalCenter
+      anchors.bottom: parent.bottom
+      margin-bottom: 5
+      width: 90
+      height: 18
+      @onClick: modules.game_minimap.downloadFullMap()
 
     UIWidget
       id: layersPanel
@@ -352,6 +352,16 @@ PhantomMiniWindow
       $pressed !disabled:
         image-source: /images/automap/automap_buttons
         image-clip: 20 0 20 20
+
+    Button
+      id: downloadMapButtonHorizontal
+      !text: tr('Download Map')
+      anchors.horizontalCenter: minimapBorder.horizontalCenter
+      anchors.bottom: minimapBorder.bottom
+      margin-bottom: 3
+      width: 90
+      height: 20
+      @onClick: modules.game_minimap.downloadFullMap()
 
     UIWidget
       id: minimapControls

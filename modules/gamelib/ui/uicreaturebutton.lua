@@ -162,10 +162,9 @@ function UICreatureButton:updateOutfitPreview(outfit)
 		return
 	end
 
-	-- battle list only: the miniature canvas hugs the creature so it fills the 20 px box
-	if creatureWidget.setAutoFit then
-		creatureWidget:setAutoFit(true)
-	end
+	-- Keep the widget dimensions intact. The old setCreatureSize(0) call
+	-- collapsed this UICreature to 0x0, leaving only the name and health bar.
+	creatureWidget:setAutoFit(true)
 
 	local mountId = tonumber(outfit and outfit.mount) or 0
 	local mounted = mountId > 0
@@ -173,20 +172,6 @@ function UICreatureButton:updateOutfitPreview(outfit)
 	creatureWidget:setCenter(mounted)
 	creatureWidget:setCenterByBoundingBox(mounted)
 
-	if not mounted then
-		creatureWidget:setCreatureSize(0)
-
-		return
-	end
-
-	local spriteSize = tonumber(g_gameConfig.getSpriteSize()) or 32
-	local previewCreature = creatureWidget:getCreature()
-	local outfitSize = previewCreature and tonumber(previewCreature:getExactSize()) or 0
-	local percentageBase = math.max(outfitSize, spriteSize * 2)
-	local visualSize = math.max(percentageBase, getCreatureThingExactSize(mountId))
-	local percentage = math.ceil(visualSize * 100 / percentageBase)
-
-	creatureWidget:setCreatureSize(math.min(255, math.max(100, percentage)))
 end
 
 function UICreatureButton:setup(creature, onlyOutfit)

@@ -2,7 +2,5 @@
 *.lua eol=lf 
 *.txt eol=lf 
 *.ot* eol=lf 
-*.cpp eol=lf
-*.h   eol=lf
-# Batch files must be CRLF to run reliably on every Windows setup
-*.bat eol=crlf
+*.cpp eol=lf 
+*.h   eol=lf 

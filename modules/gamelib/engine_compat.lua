@@ -17,22 +17,6 @@ end
 
 -- ===== g_game: simple replacements =====
 
--- These exist in our engine under different names; map the ported calls to the real
--- bindings instead of stubbing them, so the features work and stop warning [compat].
-install(g_game, "requestStoreOfferDescription", function(offerId)
-	g_game.sendRequestStoreOfferById(offerId)
-end)
-
-install(g_game, "sendMarketAction", function(action, itemId, tier)
-	if action == 3 and itemId then
-		g_game.browseMarket(3, itemId, tier or 0)
-	elseif action == 2 then
-		g_game.browseMarket(2, 0, 0)
-	elseif action == 1 then
-		g_game.browseMarket(1, 0, 0)
-	end
-end)
-
 install(g_game, "isZoomEnabled", function()
 	return true
 end)
@@ -41,31 +25,10 @@ do
 	local hoveredCreature = nil
 
 	install(g_game, "setHoveredCreature", function(creature)
-		if hoveredCreature == creature then
-			return
-		end
-
-		local oldCreature = hoveredCreature
-
 		hoveredCreature = creature
-
-		-- The real engine fires this event from C++; without it listeners like the
-		-- battle list never receive hoveredMark (white border + label on hover).
-		signalcall(g_game.onHoveredCreatureChange, creature, oldCreature)
 	end)
-	install(g_game, "clearHoveredCreature", function(creature)
-		-- optional argument: clear only when this creature is still the hovered one
-		if creature ~= nil and hoveredCreature ~= creature then
-			return
-		end
-
-		local oldCreature = hoveredCreature
-
+	install(g_game, "clearHoveredCreature", function()
 		hoveredCreature = nil
-
-		if oldCreature then
-			signalcall(g_game.onHoveredCreatureChange, nil, oldCreature)
-		end
 	end)
 	install(g_game, "getHoveredCreature", function()
 		return hoveredCreature
@@ -121,17 +84,14 @@ install(g_game, "requestResource", function() end)
 -- ===== g_game: sends with no counterpart in our protocol (no-op + warning) =====
 
 local missingSends = {
-	-- has a real counterpart (opcode 0xED) once the native binding lands; until then
-	-- warn instead of silently swallowing, so the call is never hidden
-	"sendResourceBalance",
 	"processRuleViolation",
 	"changeOutfitPodium",
 	"changeHirelingOutfit",
-	"requestConfigurePodium",
 	"confirmEditPodium",
 	"getBaseInformationForAuctionCharacter",
 	"sendCharacterAuction",
 	"sendChangeHirelingName",
+	"requestStoreOfferDescription",
 	"closeContainerByItemId",
 	"organizeContainer",
 	"useHireling",
@@ -142,6 +102,21 @@ local missingSends = {
 	"requestLockerItem",
 	"retrieveDisplayed"
 }
+
+-- This engine has no client request for resource balances. Crystal sends the
+-- complete balance list through GameServerResourceBalance (0xEE), including
+-- updates after spending/receiving resources. The Task Board calls this only
+-- as an optional refresh, so keep it as a silent no-op instead of flooding the
+-- console every time that window is opened or refreshed.
+install(g_game, "sendResourceBalance", function() end)
+
+-- The ported Market/Stash modules use sendMarketAction, while this engine
+-- exposes the same protocol operation as browseMarket.
+if not g_game.sendMarketAction and g_game.browseMarket then
+	install(g_game, "sendMarketAction", function(action, itemId, tier)
+		g_game.browseMarket(action or 1, itemId or 0, tier or 0)
+	end)
+end
 
 -- Party Hunt Analyser: our engine has these actions under the analyser names and without arguments
 -- (the server toggles the price type itself), so this is a plain rename, not a missing function.
@@ -384,14 +359,6 @@ if UICreature then
 	install(UICreature, "setCenterByBoundingBox", function() end)
 	install(UICreature, "setPodiumPreview", function() end)
 	install(UICreature, "setCreatureSmooth", function() end)
-
-	-- SEMANTICS OVERRIDE (not a missing-method shim): the ported modules treat
-	-- creatureSize as a zoom PERCENT (0 = auto, 100 = normal, up to 255). Our engine
-	-- treats it as a pixel box and setCreatureSize(0) collapses the widget to 0x0 -
-	-- that is why battle list miniatures vanished (every unmounted creature got 0).
-	-- Neutralize it: the creature always fills the widget rect (engine default when
-	-- m_creatureSize stays 0). TODO: implement real percent zoom in UICreature (C++).
-	UICreature.setCreatureSize = function(self, size) end
 end
 
 -- NOTE: setDrawOutfitLayers is called on Creature (previewCreature:getCreature()),
@@ -532,8 +499,11 @@ if Thing then
 end
 
 if LocalPlayer then
-	install(LocalPlayer, "getBlessingsIconColor", function()
-		return "#FFFFFF"
+	install(LocalPlayer, "getBlessingsIconColor", function(self)
+		-- Protocol 0x9C stores the blessing/glow indicator in getBlessings().
+		-- The inventory expects a numeric visual state: 1 grey, 2 gold, 3 green.
+		local blessings = self and self.getBlessings and self:getBlessings() or 0
+		return blessings ~= 0 and 3 or 1
 	end)
 end
 

@@ -81,14 +81,6 @@ local function beginMapTransition()
 	mapTransitionStartedAt = g_clock.realMillis()
 	mapTransitionActive = true
 
-	-- fresh readiness counter for this login (see UIMap::isReadyToDisplay)
-	local gameInterface = modules.game_interface
-	local mapPanel = gameInterface and gameInterface.getMapPanel and gameInterface.getMapPanel()
-
-	if mapPanel and not mapPanel:isDestroyed() and mapPanel.resetReadyToDisplay then
-		mapPanel:resetReadyToDisplay()
-	end
-
 	background:show()
 
 	if modules.client_topmenu then

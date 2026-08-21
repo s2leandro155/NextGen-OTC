@@ -128,16 +128,6 @@ jobs:
             Copy-Item $dll.FullName -Destination $artifactDir
           }
 
-          # Bundle the tracked runtime files so the download is an actual client,
-          # not a bare exe. Only the large game assets (data/things: appearances and
-          # sprites) stay out - they are gitignored and never present in CI.
-          foreach ($item in @("init.lua", "data", "modules", "mods")) {
-            $src = Join-Path $env:GITHUB_WORKSPACE $item
-            if (Test-Path $src) {
-              Copy-Item $src -Destination $artifactDir -Recurse -Force
-            }
-          }
-
       - name: Upload executable artifact
         uses: actions/upload-artifact@v4
         with:
@@ -174,4 +164,4 @@ jobs:
             --title "Latest build ($(date -u +%Y-%m-%d), ${GITHUB_SHA::7})" \
             --notes "Automatic build of the latest \`main\` commit ${GITHUB_SHA::7}.
 
-          Contains a runnable client: the executable plus init.lua, data, modules and mods. Only the large game assets (\`data/things\`: appearances and sprites) are NOT included - add them separately (see the README or the wiki's Game Assets page)."
+          Contains the client executable and required DLLs. Game assets are NOT included - download \`data/things\` separately (see the README or the wiki's Game Assets page)."

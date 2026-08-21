@@ -396,6 +396,8 @@ void Client::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_game", "openTransactionHistory", &Game::openTransactionHistory, &g_game);
     g_lua.bindSingletonFunction("g_game", "leaveMarket", &Game::leaveMarket, &g_game);
     g_lua.bindSingletonFunction("g_game", "browseMarket", &Game::browseMarket, &g_game);
+    g_lua.bindSingletonFunction("g_game", "sendMarketAction", &Game::sendMarketAction, &g_game);
+    g_lua.bindSingletonFunction("g_game", "sendResourceBalance", &Game::sendResourceBalance, &g_game);
     g_lua.bindSingletonFunction("g_game", "createMarketOffer", &Game::createMarketOffer, &g_game);
     g_lua.bindSingletonFunction("g_game", "cancelMarketOffer", &Game::cancelMarketOffer, &g_game);
     g_lua.bindSingletonFunction("g_game", "acceptMarketOffer", &Game::acceptMarketOffer, &g_game);
@@ -442,6 +444,9 @@ void Client::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_game", "inspectPlayer", &Game::inspectPlayer, &g_game);
     g_lua.bindSingletonFunction("g_game", "requestBestiary", &Game::requestBestiary, &g_game);
     g_lua.bindSingletonFunction("g_game", "requestBestiaryOverview", &Game::requestBestiaryOverview, &g_game);
+    // The Cyclopedia search module uses the explicit overview-search name.
+    // Both calls share the same packet; search=true selects the race-id payload.
+    g_lua.bindSingletonFunction("g_game", "requestBestiaryOverviewSearch", &Game::requestBestiaryOverview, &g_game);
     g_lua.bindSingletonFunction("g_game", "requestBestiarySearch", &Game::requestBestiarySearch, &g_game);
     g_lua.bindSingletonFunction("g_game", "BuyCharmRune", &Game::requestSendBuyCharmRune, &g_game);
     g_lua.bindSingletonFunction("g_game", "requestSetCharacterTitle", &Game::requestSetCharacterTitle, &g_game);
@@ -463,7 +468,6 @@ void Client::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_game", "sendStartOfflineTraining", &Game::sendStartOfflineTraining, &g_game);
     g_lua.bindSingletonFunction("g_game", "sendSelectSpellAim", &Game::sendSelectSpellAim, &g_game);
     g_lua.bindSingletonFunction("g_game", "sendTutorialChangeVocation", &Game::sendTutorialChangeVocation, &g_game);
-    g_lua.bindSingletonFunction("g_game", "sendResourceBalance", &Game::sendResourceBalance, &g_game);
 
     g_lua.registerSingletonClass("g_gameConfig");
     g_lua.bindSingletonFunction("g_gameConfig", "loadFonts", &GameConfig::loadFonts, &g_gameConfig);
@@ -852,6 +856,7 @@ void Client::registerLuaFunctions()
     g_lua.bindClassMemberFunction<Item>("setSubType", &Item::setSubType);
     g_lua.bindClassMemberFunction<Item>("setTooltip", &Item::setTooltip);
     g_lua.bindClassMemberFunction<Item>("setTier", &Item::setTier);
+    g_lua.bindClassMemberFunction<Item>("setQuiverAmmoCount", &Item::setQuiverAmmoCount);
 
     g_lua.bindClassMemberFunction<Item>("getCount", &Item::getCount);
     g_lua.bindClassMemberFunction<Item>("getSubType", &Item::getSubType);
@@ -864,6 +869,7 @@ void Client::registerLuaFunctions()
     g_lua.bindClassMemberFunction<Item>("isDecaying", &Item::isDecaying);
     g_lua.bindClassMemberFunction<Item>("getTier", &Item::getTier);
     g_lua.bindClassMemberFunction<Item>("getCharges", &Item::getCharges);
+    g_lua.bindClassMemberFunction<Item>("getQuiverAmmoCount", &Item::getQuiverAmmoCount);
 
     g_lua.bindClassMemberFunction<Item>("isStackable", &Item::isStackable);
     g_lua.bindClassMemberFunction<Item>("isMarketable", &Item::isMarketable);
@@ -1062,6 +1068,7 @@ void Client::registerLuaFunctions()
     g_lua.bindClassMemberFunction<LocalPlayer>("getInventoryCount", &LocalPlayer::getInventoryCount);
     g_lua.bindClassMemberFunction<LocalPlayer>("getVocation", &LocalPlayer::getVocation);
     g_lua.bindClassMemberFunction<LocalPlayer>("getBlessings", &LocalPlayer::getBlessings);
+    g_lua.bindClassMemberFunction<LocalPlayer>("getBlessingsIconColor", &LocalPlayer::getBlessingsIconColor);
     g_lua.bindClassMemberFunction<LocalPlayer>("isPremium", &LocalPlayer::isPremium);
     g_lua.bindClassMemberFunction<LocalPlayer>("isKnown", &LocalPlayer::isKnown);
     g_lua.bindClassMemberFunction<LocalPlayer>("preWalk", &LocalPlayer::preWalk);
@@ -1227,8 +1234,6 @@ void Client::registerLuaFunctions()
     g_lua.registerClass<UIMap, UIWidget>();
     g_lua.bindClassStaticFunction<UIMap>("create", [] { return std::make_shared<UIMap>(); });
     g_lua.bindClassMemberFunction<UIMap>("drawSelf", &UIMap::drawSelf);
-    g_lua.bindClassMemberFunction<UIMap>("isReadyToDisplay", &UIMap::isReadyToDisplay);
-    g_lua.bindClassMemberFunction<UIMap>("resetReadyToDisplay", &UIMap::resetReadyToDisplay);
     g_lua.bindClassMemberFunction<UIMap>("movePixels", &UIMap::movePixels);
     g_lua.bindClassMemberFunction<UIMap>("setZoom", &UIMap::setZoom);
     g_lua.bindClassMemberFunction<UIMap>("setFloatZoom", &UIMap::setFloatZoom);

@@ -89,6 +89,7 @@ public:
     void setDurationTime(uint32_t duration);
     void setDecaying(bool decaying);
     void setCharges(const uint32_t charges) { m_charges = charges; }
+    void setQuiverAmmoCount(const uint32_t count) { m_quiverAmmoCount = count; }
     void setTier(const uint8_t tier) { m_tier = tier; }
 
     int getCountOrSubType() { return m_countOrSubType; }
@@ -98,6 +99,7 @@ public:
     uint32_t getDurationTime() const;
     bool isDecaying() const { return m_decaying; }
     uint32_t getCharges() { return m_charges; }
+    uint32_t getQuiverAmmoCount() const { return m_quiverAmmoCount; }
     uint8_t getTier() { return m_tier; }
 
     bool isValid() { return getThingType() != nullptr; }
@@ -181,6 +183,7 @@ private:
     int64_t m_durationEnd{ 0 };
     bool m_decaying{ false };
     uint32_t m_charges{ 0 };
+    uint32_t m_quiverAmmoCount{ 0 };
     uint8_t m_tier{ 0 };
     uint8_t m_phase{ 0 };
 

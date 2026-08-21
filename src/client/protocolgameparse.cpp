@@ -644,11 +644,7 @@ void ProtocolGame::parseMessage(const InputMessagePtr& msg)
                     parsePlayerInventory(msg);
                     break;
                 case Proto::GameServerMarketEnter:
-                    if (g_game.getClientVersion() >= 1281) {
-                        parseMarketEnter(msg);
-                    } else {
-                        parseMarketEnterOld(msg);
-                    }
+                    parseMarketEnter(msg);
                     break;
                 case Proto::GameServerMarketDetail:
                     parseMarketDetail(msg);
@@ -2424,6 +2420,10 @@ void ProtocolGame::parseCreatureData(const InputMessagePtr& msg)
         case 14: // creature icons
             addCreatureIcon(msg, creatureId);
             break;
+        case 15: // 15.30 creature status flags
+            msg->getU8();
+            msg->getU8();
+            break;
     }
 }
 
@@ -2763,7 +2763,11 @@ void ProtocolGame::parsePlayerSkills(const InputMessagePtr& msg) const
     }
 
     if (g_game.getFeature(Otc::GameConcotions)) {
-        msg->getU8();
+        const uint8_t specializedMagicLevels = msg->getU8();
+        for (uint8_t i = 0; i < specializedMagicLevels; ++i) {
+            msg->getU8();  // element
+            msg->getU16(); // specialized magic level
+        }
     }
 
     if (g_game.getFeature(Otc::GameForgeSkillStats)) {
@@ -3479,15 +3483,11 @@ void ProtocolGame::parseBestiaryOverview(const InputMessagePtr& msg)
 
     for (auto i = 0; i < raceSize; ++i) {
         const uint16_t raceId = msg->getU16();
-        if (g_game.getClientVersion() >= 1530)
-            msg->getU8(); // 15.25 known/unlocked flag (before progress)
         const uint8_t progress = msg->getU8();
         uint8_t occurrence = 0;
         uint16_t creatureAnimusMasteryBonus = 0;
         if (progress > 0) {
             occurrence = msg->getU8();
-            if (g_game.getClientVersion() >= 1530)
-                msg->getU8(); // 15.25 extra trailing byte in the progress block
         }
         if (g_game.getClientVersion() >= 1340) {
             creatureAnimusMasteryBonus = msg->getU16(); // Creature Animous Bonus
@@ -3532,9 +3532,6 @@ void ProtocolGame::parseBestiaryMonsterData(const InputMessagePtr& msg)
     // 15.25: everything past the stars byte is gated on currentLevel != 0
     if (g_game.getClientVersion() < 1530 || data.currentLevel != 0) {
         data.ocorrence = msg->getU8();
-        if (g_game.getClientVersion() >= 1530)
-            msg->getU8(); // 15.25 extra byte after occurrence
-
         const uint8_t lootCount = msg->getU8();
         for (auto i = 0; i < lootCount; ++i) {
             LootItem lootItem;
@@ -3610,7 +3607,8 @@ void ProtocolGame::parseBestiaryCharmsData(const InputMessagePtr& msg)
         charm.removeRuneCost = 0;
         if (g_game.getClientVersion() >= 1410) {
             charm.tier = msg->getU8();
-            charm.unlocked = msg->getU8() == 1;
+            charm.unlocked = charm.tier > 0;
+            charm.asignedStatus = msg->getU8() == 1;
         } else {
             charm.name = msg->getString();
             charm.description = msg->getString();
@@ -3620,10 +3618,7 @@ void ProtocolGame::parseBestiaryCharmsData(const InputMessagePtr& msg)
             charm.tier = charm.unlocked ? 1 : 0;
         }
         if (charm.unlocked) {
-            bool asigned = true;
-            if (g_game.getClientVersion() < 1410) {
-                asigned = static_cast<bool>(msg->getU8());
-            }
+            const bool asigned = g_game.getClientVersion() >= 1410 ? charm.asignedStatus : static_cast<bool>(msg->getU8());
 
             if (asigned) {
                 charm.asignedStatus = true;
@@ -4478,7 +4473,7 @@ ItemPtr ProtocolGame::getItem(const InputMessagePtr& msg, int id)
                     break;
                 case 11: // Quiver Loot
                     msg->getU32(); // loot flags
-                    msg->getU32(); // ammo total
+                    item->setQuiverAmmoCount(msg->getU32()); // ammo total
                     if (g_game.getClientVersion() >= 1332) {
                         msg->getU32(); // obtain flags
                     }
@@ -4497,7 +4492,7 @@ ItemPtr ProtocolGame::getItem(const InputMessagePtr& msg, int id)
             if (g_game.getFeature(Otc::GameThingQuiver)) {
                 const uint8_t hasQuiverAmmoCount = msg->getU8();
                 if (hasQuiverAmmoCount) {
-                    msg->getU32(); // ammo total
+                    item->setQuiverAmmoCount(msg->getU32()); // ammo total
                 }
             }
         }
@@ -5157,10 +5152,8 @@ void ProtocolGame::parseTaskHuntingData(const InputMessagePtr& msg)
 
 void ProtocolGame::parseExperienceTracker(const InputMessagePtr& msg)
 {
-    const int64_t rawExp = msg->get64();
-    const int64_t finalExp = msg->get64();
-
-    g_lua.callGlobalField("g_game", "onUpdateExperience", rawExp, finalExp);
+    msg->get64(); // raw exp
+    msg->get64(); // final exp
 }
 
 void ProtocolGame::parseLootContainers(const InputMessagePtr& msg)
@@ -6876,13 +6869,50 @@ void ProtocolGame::parseMarketEnterOld(const InputMessagePtr& msg)
     const uint8_t vocation = g_game.getClientVersion() < 950 ? msg->getU8() : g_game.getLocalPlayer()->getVocation();
 
     const uint8_t offers = msg->getU8();
-    const uint16_t itemsSent = msg->getU16();
+    uint16_t itemsSent = msg->getU16();
 
+    // Crystal's running 15.30 server sends the legacy header with a zero item
+    // count, followed by a packed list of (itemId:u16, count:u16) entries.
+    // Recover that list from the remaining payload. Market-enter is flushed as
+    // its own network message, therefore the remainder consists only of pairs.
     std::vector<std::map<std::string, uint16_t>> depotItems;
-    for (auto i = 0; i < itemsSent; ++i) {
-        const uint16_t itemId = msg->getU16();
-        const uint16_t count = msg->getU16();
-        depotItems.push_back({ { "itemId", itemId }, { "tier", 0 }, { "count", count } });
+    if (itemsSent == 0 && msg->getUnreadSize() >= 4) {
+        // The running Crystal server omits the entry count. Entries are
+        // itemId:u16, optional tier:u8 for classified items, count:u16.
+        // Validate each item before consuming it so the following opcode stays
+        // available to the main protocol loop.
+        while (msg->getUnreadSize() >= 4) {
+            const int entryPos = msg->getReadPos();
+            const uint16_t itemId = msg->getU16();
+            const auto& thing = g_things.getThingType(itemId, ThingCategoryItem);
+            if (!thing || itemId == 0) {
+                msg->setReadPos(entryPos);
+                break;
+            }
+
+            uint8_t tier = 0;
+            if (thing->getClassification() > 0) {
+                if (msg->getUnreadSize() < 3) {
+                    msg->setReadPos(entryPos);
+                    break;
+                }
+                tier = msg->getU8();
+            }
+
+            const uint16_t count = msg->getU16();
+            if (count == 0) {
+                msg->setReadPos(entryPos);
+                break;
+            }
+            depotItems.push_back({ { "itemId", itemId }, { "tier", tier }, { "count", count } });
+        }
+        g_logger.info(fmt::format("[market] recovered {} typed locker entries from 0xF6 payload", depotItems.size()));
+    } else {
+        for (auto i = 0; i < itemsSent; ++i) {
+            const uint16_t itemId = msg->getU16();
+            const uint16_t count = msg->getU16();
+            depotItems.push_back({ { "itemId", itemId }, { "tier", 0 }, { "count", count } });
+        }
     }
 
     g_lua.callGlobalField("g_game", "onMarketEnter", offers, depotItems, balance, vocation);
@@ -6990,7 +7020,7 @@ void ProtocolGame::parseMarketDetail(const InputMessagePtr& msg)
     const uint16_t itemId = msg->getU16();
 
     const int clientVersion = g_game.getClientVersion();
-    const bool pricesAreU64 = (clientVersion >= 1281);
+    const bool pricesAreU64 = clientVersion >= 1281;
 
     const uint8_t itemTier = readMarketItemTier(msg, itemId, clientVersion);
     auto descriptions = readMarketDescriptions(msg, clientVersion);
@@ -7037,7 +7067,7 @@ MarketOffer ProtocolGame::readMarketOffer(const InputMessagePtr& msg, const uint
     const int clientVersion = g_game.getClientVersion();
     if (var == Otc::OLD_MARKETREQUEST_MY_OFFERS || var == Otc::MARKETREQUEST_OWN_OFFERS || var == Otc::OLD_MARKETREQUEST_MY_HISTORY || var == Otc::MARKETREQUEST_OWN_HISTORY) {
         itemId = msg->getU16();
-        itemTier = readMarketItemTier(msg, itemId, clientVersion);
+		itemTier = readMarketItemTier(msg, itemId, clientVersion);
     } else {
         itemId = var;
     }

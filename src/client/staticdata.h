@@ -562,7 +562,7 @@ struct BestiaryCharmsData
 
     uint32_t points;
     std::vector<CharmData> charms;
-    std::vector<uint16_t> finishedMonsters;
+    std::vector<uint32_t> finishedMonsters;
 };
 
 struct BestiaryOverviewMonsters

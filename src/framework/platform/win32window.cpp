@@ -1078,15 +1078,10 @@ void WIN32Window::setFullscreen(bool fullscreen)
         if (fullscreen) {
             const auto& size = getDisplaySize();
             GetWindowPlacement(m_window, &wpPrev);
-            // Borderless windowed fullscreen: cover the screen with a WS_POPUP but do NOT make the
-            // window top-most. A top-most fullscreen window stays painted above everything, so
-            // Alt+Tab (to Chrome etc.) and even leaving fullscreen appear broken - the game keeps
-            // covering the screen. HWND_TOP brings it forward without pinning it above other apps.
-            // (WS_EX_TOPMOST is an extended style and never belonged in GWL_STYLE in the first place.)
-            SetWindowLong(m_window, GWL_STYLE, (dwStyle & ~WS_OVERLAPPEDWINDOW) | WS_POPUP);
-            SetWindowPos(m_window, HWND_TOP, 0, 0, size.width(), size.height(), SWP_FRAMECHANGED);
+            SetWindowLong(m_window, GWL_STYLE, (dwStyle & ~WS_OVERLAPPEDWINDOW) | WS_POPUP | WS_EX_TOPMOST);
+            SetWindowPos(m_window, HWND_TOPMOST, 0, 0, size.width(), size.height(), SWP_FRAMECHANGED);
         } else {
-            SetWindowLong(m_window, GWL_STYLE, (dwStyle & ~WS_POPUP) | WS_OVERLAPPEDWINDOW);
+            SetWindowLong(m_window, GWL_STYLE, (dwStyle & ~(WS_POPUP | WS_EX_TOPMOST)) | WS_OVERLAPPEDWINDOW);
             SetWindowPlacement(m_window, &wpPrev);
             SetWindowPos(m_window, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_FRAMECHANGED);
         }

@@ -715,7 +715,22 @@ local function formatCharmsData(charmsData)
 end
 
 function Cyclopedia.applyCharmsData(charmsData)
-	Cyclopedia.Charms.SelectableCreatures = charmsData.selectableCreatures or {}
+	local selectableCreatures = charmsData.selectableCreatures or {}
+
+	-- This engine exposes the server's finished-monster race ids directly.
+	-- The ported UI expects richer selectable-creature records instead.
+	if #selectableCreatures == 0 then
+		for _, raceId in ipairs(charmsData.finishedMonsters or {}) do
+			table.insert(selectableCreatures, {
+				raceId = raceId,
+				showInMajorListState = true,
+				showInMinorListState = true,
+				monsterMinorState = 1
+			})
+		end
+	end
+
+	Cyclopedia.Charms.SelectableCreatures = selectableCreatures
 	Cyclopedia.Charms.resetAllCharmsCost = tonumber(charmsData.resetAllCharmsCost) or 0
 	Cyclopedia.Charms.List = formatCharmsData(charmsData)
 	Cyclopedia.Charms.points = charmsData.points

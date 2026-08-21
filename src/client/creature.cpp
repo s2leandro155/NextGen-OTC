@@ -145,11 +145,6 @@ void Creature::draw(const Rect& destRect, const uint8_t size, const bool center,
         ? getExactSize(0, 0, 0)
         : std::max<int>(getRealSize(), getExactSize());
     const int tileCount = 2;
-
-    // autoFit (opt-in, battle list miniatures): size the preview framebuffer to the
-    // creature itself instead of the fixed 2x2-tile canvas, so a 32 px monster fills
-    // a ~20 px widget instead of occupying a quarter of a 64 px canvas. Everything
-    // else (character list, outfit window, cyclopedia) keeps the legacy canvas.
     const int fbSize = autoFit ? std::max<int>(nativeSize, baseSprite) : tileCount * baseSprite;
 
     g_drawPool.bindFrameBuffer(fbSize); {
@@ -1233,12 +1228,6 @@ const Light& Creature::getLight() const
 }
 
 ThingType* Creature::getThingType() const {
-    // Half-initialized preview creatures (empty outfit rejected by setOutfit) keep the
-    // default invalid category; asking the manager would just spam "invalid thing type
-    // client id 0 in category 4" on every query (canDraw, getExactSize, ...).
-    if (m_outfit.getCategory() >= ThingLastCategory)
-        return nullptr;
-
     return g_things.getRawThingType(m_outfit.isCreature() ? m_outfit.getId() : m_outfit.getAuxId(), m_outfit.getCategory());
 }
 

@@ -8,7 +8,7 @@ Services = {
     --websites = "http://localhost/?subtopic=accountmanagement", --./client_entergame "Forgot password and/or email"
     --createAccount = "http://localhost/clientcreateaccount.php", --./client_entergame -- createAccount.lua
     --getCoinsUrl = "http://localhost/?subtopic=shop&step=terms", --./game_market
-    --minimap = "http://localhost/minimap.otmm", --./game_minimap
+    minimap = "http://127.0.0.1/minimap.otmm", --./game_minimap
 }
 
 --- Enables or disables the entire server configuration block.
@@ -53,7 +53,7 @@ if ENABLE_SERVERS then
     -- release endpoint. Release (no flag) = the production login below.
     if g_resources.fileExists("/devserver.flag") then
         Servers_init = {
-            ["http://127.0.0.1/summer/login.php"] = {
+            ["http://127.0.0.1/login.php"] = {
                 port = 80,
                 protocol = 1530,
                 httpLogin = true,
@@ -62,7 +62,7 @@ if ENABLE_SERVERS then
         }
     else
         Servers_init = {
-            ["http://127.0.0.1/summer/login.php"] = {
+            ["http://127.0.0.1/login.php"] = {
                 port = 80,
                 protocol = 1530,
                 httpLogin = true,

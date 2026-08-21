@@ -44,18 +44,10 @@ struct FontConfig
     std::string itemCount;
 };
 
-struct DebugConfig
-{
-    // Periodic memory/renderer diagnostics ([gc], [mem], [boot], [vulkan] frame stats).
-    // Off by default - enable in config.ini ([debug] memoryLog = 1) when hunting RAM issues.
-    bool memoryLog = false;
-};
-
 struct PublicConfig
 {
     GraphicsConfig graphics;
     FontConfig font;
-    DebugConfig debug;
 };
 
 // @bindsingleton g_configs

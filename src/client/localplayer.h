@@ -92,6 +92,7 @@ public:
     uint16_t getSkillLevelPercent(const Otc::Skill skill) { return m_skills[skill].levelPercent; }
     uint16_t getStamina() { return m_stamina; }
     uint16_t getBlessings() { return m_blessings; }
+    uint8_t getBlessingsIconColor() const { return m_blessVisualState; }
     uint16_t getRegenerationTime() { return m_regenerationTime; }
     uint16_t getOfflineTrainingTime() { return m_offlineTrainingTime; }
     uint16_t getStoreExpBoostTime() { return m_storeExpBoostTime; }

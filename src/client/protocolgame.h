@@ -131,10 +131,10 @@ public:
     void sendOpenTransactionHistory(uint8_t entriesPerPage);
     void sendMarketLeave();
     void sendMarketBrowse(uint8_t browseId, uint16_t browseType, uint8_t tier = 0);
+    void sendResourceBalance(uint8_t resourceType);
     void sendMarketCreateOffer(uint8_t type, uint16_t itemId, uint8_t itemTier, uint16_t amount, uint64_t price, uint8_t anonymous);
     void sendMarketCancelOffer(uint32_t timestamp, uint16_t counter);
     void sendMarketAcceptOffer(uint32_t timestamp, uint16_t counter, uint16_t amount);
-    void sendResourceBalance(uint8_t resourceType);
     void sendPreyAction(uint8_t slot, uint8_t actionType, uint16_t index);
     void sendPreyRequest();
     void sendOpenPortableForge();

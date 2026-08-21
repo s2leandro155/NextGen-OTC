@@ -1,4 +1,4 @@
--- chunkname: @/game_minimap/minimap.lua
+﻿-- chunkname: @/game_minimap/minimap.lua
 
 local minimapWidget, oldPos, fullscreenWidget
 local virtualFloor = 7
@@ -886,11 +886,13 @@ function mapController:onInit()
 		mini:getChildById("zoomInButton"):hide()
 		mini:getChildById("zoomOutButton"):hide()
 		mini:getChildById("resetButton"):hide()
-		
-		if not Services or not Services.minimap or Services.minimap == "" then
-			local dlBtn = mini:getChildById("downloadMapButton")
-			if dlBtn then
-				dlBtn:hide()
+	end
+
+	if not Services or not Services.minimap or Services.minimap == "" then
+		for _, id in ipairs({ "downloadMapButton", "downloadMapButtonHorizontal" }) do
+			local downloadButton = self.ui:recursiveGetChildById(id)
+			if downloadButton then
+				downloadButton:hide()
 			end
 		end
 	end
@@ -1101,23 +1103,28 @@ function getMiniMapUi()
 end
 
 function downloadFullMap()
-	local url = Services.minimap
+	local url = Services and Services.minimap
 	if not url or url == "" then
 		g_logger.error("[game_minimap] Services.minimap URL is not configured.")
 		return
 	end
 
 	local minimap = getMiniMapUi()
-	local button = minimap and minimap:getChildById("downloadMapButton") or nil
-	if button then
+	local button
+	if mapController.ui then
+		local horizontal = mapController.ui:recursiveGetChildById("downloadMapButtonHorizontal")
+		local default = mapController.ui:recursiveGetChildById("downloadMapButton")
+		button = horizontal and horizontal:isVisible() and horizontal or default
+	end
+	if button and not button:isDestroyed() then
 		button:setEnabled(false)
-		button:setText(tr('Downloading...'))
+		button:setText(tr("Downloading..."))
 	end
 
 	HTTP.download(url, "minimap.otmm", function(path, checksum, err)
 		if button and not button:isDestroyed() then
 			button:setEnabled(true)
-			button:setText(tr('Download Map'))
+			button:setText(tr("Download Map"))
 		end
 
 		if err then
@@ -1127,31 +1134,39 @@ function downloadFullMap()
 			end
 			return
 		end
-		
-		g_logger.info("[game_minimap] Full map downloaded successfully!")
-		if modules.game_textmessage then
-			modules.game_textmessage.displayGameMessage(tr("Map downloaded successfully. Reloading..."))
-		end
-		
-		if minimap then
-			-- Read the downloaded map from the virtual /downloads/ memory array
-			local content = g_resources.readFileContents("/downloads/" .. path)
-			if content and #content > 0 then
-				-- Save it directly to the local disk as user progress
-				g_resources.writeFileContents("/user_minimap.otmm", content)
-				
-				-- Force a full UI redraw
-				g_minimap.clean()
-				persistentMinimapDataLoaded = false
-				loadPersistentMinimapData()
-				
-				local player = g_game.getLocalPlayer()
-				if player then
-					minimap:setCameraPosition(player:getPosition())
-				end
-			else
-				g_logger.error("[game_minimap] Failed to read downloaded OTMM map from memory!")
+
+		local content = g_resources.readFileContents("/downloads/" .. path)
+		if not content or #content == 0 then
+			g_logger.error("[game_minimap] Downloaded map is empty or unavailable.")
+			if modules.game_textmessage then
+				modules.game_textmessage.displayFailureMessage(tr("Failed to load the downloaded map."))
 			end
+			return
+		end
+
+		-- Some HTTP servers return an HTML error page without surfacing an error to
+		-- g_http.download. Never replace the user's minimap unless the OTMM magic is valid.
+		if #content < 12 or content:sub(1, 4) ~= "OTMM" then
+			g_logger.error("[game_minimap] Downloaded file is not a valid OTMM map.")
+			if modules.game_textmessage then
+				modules.game_textmessage.displayFailureMessage(tr("The downloaded file is not a valid map."))
+			end
+			return
+		end
+
+		g_resources.writeFileContents(USER_MINIMAP_OTMM_PATH, content)
+		g_minimap.clean()
+		persistentMinimapDataLoaded = false
+		loadPersistentMinimapData()
+
+		local player = g_game.getLocalPlayer()
+		if minimap and not minimap:isDestroyed() and player then
+			minimap:setCameraPosition(player:getPosition())
+		end
+
+		g_logger.info("[game_minimap] Full map downloaded and reloaded successfully.")
+		if modules.game_textmessage then
+			modules.game_textmessage.displayGameMessage(tr("Map downloaded successfully."))
 		end
 	end)
 end

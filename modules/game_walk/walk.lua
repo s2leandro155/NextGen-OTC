@@ -916,30 +916,10 @@ local WASD_MOVEMENT_KEYS = {
 	Z = SouthWest
 }
 
--- Numpad digits (Num Lock ON) walk only while chat is OFF; the console binds/unbinds
--- them together with WASD via getWasdMovementKeyDirs, so they stay typeable in chat.
-local NUMPAD_MOVEMENT_KEYS = {
-	["Num+8"] = North,
-	["Num+9"] = NorthEast,
-	["Num+6"] = East,
-	["Num+3"] = SouthEast,
-	["Num+2"] = South,
-	["Num+1"] = SouthWest,
-	["Num+4"] = West,
-	["Num+7"] = NorthWest
-}
-
 function getWasdMovementKeyDirs()
 	local list = {}
 
 	for key, dir in pairs(WASD_MOVEMENT_KEYS) do
-		table.insert(list, {
-			key,
-			dir
-		})
-	end
-
-	for key, dir in pairs(NUMPAD_MOVEMENT_KEYS) do
 		table.insert(list, {
 			key,
 			dir

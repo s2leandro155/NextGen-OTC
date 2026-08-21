@@ -351,26 +351,46 @@ function onUnjustifiedPointsChange(unjustifiedPoints)
 		return
 	end
 
-	-- The protocol already carries the fill as a PERCENT computed by the server
-	-- (killsDay/killsWeek/killsMonth = progress %, per its own kill limits). The old
-	-- code reconstructed kill counts from the "remaining" fields against hardcoded
-	-- official-Tibia maxima (7/49/210), so on servers with smaller limits (ours:
-	-- 3/5/10) the bars showed phantom progress with zero kills.
-	local progressDay = math.min(unjustifiedPoints.killsDay or 0, 100)
-	local progressWeek = math.min(unjustifiedPoints.killsWeek or 0, 100)
-	local progressMonth = math.min(unjustifiedPoints.killsMonth or 0, 100)
-	local remDay = unjustifiedPoints.killsDayRemaining or 0
-	local remWeek = unjustifiedPoints.killsWeekRemaining or 0
-	local remMonth = unjustifiedPoints.killsMonthRemaining or 0
+	local localPlayer = g_game.getLocalPlayer()
+	local hasRedBlackSkull = false
+
+	if localPlayer then
+		local sk = localPlayer:getSkull()
+
+		hasRedBlackSkull = sk == SkullRed or sk == SkullBlack
+	end
+
+	local maxDayKills = hasRedBlackSkull and 14 or 7
+	local maxWeekKills = hasRedBlackSkull and 98 or 49
+	local maxMonthKills = hasRedBlackSkull and 420 or 210
+	local remDay = unjustifiedPoints.killsDayRemaining
+	local remWeek = unjustifiedPoints.killsWeekRemaining
+	local remMonth = unjustifiedPoints.killsMonthRemaining
+
+	if remDay == nil then
+		remDay = maxDayKills
+	end
+
+	if remWeek == nil then
+		remWeek = maxWeekKills
+	end
+
+	if remMonth == nil then
+		remMonth = maxMonthKills
+	end
+
+	local actualDayKills = math.max(0, maxDayKills - remDay)
+	local actualWeekKills = math.max(0, maxWeekKills - remWeek)
+	local actualMonthKills = math.max(0, maxMonthKills - remMonth)
 	local dayTooltip = string.format("Unjustified points gained during the last 24 hours.\n%i kill%s left.", remDay, remDay == 1 and "" or "s")
 
-	setProgressBarImage(dayProgressBar, dayProgressBarBackground, progressDay, 100, dayTooltip, "day")
+	setProgressBarImage(dayProgressBar, dayProgressBarBackground, actualDayKills, maxDayKills, dayTooltip, "day")
 
 	local weekTooltip = string.format("Unjustified points gained during the last 7 days.\n%i kill%s left.", remWeek, remWeek == 1 and "" or "s")
 
-	setProgressBarImage(weekProgressBar, weekProgressBarBackground, progressWeek, 100, weekTooltip, "week")
+	setProgressBarImage(weekProgressBar, weekProgressBarBackground, actualWeekKills, maxWeekKills, weekTooltip, "week")
 
 	local monthTooltip = string.format("Unjustified points gained during the last 30 days.\n%i kill%s left.", remMonth, remMonth == 1 and "" or "s")
 
-	setProgressBarImage(monthProgressBar, monthProgressBarBackground, progressMonth, 100, monthTooltip, "month")
+	setProgressBarImage(monthProgressBar, monthProgressBarBackground, actualMonthKills, maxMonthKills, monthTooltip, "month")
 end

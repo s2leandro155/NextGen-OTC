@@ -2571,6 +2571,11 @@ function terminate()
 end
 
 function onOpenPlayerOutfitWindow(player, outfitList, creatureMount, mountList, familiarList)
+	if modules.game_customisepodium and modules.game_customisepodium.consumePendingOutfitWindow and
+		modules.game_customisepodium.consumePendingOutfitWindow(player, outfitList, creatureMount, mountList) then
+		return
+	end
+
 	hirelingContext = nil
 	memoryScenarioSelectionSequence = 0
 

@@ -409,7 +409,7 @@ Panel
         tooltip: Information
         tooltip-delayed: true
         @onHoverChange: modules.game_wheel.onPresetTabButtonHoverChange(self, hovered)
-        @onClick: modules.game_wheel.toggleTabBarButtons('informationButton')
+        @onClick: toggleTabBarButtons('informationButton')
 
       UIButton
         id: managePresetsButton
@@ -420,7 +420,7 @@ Panel
         tooltip: Manage Presets
         tooltip-delayed: true
         @onHoverChange: modules.game_wheel.onPresetTabButtonHoverChange(self, hovered)
-        @onClick: modules.game_wheel.toggleTabBarButtons('managePresetsButton')
+        @onClick: toggleTabBarButtons('managePresetsButton')
 
     Panel
       id: tabContent
@@ -689,7 +689,7 @@ Panel
         image-clip: 0 0 14 14
       $hover:
         image-clip: 0 14 14 14
-      @onClick: modules.game_wheel.toggleSummary()
+      @onClick: toggleSummary()
     Label
       anchors.horizontalCenter: parent.horizontalCenter
       anchors.top: parent.top
@@ -745,7 +745,7 @@ Panel
         image-clip: 0 14 14 14
       $hover:
         image-clip: 0 0 14 14
-      @onClick: modules.game_wheel.toggleSummary()
+      @onClick: toggleSummary()
     Label
       anchors.horizontalCenter: parent.horizontalCenter
       anchors.top: parent.top

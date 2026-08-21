@@ -12,6 +12,20 @@ UIWidget
     height: 22
 
     OptionCheckBoxMarked
+      id: freeWindowPlacement
+      margin-top: -1
+      text-offset: 16 0
+      !text: tr('Free Window Placement')
+      !tooltip: tr('When enabled, mini-windows (minimap, containers, trackers...)\ncan be dragged anywhere over the game area, not only into the\nside dock panels. Drag one back onto a dock to re-dock it.')
+
+  OnePixelDownFrame
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.top: prev.bottom
+    margin-top: 5
+    height: 22
+
+    OptionCheckBoxMarked
       id: showTextualEffects
       margin-top: -1
       text-offset: 16 0

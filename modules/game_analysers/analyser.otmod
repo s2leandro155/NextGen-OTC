@@ -3,6 +3,6 @@ Module
   description: Analytics Selector
   author: CrystalOTC
   sandboxed: false
-  scripts: [ analyser, menus/AnalyserSession, menus/Controller, menus/HuntingAnalyser, menus/LootAnalyser, menus/SupplyAnalyser, menus/ImpactAnalyser, menus/InputAnalyser, menus/XPAnalyser, menus/DropTrackerAnalyser, menus/PartyHuntAnalyser, menus/BossCooldown ]
+  scripts: [ analyser, menus/AnalyserSession, menus/Controller, menus/HuntingAnalyser, menus/LootAnalyser, menus/SupplyAnalyser, menus/ImpactAnalyser, menus/InputAnalyser, menus/XPAnalyser, menus/DropTrackerAnalyser, menus/PartyHuntAnalyser, menus/BossCooldown, menus/MiscAnalyser ]
   @onLoad: init()
   @onUnload: terminate()
