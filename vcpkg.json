@@ -56,5 +56,11 @@
       "platform": "windows"
     }
   ],
+  "overrides": [
+    {
+      "name": "bshoshany-thread-pool",
+      "version": "4.1.0"
+    }
+  ],
   "builtin-baseline": "127402f1c75bb3d5ff6bce04b285faa4930a5aca"
 }
