@@ -107,21 +107,48 @@ jobs:
       - name: Get latest CMake and Ninja
         uses: lukka/get-cmake@v3.31.6
 
+      - name: Set up MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+
       - name: Configure and Build
-        uses: lukka/run-cmake@main
-        with:
-          configurePreset: windows-release
-          buildPreset: windows-release
+        id: compile
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          $log = "$env:GITHUB_WORKSPACE\windows-build.log"
+          cmake --preset windows-release *>&1 | Tee-Object -FilePath $log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cmake --build --preset windows-release *>&1 | Tee-Object -FilePath $log -Append
+          exit $LASTEXITCODE
 
       - name: Upload build diagnostics
-        if: ${{ failure() }}
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           name: CrystalOTC-windows-build-log
           path: |
+            ${{ github.workspace }}/windows-build.log
             ${{ github.workspace }}/build/windows-release/vcpkg-manifest-install.log
             ${{ github.workspace }}/vcpkg/buildtrees/**/*.log
           if-no-files-found: ignore
+
+      - name: Report build failure
+        if: ${{ steps.compile.outcome == 'failure' }}
+        shell: pwsh
+        run: |
+          $log = "$env:GITHUB_WORKSPACE\windows-build.log"
+          if (Test-Path $log) {
+            $lines = @(Get-Content $log -Tail 120)
+            for ($offset = 0; $offset -lt $lines.Count; $offset += 30) {
+              $end = [Math]::Min($offset + 29, $lines.Count - 1)
+              $text = ($lines[$offset..$end] -join "`n")
+              $text = $text.Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
+              $part = [int]($offset / 30) + 1
+              Write-Output "::error title=Windows build log part $part::$text"
+            }
+          }
+          Write-Error "Windows build failed. See the annotations or download CrystalOTC-windows-build-log."
+          exit 1
 
       - name: Prepare artifact folder
         shell: pwsh
