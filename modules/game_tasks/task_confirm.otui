@@ -1,0 +1,131 @@
+MainWindow
+  id: tasksConfirmWindow
+  !text: 'Confirmação de compra'
+  size: 400 170
+
+  UIWidget
+    id: header
+    text-align: left
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.top: parent.top
+    margin-right: 10
+    height: 20
+    text-wrap: true
+    text-vertical-auto-resize: true
+    color: #C0C0C0FF
+
+  UIWidget
+    id: showOffBackground
+    anchors.left: parent.left
+    anchors.top: parent.top
+    image-source: /images/ui/textedit
+    image-border: 2
+    size: 80 80
+
+  UIItem
+    id: item
+    size: 64 64
+    anchors.centerIn: showOffBackground
+    item-count: 100
+    visible: false
+    phantom: true
+    virtual: true
+
+  UICreature
+    id: creature
+    anchors.centerIn: showOffBackground
+    visible: false
+    idleanimate: true
+    animate: true
+    virtual: true
+    phantom: true
+    size: 64 64
+
+  UIWidget
+    id: descriptionbackground
+    anchors.left: showOffBackground.right
+    anchors.top: showOffBackground.top
+    anchors.bottom: showOffBackground.bottom
+    anchors.right: parent.right
+    margin-left: 10
+    image-source: /images/ui/textedit
+    image-border: 2
+
+  UIWidget
+    id: name
+    anchors.left: descriptionbackground.left
+    anchors.bottom: descriptionbackground.verticalCenter
+    color: #C0C0C0FF
+    margin-bottom: 2
+    margin-left: 10
+    !text: '100x Great Health Potion'
+
+  UIWidget
+    id: priceLabel
+    anchors.left: name.left
+    anchors.top: descriptionbackground.verticalCenter
+    color: #C0C0C0FF
+    margin-top: 2
+    !text: 'Preço:'
+
+  UIWidget
+    id: price
+    anchors.left: priceLabel.right
+    anchors.top: descriptionbackground.verticalCenter
+    color: #C0C0C0FF
+    margin-top: 2
+    margin-left: 5
+    !text: ''
+
+  UIWidget
+    id: icon
+    size: 12 12
+    anchors.left: price.right
+    anchors.verticalCenter: price.verticalCenter
+    margin-left: 5
+    image-source: /resources/icons_currency
+    image-clip: 168 0 12 12
+
+  HorizontalSeparator
+    id: separator
+    anchors.left: parent.left
+    anchors.top: showOffBackground.bottom
+    anchors.right: parent.right
+    margin-top: 10
+
+  Button
+    id: cancel
+    anchors.right: parent.right
+    anchors.top: separator.bottom
+    font: cipsoftFont
+    color: white
+    width: 65
+    margin-top: 10
+    !text: 'Cancelar'
+
+  Button
+    id: buy
+    anchors.right: cancel.left
+    anchors.top: cancel.top
+    image-source: /images/store/button_blue
+    image-clip: 0 0 98 40
+    text-offset: 0 0
+    font: cipsoftFont
+    color: white
+    width: 65
+    margin-right: 5
+    !text: 'Confirmar'
+
+    $pressed !disabled:
+      text-offset: 1 1
+      image-clip: 98 0 98 40
+
+    $disabled:
+      text-offset: 1 1
+      image-source: /images/ui/button
+      image-clip: 0 0 22 23
+      color: #6F6D6AFF
+
+    $hover !disabled:
+      image-clip: 0 0 98 40

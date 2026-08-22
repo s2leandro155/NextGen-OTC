@@ -37,7 +37,7 @@ local doNotShowWarningLargeAmounts = true
 local npcTradeSelectedEntry, npcTradeLookThing
 local npcTradeCurrentUnitPrice = 0
 local npcTradeQuantity = 0
-local sellAllModal, sellAllButton
+local sellAllModal, sellAllButton, sellAllPendingEvent
 
 lootPouchItems = {}
 sellAllIgnoredItems = {}
@@ -1677,6 +1677,11 @@ function init()
 end
 
 function terminate()
+	if sellAllPendingEvent then
+		sellAllPendingEvent:cancel()
+		sellAllPendingEvent = nil
+	end
+
 	saveSellAllIgnoreList()
 	disconnect(g_game, {
 		onGameStart = npcModalOnSellAllGameStart,
@@ -2031,27 +2036,30 @@ function onPlayerGoods(money, items, lootPouch)
 	lootPouch = lootPouch or {}
 
 	for _, data in pairs(items) do
-		local id = data[1]
+		local ptr = data[1]
+		local id = ptr and ptr.getId and ptr:getId() or tonumber(ptr)
 		local amount = data[2]
 
-		if not playerItems[id] then
-			playerItems[id] = amount
-		else
-			playerItems[id] = playerItems[id] + amount
+		if id and amount then
+			playerItems[id] = (playerItems[id] or 0) + amount
 		end
 	end
 
 	lootPouchItems = {}
 
 	for _, data in pairs(lootPouch) do
-		local id = data[1]
+		local ptr = data[1]
+		local id = ptr and ptr.getId and ptr:getId() or tonumber(ptr)
 		local amount = data[2]
 
-		if not lootPouchItems[id] then
-			lootPouchItems[id] = amount
-		else
-			lootPouchItems[id] = lootPouchItems[id] + amount
+		if id and amount then
+			lootPouchItems[id] = (lootPouchItems[id] or 0) + amount
 		end
+	end
+
+	if npcModalTrade then
+		refreshNpcTradeItemList()
+		revalidateNpcTradeQuantity()
 	end
 
 	refreshSellAllButtonVisibility()
@@ -2292,29 +2300,8 @@ function closeSellAllWindow()
 end
 
 function openSellAllWindow()
-	-- This server does not append the optional loot-pouch contents to the
-	-- PlayerGoods packet. In that case there is nothing useful to display in
-	-- this modal, so perform the server-side "sell pouch" action immediately.
-	if next(lootPouchItems) == nil then
-		sendSellAll()
-		return
-	end
-
-	mainNpcModal:hide()
-	npcOutfit:hide()
-	multiNpc:hide()
-	npcNameLabel:hide()
-	hideTradeWindowChildrens()
-	loadSellAllIgnoreList()
-	refreshSellAllModalLists()
-	sellAllModal:show()
-	sellAllModal:raise()
-	sellAllModal:focus()
-
-	local goldBalancePanel = sellAllModal:getChildById("goldBalancePanel")
-	local goldBalanceValue = goldBalancePanel:getChildById("value")
-
-	goldBalanceValue:setText(formatNumberWithCommas(getPlayerMoney()))
+	-- One click sells the complete loot pouch through the NPC's special offer.
+	sendSellAll()
 end
 
 function sendSellAll()
@@ -2322,18 +2309,23 @@ function sendSellAll()
 		return
 	end
 
-	-- The server handles selling the loot pouch as a special NPC trade item and
-	-- recursively sells every eligible item inside it.  This client does not
-	-- receive the optional lootPouch list in onPlayerGoods, and the custom
-	-- PARSE_SELL_ALL opcode is not supported by the server, so sending the
-	-- regular shop sell request is the compatible path.
-	local pouch = nil
-
-	if g_game.findPlayerItem then
-		pouch = g_game.findPlayerItem(LOOT_POUCH_ITEM_ID, -1, 0)
+	if sellAllPendingEvent then
+		return
 	end
 
-	if not pouch then
+	local pouchOffer = nil
+	for _, entry in ipairs(SellNpcTradeItems or {}) do
+		if entry.item and entry.item:getId() == LOOT_POUCH_ITEM_ID then
+			pouchOffer = entry.item
+			break
+		end
+	end
+
+	if not pouchOffer and g_game.findPlayerItem then
+		pouchOffer = g_game.findPlayerItem(LOOT_POUCH_ITEM_ID, -1, 0)
+	end
+
+	if not pouchOffer then
 		local player = g_game.getLocalPlayer()
 
 		if player then
@@ -2341,20 +2333,31 @@ function sendSellAll()
 				local inventoryItem = player:getInventoryItem(slot)
 
 				if inventoryItem and inventoryItem:getId() == LOOT_POUCH_ITEM_ID then
-					pouch = inventoryItem
+					pouchOffer = inventoryItem
 					break
 				end
 			end
 		end
 	end
 
-	if not pouch then
+	if not pouchOffer then
 		return
 	end
 
-	g_game.sellItem(pouch, 1, true)
+	if sellAllButton and not sellAllButton:isDestroyed() then
+		sellAllButton:setEnabled(false)
+	end
 
-	addEvent(function()
+	-- NPC chat/trade opening shares the action cooldown. Waiting one interval
+	-- prevents an immediate click from being rejected as "objects too fast".
+	sellAllPendingEvent = scheduleEvent(function()
+		sellAllPendingEvent = nil
+		if g_game.isOnline() then
+			g_game.sellItem(pouchOffer, 1, true)
+		end
+		if sellAllButton and not sellAllButton:isDestroyed() then
+			sellAllButton:setEnabled(true)
+		end
 		closeSellAllWindow()
-	end, 100)
+	end, 450)
 end

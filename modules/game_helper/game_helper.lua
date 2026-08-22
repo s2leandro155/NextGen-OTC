@@ -3293,6 +3293,45 @@ function cavebotAddCurrentPosition(waypointType)
 	if HelperCavebot then HelperCavebot.addCurrentPosition(waypointType or "Walk") end
 end
 
+function cavebotSetDirection(direction)
+	if HelperCavebot then HelperCavebot.setDirection(direction) end
+end
+
+function cavebotToggle()
+	if HelperCavebot then HelperCavebot.toggle() end
+end
+
+function cavebotOpenSettings() if HelperCavebot then HelperCavebot.openSettings() end end
+function cavebotCloseSettings() if HelperCavebot then HelperCavebot.closeSettings() end end
+function cavebotSettingsTab(name) if HelperCavebot then HelperCavebot.settingsTab(name) end end
+function cavebotApplySettings(closeAfter) if HelperCavebot then HelperCavebot.applySettings(closeAfter) end end
+function cavebotOpenSupplies() if HelperCavebot then HelperCavebot.openSupplies() end end
+function cavebotCloseSupplies() if HelperCavebot then HelperCavebot.closeSupplies() end end
+
+function cavebotSetWaypointMode(mode)
+	if HelperCavebot then HelperCavebot.setWaypointMode(mode) end
+end
+
+function cavebotSetOption(name, checked)
+	if HelperCavebot then HelperCavebot.setOption(name, checked == true) end
+end
+
+function cavebotSetNumericOption(name, value)
+	if HelperCavebot then HelperCavebot.setNumericOption(name, value) end
+end
+
+function cavebotShowInfo(message)
+	if HelperCavebot then HelperCavebot.showInfo(message) end
+end
+
+function cavebotOpenScriptsWindow()
+	if HelperCavebot then HelperCavebot.openScriptsWindow() end
+end
+
+function cavebotCloseScriptsWindow()
+	if HelperCavebot then HelperCavebot.closeScriptsWindow() end
+end
+
 function cavebotRemoveSelected()
 	if HelperCavebot then HelperCavebot.removeSelected() end
 end

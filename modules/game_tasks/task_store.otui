@@ -1,0 +1,131 @@
+TaskStoreProduct < UIWidget
+  size: 335 92
+  image-source: images/ui/window_light
+  image-border-left: 2
+  image-border-right: 2
+  image-border-top: 27
+  image-border-bottom: 4
+
+  Item
+    id: item
+    anchors.left: parent.left
+    anchors.verticalCenter: parent.verticalCenter
+    margin-left: 12
+    size: 64 64
+    virtual: true
+
+  Label
+    id: name
+    anchors.left: item.right
+    anchors.top: parent.top
+    margin-left: 8
+    margin-top: 18
+    font: verdana-11px-rounded
+    color: #e8d9a8
+
+  Label
+    id: price
+    anchors.left: item.right
+    anchors.top: name.bottom
+    margin-left: 8
+    margin-top: 8
+    font: verdana-11px-rounded
+    color: #ffd85a
+
+  Button
+    id: buy
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    margin-right: 8
+    margin-bottom: 8
+    width: 68
+    height: 22
+    text: Buy
+
+MainWindow
+  id: taskStoreWindow
+  text: Task Coin Store
+  size: 760 560
+  @onEscape: modules.game_tasks.hideTaskStore()
+
+  UIWidget
+    id: header
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.top: parent.top
+    margin-left: 8
+    margin-right: 8
+    margin-top: 8
+    height: 170
+    image-source: images/task_store_banner
+    image-auto-resize: true
+
+    Label
+      anchors.horizontalCenter: parent.horizontalCenter
+      anchors.top: parent.top
+      margin-top: 18
+      text: TASK COIN STORE
+      color: #fff0a0
+      font: verdana-11px-rounded
+
+    Label
+      anchors.horizontalCenter: parent.horizontalCenter
+      anchors.top: prev.bottom
+      margin-top: 8
+      text: Exclusive rewards earned by completing tasks
+      color: #ffffff
+      font: verdana-11px-rounded
+
+  FlatPanel
+    id: balance
+    anchors.left: parent.left
+    anchors.bottom: parent.bottom
+    margin-left: 12
+    margin-bottom: 8
+    size: 230 28
+    image-source: /images/ui/containerslot
+    image-border: 3
+
+    Label
+      id: text
+      anchors.centerIn: parent
+      text: 'Task Coins: 0'
+      text-horizontal-auto-resize: true
+      color: #ffd85a
+      font: verdana-11px-rounded
+
+  VerticalScrollBar
+    id: scroll
+    anchors.top: header.bottom
+    anchors.right: parent.right
+    anchors.bottom: close.top
+    margin-top: 10
+    margin-right: 8
+    margin-bottom: 10
+    step: 58
+    pixels-scroll: true
+
+  ScrollablePanel
+    id: products
+    anchors.top: scroll.top
+    anchors.left: parent.left
+    anchors.right: scroll.left
+    anchors.bottom: scroll.bottom
+    margin-left: 18
+    margin-right: 4
+    vertical-scrollbar: scroll
+    layout:
+      type: grid
+      cell-size: 335 92
+      cell-spacing: 10
+      flow: true
+
+  Button
+    id: close
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    margin-right: 8
+    margin-bottom: 8
+    width: 70
+    text: Close
+    @onClick: modules.game_tasks.hideTaskStore()

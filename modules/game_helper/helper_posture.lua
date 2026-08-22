@@ -304,8 +304,8 @@ local function resolveOfficialBorderSpellId(incomingId)
 		return nil
 	end
 
-	if Spells and type(Spells.getSpellByClientId) == "function" then
-		local ok, spell = pcall(Spells.getSpellByClientId, spellId)
+	if Spells and type(Spells.getSpellDataById) == "function" then
+		local ok, spell = pcall(Spells.getSpellDataById, spellId)
 
 		if ok and type(spell) == "table" then
 			return tonumber(spell.id) or spellId

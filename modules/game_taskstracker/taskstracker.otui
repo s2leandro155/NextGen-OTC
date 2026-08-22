@@ -1,0 +1,154 @@
+TaskTrackerKillEntry < UIWidget
+  height: 15
+
+  UIWidget
+    id: icon
+    anchors.verticalCenter: parent.verticalCenter
+    anchors.left: parent.left
+    image-source: /images/store/selector_right
+    size: 7 7
+    phantom: true
+
+  UIWidget
+    id: amount
+    anchors.verticalCenter: paren.verticalCenter
+    anchors.right: parent.right
+    margin-right: 5
+    !text: '12,234'
+    text-horizontal-auto-resize: true
+    color: #C0C0C0
+    phantom: true
+
+  UIWidget
+    id: title
+    anchors.verticalCenter: paren.verticalCenter
+    anchors.right: amount.left
+    anchors.left: icon.right
+    margin-left: 5
+    margin-right: 5
+    !text: 'Demon:'
+    text-truncate: true
+    text-align: left
+    text-horizontal-auto-resize: true
+    color: #C0C0C0
+    phantom: true
+
+TaskTrackerEntry < UIWidget
+  height: 42
+
+  UIWidget
+    id: creatureBorder
+    size: 36 36
+    anchors.top: parent.top
+    anchors.left: parent.left
+    margin-left: 5
+    margin-top: 5
+    phantom: true
+    clipping: true
+    image-source: /images/ui/1pixel_down_frame
+    image-border: 2
+
+  UICreature
+    id: creature
+    anchors.fill: creatureBorder
+    outfit-id: 35
+    phantom: true
+    virtual: true
+    margin: 2
+
+  UIWidget
+    id: title
+    anchors.left: creatureBorder.right
+    anchors.top: creatureBorder.top
+    margin-left: 3
+    margin-top: 2
+    anchors.right: parent.right
+    !text: 'Demons'
+    color: #C0C0C0
+    text-align: left
+    phantom: true
+
+  UIWidget
+    id: progress
+    anchors.left: progressBar.left
+    anchors.top: progressBar.top
+    anchors.bottom: progressBar.bottom
+    margin-left: 4
+    margin-top: 3
+    margin-bottom: 3
+    width: 65
+    background-color: #00e4ff
+    phantom: true
+
+  UIWidget
+    id: progressBar
+    anchors.left: title.left
+    anchors.bottom: creatureBorder.bottom
+    size: 113 16
+    image-source: /resources/task_tracker_border
+    margin-bottom: 3
+    !text: '100%'
+    font: verdana-11px-rounded
+    text-offset: 0 2
+    color: #cdcdcd
+
+  Panel
+    id: creatures
+    anchors.left: creatureBorder.left
+    anchors.right: parent.right
+    anchors.top: creatureBorder.bottom
+    margin-top: 5
+    height: 0
+    visible: false
+    layout:
+      type: verticalBox
+
+MiniWindow
+  id: tasksTrackerWindow
+  !text: 'Task Tracker'
+  height: 100
+  icon: /images/icons/icon_taskstracker
+  icon-rect: 4 4 12 12
+  icon-clip: 0 0 12 12
+  &save: true
+  &autoOpen: false
+  @onClose: |
+    modules.game_taskstracker.hide()
+
+  MiniWindowContents
+    layout: verticalBox
+    padding-left: 0
+    padding-right: 0
+    padding-top: 3
+
+  UIButton
+    id: menuButton
+    anchors.top: minimizeButton.top
+    anchors.right: minimizeButton.left
+    margin-right: 3
+    size: 14 14
+    image-source: /images/ui/miniwindow_buttons
+    image-clip: 112 0 14 14
+
+    $hover:
+      image-clip: 112 14 14 14
+
+    $pressed:
+      image-clip: 112 28 14 14
+
+  UIButton
+    id: taskButton
+    anchors.top: minimizeButton.top
+    anchors.right: menuButton.left
+    margin-right: 3
+    size: 14 14
+    image-source: /images/ui/miniwindow_buttons
+    image-clip: 154 0 14 14
+    @onLeftClick: |
+      modules.game_tasks.tryOpen()
+
+    $hover:
+      image-clip: 154 14 14 14
+
+    $pressed:
+      image-clip: 154 28 14 14

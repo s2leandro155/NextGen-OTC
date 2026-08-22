@@ -2691,6 +2691,14 @@ function setupOptionsMainButton()
 		end, false, 1000)
 	end
 
+	if not extraWidgets.linkedTasksButton then
+		extraWidgets.linkedTasksButton = modules.game_mainpanel.addToggleButton("linkedTasks", tr("Open Linked Tasks"), "/images/options/button_task_window", function()
+			if modules.game_tasks and type(modules.game_tasks.tryOpen) == "function" then
+				modules.game_tasks.tryOpen()
+			end
+		end, false, 1001)
+	end
+
 	if not extraWidgets.spellListButton then
 		extraWidgets.spellListButton = modules.game_mainpanel.addToggleButton("spellListWidget", tr("Open Spell List"), "/images/options/button_spell_list", function()
 			local spellModule = g_modules.getModule("game_spelllist")

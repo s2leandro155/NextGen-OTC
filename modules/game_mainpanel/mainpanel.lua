@@ -72,6 +72,7 @@ ControlButtonNames = {
 	spellListWidget = "Spell List",
 	imbuementTrackerButton = "Imbuement Tracker",
 	taskBoard = "Task Board",
+	linkedTasks = "Linked Tasks",
 	highscoresButton = "Highscores",
 	unjustifiedPointsButton = "Unjustified Points",
 	helperDialog = "Helper",
@@ -107,6 +108,8 @@ local DEFAULT_SHORTCUT_ORDER = {
 	"unjustifiedPointsButton",
 	"questLogButton",
 	"preyButton",
+	"taskBoard",
+	"linkedTasks",
 	"CyclopediaButton",
 	"highscoresButton",
 	"ProciencyButton",
@@ -160,7 +163,7 @@ function reloadMainPanelSizes()
 						store_height = store_count * PANEL_CONSTANTS.MULTI_STORE_HEIGHT
 					end
 
-					store_panel:setHeight(store_count > 0 and PANEL_CONSTANTS.MULTI_STORE_HEIGHT or 0)
+					store_panel:setHeight(store_height)
 
 					if panel:isOn() then
 						local options_panel = optionsController.ui.onPanel.options
@@ -444,6 +447,17 @@ optionsController:setUI("mainoptionspanel", modules.game_interface.getMainRightP
 
 function optionsController:onInit()
 	createButton_large("Store shop", tr("Open the Store"), "/images/options/store_large", toggleStore, "store", false)
+	createButton_large("battlePassButton", tr("Battle Pass"), "/images/options/battlepass_large", function()
+		local module = g_modules.getModule("game_battlepass")
+
+		if module and not module:isLoaded() then
+			g_modules.ensureModuleLoaded("game_battlepass")
+		end
+
+		if modules.game_battlepass and modules.game_battlepass.openOrPreview then
+			modules.game_battlepass.openOrPreview()
+		end
+	end, "store", false)
 	refreshShortcutsSidebarContextMenu()
 end
 
@@ -696,8 +710,20 @@ function loadButtonConfig()
 		end
 	end
 
+	shortcutOrder = shortcutOrder or DEFAULT_SHORTCUT_ORDER
+
+	-- The Task Board backend and client module are available, but older sidebar
+	-- settings were saved before its shortcut existed. Add it once to those
+	-- layouts so players can actually discover and open the system.
+	if not table.find(shortcutOrder, "taskBoard") then
+		table.insert(shortcutOrder, "taskBoard")
+	end
+	if not table.find(shortcutOrder, "linkedTasks") then
+		table.insert(shortcutOrder, "linkedTasks")
+	end
+
 	return {
-		shortcutOrder = shortcutOrder or DEFAULT_SHORTCUT_ORDER
+		shortcutOrder = shortcutOrder
 	}
 end
 

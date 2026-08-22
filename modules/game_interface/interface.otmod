@@ -59,6 +59,7 @@ Module
     - game_wheel
     - game_exaltationforge
     - game_taskboard
+    - game_tasks
     - game_analysers
     - game_offlinetraining
     - game_soulpit

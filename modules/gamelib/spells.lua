@@ -6540,6 +6540,12 @@ function Spells.getImageClipNormal(id, profile)
 end
 
 function Spells.getSpellDataById(spellId)
+	spellId = tonumber(spellId)
+
+	if not spellId then
+		return nil
+	end
+
 	local cached = spellByIdCache[spellId]
 
 	if cached ~= nil then

@@ -1681,7 +1681,8 @@ function createBattleListCreatureMenu(menuPosition, creature)
 	if sameFloor then
 		if creature:isNpc() then
 			menu:addOption(tr("Talk"), function()
-				g_game.attack(creature)
+				g_game.cancelAttack()
+				g_game.talk("hi")
 			end, talkShortcut)
 		elseif g_game.getAttackingCreature() ~= creature then
 			menu:addOption(tr("Attack"), function()
@@ -2545,9 +2546,10 @@ function createThingMenu(menuPosition, lookThing, useThing, creatureThing, mapTi
 					g_window.setClipboardText(creatureName)
 				end)
 			elseif creatureThing:getPosition().z == localPosition.z then
-				if creatureThing:isNpc() then
+			if creatureThing:isNpc() then
 					menu:addOption(tr("Talk"), function()
-						g_game.attack(creatureThing)
+						g_game.cancelAttack()
+						g_game.talk("hi")
 					end, talkShortcut)
 				elseif g_game.getAttackingCreature() ~= creatureThing then
 					menu:addOption(tr("Attack"), function()
@@ -2804,6 +2806,15 @@ local function handleUseThing(thing, quickLootContainers)
 end
 
 local function tryClassicAttack(player, attackCreature, creatureThing, autoWalkPos)
+	local npc = attackCreature and attackCreature:isNpc() and attackCreature or creatureThing and creatureThing:isNpc() and creatureThing
+
+	if npc then
+		g_game.cancelAttack()
+		g_game.talk("hi")
+
+		return true
+	end
+
 	if attackCreature and attackCreature ~= player then
 		g_game.attack(attackCreature)
 
@@ -2829,6 +2840,16 @@ function processMouseAction(menuPosition, mouseButton, autoWalkPos, lookThing, u
 	end
 
 	local effectiveUseThing = resolveHirelingUseThing(useThing, creatureThing)
+	local clickedNpc = creatureThing and creatureThing:isNpc() and creatureThing or attackCreature and attackCreature:isNpc() and attackCreature
+
+	-- NPCs are never attack targets. A normal left click greets them and lets the
+	-- server open the NPC dialog, regardless of the selected mouse-control mode.
+	if clickedNpc and ((mouseButton == MouseLeftButton and keyboardModifiers == KeyboardNoModifier) or g_keyboard.isAltPressed()) then
+		g_game.cancelAttack()
+		g_game.talk("hi")
+
+		return true
+	end
 
 	if g_platform.isMobile() then
 		if mouseButton == MouseRightButton then
@@ -2913,7 +2934,8 @@ function processMouseAction(menuPosition, mouseButton, autoWalkPos, lookThing, u
 		if classicControl == "leftSmart" and mouseButton == MouseLeftButton and keyboardModifiers == KeyboardNoModifier then
 			-- NPC BEFORE attack: the clicked NPC shows up as attackCreature too, so checking
 			-- attack first would try to attack the NPC instead of greeting it.
-			if creatureThing and creatureThing:isNpc() then
+			if clickedNpc then
+				g_game.cancelAttack()
 				g_game.talk("hi")
 
 				return true

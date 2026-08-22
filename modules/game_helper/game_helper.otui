@@ -4296,8 +4296,8 @@ PainelCavebot < Panel
         size: 48 20
         anchors.left: parent.left
         anchors.top: parent.top
-        text: Walk
-        @onClick: modules.game_helper.cavebotAddCurrentPosition('Walk')
+        text: Load
+        @onClick: modules.game_helper.cavebotLoadScript()
 
       Button
         id: cavebotStandButton
@@ -4305,62 +4305,62 @@ PainelCavebot < Panel
         anchors.left: prev.right
         anchors.top: parent.top
         margin-left: 5
-        text: Stand
-        @onClick: modules.game_helper.cavebotAddCurrentPosition('Stand')
+        text: Save
+        @onClick: modules.game_helper.cavebotSaveScript()
 
       Button
         id: cavebotNodeButton
-        size: 48 20
+        size: 57 20
         anchors.left: prev.right
         anchors.top: parent.top
         margin-left: 5
-        text: Node
-        @onClick: modules.game_helper.cavebotAddCurrentPosition('Node')
+        text: Settings
+        @onClick: modules.game_helper.cavebotShowInfo('Settings are available below.')
 
       Button
         id: cavebotUseButton
-        size: 48 20
+        size: 75 20
         anchors.left: prev.right
         anchors.top: parent.top
         margin-left: 5
-        text: Use
-        @onClick: modules.game_helper.cavebotAddCurrentPosition('Use')
+        text: Special Areas
+        @onClick: modules.game_helper.cavebotShowInfo('Special Areas mode enabled for route editing.')
 
       Button
         id: cavebotRopeButton
-        size: 48 20
+        size: 70 20
         anchors.left: parent.left
         anchors.top: parent.top
         margin-top: 23
-        text: Rope
-        @onClick: modules.game_helper.cavebotAddCurrentPosition('Rope')
+        text: Learn More
+        @onClick: modules.game_helper.cavebotShowInfo('Select a type and direction, then click to add a waypoint.')
 
       Button
         id: cavebotShovelButton
-        size: 48 20
+        size: 50 20
         anchors.left: prev.right
         anchors.top: prev.top
         margin-left: 5
-        text: Shovel
-        @onClick: modules.game_helper.cavebotAddCurrentPosition('Shovel')
+        text: Delete
+        @onClick: modules.game_helper.cavebotRemoveSelected()
 
       Button
         id: cavebotActionButton
-        size: 48 20
-        anchors.left: prev.right
-        anchors.top: prev.top
-        margin-left: 5
-        text: Action
-        @onClick: modules.game_helper.cavebotAddCurrentPosition('Action')
-
-      Button
-        id: cavebotClearButton
-        size: 48 20
+        size: 50 20
         anchors.left: prev.right
         anchors.top: prev.top
         margin-left: 5
         text: Clear
         @onClick: modules.game_helper.cavebotClear()
+
+      Button
+        id: cavebotClearButton
+        size: 50 20
+        anchors.left: prev.right
+        anchors.top: prev.top
+        margin-left: 5
+        text: Up
+        @onClick: modules.game_helper.cavebotMoveSelected(-1)
 
     Label
       id: cavebotWaypointCount
@@ -4377,72 +4377,265 @@ PainelCavebot < Panel
 
   HelperPopupSection
     id: cavebotScriptsSection
-    width: 145
-    !text: tr('Scripts')
+    width: 184
+    !text: tr('Waypoint Type:')
     anchors.top: parent.top
     anchors.right: parent.right
     anchors.bottom: cavebotControls.top
     margin-bottom: 7
 
-    TextList
-      id: cavebotScriptList
-      anchors.top: parent.top
-      anchors.left: parent.left
-      anchors.right: parent.right
-      anchors.bottom: cavebotSaveScriptButton.top
-      margin-top: 8
-      margin-left: 7
-      margin-right: 19
-      margin-bottom: 7
-      background-color: #414141
-      vertical-scrollbar: cavebotScriptScroll
+    Panel
+      id: cavebotTypeButtons
+      anchors.fill: parent
+      margin: 8 7 7 7
 
-    VerticalScrollBar
-      id: cavebotScriptScroll
-      anchors.top: cavebotScriptList.top
-      anchors.right: parent.right
-      anchors.bottom: cavebotScriptList.bottom
-      margin-right: 7
-      width: 12
-      step: 19
+      Button
+        id: cavebotWalkButton
+        size: 82 19
+        anchors.left: parent.left
+        anchors.top: parent.top
+        text: Walk
+        @onClick: modules.game_helper.cavebotAddCurrentPosition('Walk')
+      Button
+        size: 82 19
+        anchors.right: parent.right
+        anchors.top: parent.top
+        text: Node
+        @onClick: modules.game_helper.cavebotAddCurrentPosition('Node')
+      Button
+        size: 82 19
+        anchors.left: parent.left
+        anchors.top: cavebotWalkButton.bottom
+        margin-top: 2
+        text: Stand
+        @onClick: modules.game_helper.cavebotAddCurrentPosition('Stand')
+      Button
+        size: 82 19
+        anchors.right: parent.right
+        anchors.top: cavebotWalkButton.bottom
+        margin-top: 2
+        text: Use
+        @onClick: modules.game_helper.cavebotAddCurrentPosition('Use')
+      Button
+        id: cavebotStartLureButton
+        size: 82 19
+        anchors.left: parent.left
+        anchors.top: cavebotWalkButton.bottom
+        margin-top: 23
+        text: Start Lure
+        @onClick: modules.game_helper.cavebotAddCurrentPosition('Start Lure')
+      Button
+        size: 82 19
+        anchors.right: parent.right
+        anchors.top: cavebotWalkButton.bottom
+        margin-top: 23
+        text: End Lure
+        @onClick: modules.game_helper.cavebotAddCurrentPosition('End Lure')
+      Button
+        id: cavebotDynStartButton
+        size: 82 19
+        anchors.left: parent.left
+        anchors.top: cavebotWalkButton.bottom
+        margin-top: 44
+        text: Dyn. Start
+        @onClick: modules.game_helper.cavebotAddCurrentPosition('Dyn.Start')
+      Button
+        size: 82 19
+        anchors.right: parent.right
+        anchors.top: cavebotWalkButton.bottom
+        margin-top: 44
+        text: Dyn. End
+        @onClick: modules.game_helper.cavebotAddCurrentPosition('Dyn.End')
+      Button
+        id: cavebotRopeTypeButton
+        size: 82 19
+        anchors.left: parent.left
+        anchors.top: cavebotWalkButton.bottom
+        margin-top: 65
+        text: Rope
+        @onClick: modules.game_helper.cavebotAddCurrentPosition('Rope')
+      Button
+        size: 82 19
+        anchors.right: parent.right
+        anchors.top: cavebotWalkButton.bottom
+        margin-top: 65
+        text: Ladder
+        @onClick: modules.game_helper.cavebotAddCurrentPosition('Ladder')
+      Button
+        id: cavebotHoleButton
+        size: 82 19
+        anchors.left: parent.left
+        anchors.top: cavebotWalkButton.bottom
+        margin-top: 86
+        text: Hole
+        @onClick: modules.game_helper.cavebotAddCurrentPosition('Hole')
+      Button
+        size: 82 19
+        anchors.right: parent.right
+        anchors.top: cavebotWalkButton.bottom
+        margin-top: 86
+        text: Shovel
+        @onClick: modules.game_helper.cavebotAddCurrentPosition('Shovel')
+      Button
+        id: cavebotTeleportButton
+        size: 82 19
+        anchors.left: parent.left
+        anchors.top: cavebotWalkButton.bottom
+        margin-top: 107
+        text: Teleport
+        @onClick: modules.game_helper.cavebotAddCurrentPosition('Teleport')
+      Button
+        size: 82 19
+        anchors.right: parent.right
+        anchors.top: cavebotWalkButton.bottom
+        margin-top: 107
+        text: Label
+        @onClick: modules.game_helper.cavebotAddCurrentPosition('Label')
+      Button
+        id: cavebotGotoButton
+        size: 82 19
+        anchors.left: parent.left
+        anchors.top: cavebotWalkButton.bottom
+        margin-top: 128
+        text: Go to
+        @onClick: modules.game_helper.cavebotAddCurrentPosition('Go to')
+      Button
+        size: 82 19
+        anchors.right: parent.right
+        anchors.top: cavebotWalkButton.bottom
+        margin-top: 128
+        text: Script
+        @onClick: modules.game_helper.cavebotAddCurrentPosition('Script')
 
-    Button
-      id: cavebotSaveScriptButton
-      height: 20
-      anchors.left: parent.left
-      anchors.right: parent.right
-      anchors.bottom: cavebotLoadScriptButton.top
-      margin-left: 7
-      margin-right: 7
-      margin-bottom: 4
-      text: Save
-      @onClick: modules.game_helper.cavebotSaveScript()
+      Label
+        id: cavebotDirectionTitle
+        anchors.left: parent.left
+        anchors.top: cavebotGotoButton.bottom
+        margin-top: 5
+        text: Direction:
+        font: $var-cip-font
+        color: #c0c0c0
+        text-auto-resize: true
 
-    Button
-      id: cavebotLoadScriptButton
-      width: 61
-      height: 20
-      anchors.left: parent.left
-      anchors.bottom: parent.bottom
-      margin-left: 7
-      margin-bottom: 7
-      text: Load
-      @onClick: modules.game_helper.cavebotLoadScript()
+      Panel
+        id: cavebotDirections
+        size: 72 57
+        anchors.left: parent.left
+        anchors.top: cavebotDirectionTitle.bottom
+        margin-top: 2
 
-    Button
-      id: cavebotDeleteScriptButton
-      width: 61
-      height: 20
-      anchors.right: parent.right
-      anchors.bottom: parent.bottom
-      margin-right: 7
-      margin-bottom: 7
-      text: Delete
-      @onClick: modules.game_helper.cavebotDeleteScript()
+        Button
+          size: 23 18
+          anchors.left: parent.left
+          anchors.top: parent.top
+          text: NW
+          @onClick: modules.game_helper.cavebotSetDirection('NW')
+        Button
+          size: 23 18
+          anchors.horizontalCenter: parent.horizontalCenter
+          anchors.top: parent.top
+          text: N
+          @onClick: modules.game_helper.cavebotSetDirection('N')
+        Button
+          size: 23 18
+          anchors.right: parent.right
+          anchors.top: parent.top
+          text: NE
+          @onClick: modules.game_helper.cavebotSetDirection('NE')
+        Button
+          size: 23 18
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          text: W
+          @onClick: modules.game_helper.cavebotSetDirection('W')
+        Button
+          size: 23 18
+          anchors.horizontalCenter: parent.horizontalCenter
+          anchors.verticalCenter: parent.verticalCenter
+          text: C
+          @onClick: modules.game_helper.cavebotSetDirection('C')
+        Button
+          size: 23 18
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          text: E
+          @onClick: modules.game_helper.cavebotSetDirection('E')
+        Button
+          size: 23 18
+          anchors.left: parent.left
+          anchors.bottom: parent.bottom
+          text: SW
+          @onClick: modules.game_helper.cavebotSetDirection('SW')
+        Button
+          size: 23 18
+          anchors.horizontalCenter: parent.horizontalCenter
+          anchors.bottom: parent.bottom
+          text: S
+          @onClick: modules.game_helper.cavebotSetDirection('S')
+        Button
+          size: 23 18
+          anchors.right: parent.right
+          anchors.bottom: parent.bottom
+          text: SE
+          @onClick: modules.game_helper.cavebotSetDirection('SE')
+
+      Label
+        width: 78
+        anchors.left: parent.left
+        anchors.top: cavebotDirectionTitle.bottom
+        margin-left: 82
+        margin-top: 1
+        text: Waypoint Mode:
+        font: $var-cip-font
+        color: #c0c0c0
+        text-auto-resize: true
+      OptionCheckBox
+        id: cavebotModeReplace
+        anchors.left: parent.left
+        anchors.top: cavebotDirectionTitle.bottom
+        margin-left: 82
+        margin-top: 18
+        @onCheckChange: if self:isChecked() then modules.game_helper.cavebotSetWaypointMode('Replace') end
+      Label
+        size: 60 14
+        anchors.left: parent.left
+        anchors.verticalCenter: cavebotModeReplace.verticalCenter
+        margin-left: 101
+        text: Replace
+        font: $var-cip-font
+      OptionCheckBox
+        id: cavebotModeAdd
+        anchors.left: parent.left
+        anchors.top: cavebotModeReplace.bottom
+        margin-left: 82
+        margin-top: 2
+        checked: true
+        @onCheckChange: if self:isChecked() then modules.game_helper.cavebotSetWaypointMode('Add') end
+      Label
+        size: 60 14
+        anchors.left: parent.left
+        anchors.verticalCenter: cavebotModeAdd.verticalCenter
+        margin-left: 101
+        text: Add
+        font: $var-cip-font
+      OptionCheckBox
+        id: cavebotModeInsert
+        anchors.left: parent.left
+        anchors.top: cavebotModeAdd.bottom
+        margin-left: 82
+        margin-top: 2
+        @onCheckChange: if self:isChecked() then modules.game_helper.cavebotSetWaypointMode('Insert') end
+      Label
+        size: 60 14
+        anchors.left: parent.left
+        anchors.verticalCenter: cavebotModeInsert.verticalCenter
+        margin-left: 101
+        text: Insert
+        font: $var-cip-font
 
   OnePixelDownFrame
     id: cavebotControls
-    height: 55
+    height: 79
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.bottom: cavebotStatusFrame.top
@@ -4450,6 +4643,7 @@ PainelCavebot < Panel
 
     Label
       id: cavebotHelperStatusTitle
+      visible: false
       anchors.left: parent.left
       anchors.top: parent.top
       margin-left: 10
@@ -4461,6 +4655,7 @@ PainelCavebot < Panel
 
     Label
       id: cavebotHelperStatusValue
+      visible: false
       anchors.left: cavebotHelperStatusTitle.left
       anchors.top: cavebotHelperStatusTitle.bottom
       margin-top: 2
@@ -4470,65 +4665,151 @@ PainelCavebot < Panel
       text-auto-resize: true
 
     Label
-      id: cavebotToggleTitle
-      anchors.left: parent.left
-      anchors.verticalCenter: parent.verticalCenter
-      margin-left: 190
-      text: "Cavebot:"
-      font: $var-cip-font
-      color: #c0c0c0
-      text-auto-resize: true
-
-    Label
       id: cavebotToggleValue
-      anchors.left: cavebotToggleTitle.right
-      anchors.verticalCenter: parent.verticalCenter
-      margin-left: 4
+      visible: false
+      size: 55 16
+      anchors.left: parent.left
+      anchors.top: parent.top
+      margin-left: 125
+      margin-top: 10
       text: "Off"
       font: $var-cip-font
       color: #ff3030
-      text-auto-resize: true
+      text-align: center
 
     OptionCheckBox
       id: cavebotEnableCheckBox
-      anchors.left: cavebotToggleValue.right
-      anchors.verticalCenter: parent.verticalCenter
-      margin-left: 8
+      anchors.left: parent.left
+      anchors.bottom: parent.bottom
+      margin-left: 285
+      margin-bottom: 8
       @onCheckChange: modules.game_helper.onCavebotEnableChange(self:isChecked())
+
+    Label
+      id: cavebotEnableLabel
+      size: 105 16
+      anchors.left: parent.left
+      anchors.verticalCenter: cavebotEnableCheckBox.verticalCenter
+      margin-left: 304
+      text: Enable CaveBot
+      font: $var-cip-font
+      color: #c0c0c0
 
     OptionCheckBox
       id: cavebotLoopCheckBox
+      visible: false
       anchors.left: parent.left
-      anchors.verticalCenter: parent.verticalCenter
+      anchors.top: parent.top
       margin-left: 300
+      margin-top: 10
       checked: true
       @onCheckChange: modules.game_helper.onCavebotLoopChange(self:isChecked())
 
     Label
-      anchors.left: cavebotLoopCheckBox.right
+      size: 42 14
+      visible: false
+      anchors.left: parent.left
+      anchors.verticalCenter: cavebotLoopCheckBox.verticalCenter
+      margin-left: 320
+      text: Loop
+      font: $var-cip-font
+      color: #c0c0c0
+      text-auto-resize: true
+
+    fakeCheckBox
+      id: cavebotRecordingCheckBox
+      visible: false
+      size: 106 23
+      anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
-      margin-left: 5
-      text: Shortcuts
+      margin-right: 8
+      text: Not Recording
+      text-align: center
+      padding: 0
+      @onCheckChange: modules.game_helper.onCavebotRecordingChange(self:isChecked())
+
+    OptionCheckBox
+      id: cavebotWaypointColorsCheckBox
+      anchors.left: parent.left
+      anchors.top: parent.top
+      margin-left: 10
+      margin-top: 8
+      checked: true
+      @onCheckChange: modules.game_helper.cavebotSetOption('waypointColors', self:isChecked())
+    Label
+      size: 190 16
+      anchors.left: parent.left
+      anchors.verticalCenter: cavebotWaypointColorsCheckBox.verticalCenter
+      margin-left: 29
+      text: Enable Waypoint Colors
       font: $var-cip-font
       color: #c0c0c0
       text-auto-resize: true
 
     OptionCheckBox
-      id: cavebotRecordingCheckBox
+      id: cavebotStartNearestCheckBox
       anchors.left: parent.left
-      anchors.verticalCenter: parent.verticalCenter
-      margin-left: 375
-      @onCheckChange: modules.game_helper.onCavebotRecordingChange(self:isChecked())
-
+      anchors.bottom: parent.bottom
+      margin-left: 10
+      margin-bottom: 8
+      checked: true
+      @onCheckChange: modules.game_helper.cavebotSetOption('startNearest', self:isChecked())
     Label
-      id: cavebotRecordingValue
-      anchors.left: cavebotRecordingCheckBox.right
-      anchors.verticalCenter: parent.verticalCenter
-      margin-left: 5
-      text: Not Recording
+      size: 190 16
+      anchors.left: parent.left
+      anchors.verticalCenter: cavebotStartNearestCheckBox.verticalCenter
+      margin-left: 29
+      text: Start From Nearest Waypoint
       font: $var-cip-font
       color: #c0c0c0
       text-auto-resize: true
+
+    OptionCheckBox
+      id: cavebotAutoRecorderCheckBox
+      anchors.left: parent.left
+      anchors.top: parent.top
+      margin-left: 285
+      margin-top: 8
+      @onCheckChange: modules.game_helper.cavebotSetOption('autoRecorder', self:isChecked())
+    Label
+      size: 105 16
+      anchors.left: parent.left
+      anchors.verticalCenter: cavebotAutoRecorderCheckBox.verticalCenter
+      margin-left: 304
+      text: Auto Recorder
+      font: $var-cip-font
+      color: #c0c0c0
+      text-auto-resize: true
+
+    OptionCheckBox
+      id: cavebotEncryptCheckBox
+      anchors.left: parent.left
+      anchors.verticalCenter: parent.verticalCenter
+      margin-left: 10
+      @onCheckChange: modules.game_helper.cavebotSetOption('encryptRoute', self:isChecked())
+    Label
+      size: 150 16
+      anchors.left: parent.left
+      anchors.verticalCenter: cavebotEncryptCheckBox.verticalCenter
+      margin-left: 29
+      text: Encrypt CaveBot on Save
+      font: $var-cip-font
+      color: #c0c0c0
+
+    OptionCheckBox
+      id: cavebotDebugHudCheckBox
+      anchors.left: parent.left
+      anchors.verticalCenter: parent.verticalCenter
+      margin-left: 285
+      @onCheckChange: modules.game_helper.cavebotSetOption('debugHud', self:isChecked())
+    Label
+      size: 115 16
+      anchors.left: parent.left
+      anchors.verticalCenter: cavebotDebugHudCheckBox.verticalCenter
+      margin-left: 304
+      text: Enable Debug HUD
+      font: $var-cip-font
+      color: #c0c0c0
 
   OnePixelDownFrame
     id: cavebotStatusFrame
@@ -4544,10 +4825,583 @@ PainelCavebot < Panel
       anchors.verticalCenter: parent.verticalCenter
       margin-left: 10
       margin-right: 10
-      text: Parado
+      text: State: STOPPED
+      font: $var-cip-font
+      color: #79aaff
+      text-auto-resize: false
+
+    Label
+      id: cavebotCompatibilityStatus
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      margin-right: 10
+      text: Route compatible
+      font: $var-cip-font
+      color: #75df75
+      text-auto-resize: true
+
+PainelCavebotClean < Panel
+  anchors.fill: parent
+
+  Label
+    id: cavebotRouteTitle
+    height: 16
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    text: "Route: New Route (0 WPs) *"
+    font: $var-cip-font
+    color: #c0c0c0
+
+  Panel
+    id: cavebotWaypointHeader
+    height: 18
+    anchors.top: cavebotRouteTitle.bottom
+    anchors.left: parent.left
+    anchors.right: cavebotRightPanel.left
+    margin-right: 8
+    background-color: #363636
+
+    Label
+      size: 30 18
+      anchors.left: parent.left
+      anchors.verticalCenter: parent.verticalCenter
+      margin-left: 5
+      text: ID
       font: $var-cip-font
       color: #c0c0c0
-      text-auto-resize: false
+    Label
+      size: 75 18
+      anchors.left: prev.right
+      anchors.verticalCenter: parent.verticalCenter
+      text: Type
+      font: $var-cip-font
+      color: #c0c0c0
+    Label
+      anchors.left: prev.right
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      text: Coordinates
+      font: $var-cip-font
+      color: #c0c0c0
+
+  TextList
+    id: cavebotWaypointList
+    anchors.top: cavebotWaypointHeader.bottom
+    anchors.left: parent.left
+    anchors.right: cavebotRightPanel.left
+    anchors.bottom: cavebotToolbar.top
+    margin-right: 20
+    margin-bottom: 6
+    padding: 1
+    focusable: true
+    background-color: #303030
+    vertical-scrollbar: cavebotWaypointScroll
+
+  VerticalScrollBar
+    id: cavebotWaypointScroll
+    anchors.top: cavebotWaypointList.top
+    anchors.right: cavebotRightPanel.left
+    anchors.bottom: cavebotWaypointList.bottom
+    margin-right: 8
+    width: 12
+    step: 19
+    pixels-scroll: true
+
+  Panel
+    id: cavebotRightPanel
+    width: 196
+    anchors.top: parent.top
+    anchors.right: parent.right
+    anchors.bottom: cavebotToolbar.top
+
+    Label
+      id: cavebotWaypointTypeTitle
+      height: 16
+      anchors.top: parent.top
+      anchors.left: parent.left
+      anchors.right: parent.right
+      text: "Waypoint Type:"
+      font: $var-cip-font
+      color: #c0c0c0
+
+    Panel
+      id: cavebotTypeGrid
+      height: 152
+      anchors.top: cavebotWaypointTypeTitle.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+
+      Button
+        id: cavebotWalkButton
+        size: 96 19
+        anchors.left: parent.left
+        anchors.top: parent.top
+        text: Stand
+        @onClick: modules.game_helper.cavebotAddCurrentPosition('Stand')
+      Button
+        size: 96 19
+        anchors.right: parent.right
+        anchors.top: parent.top
+        text: Node
+        @onClick: modules.game_helper.cavebotAddCurrentPosition('Node')
+      Button
+        id: cavebotStartLureButton
+        size: 96 19
+        anchors.left: parent.left
+        anchors.top: cavebotWalkButton.bottom
+        text: Start Lure
+        @onClick: modules.game_helper.cavebotAddCurrentPosition('Start Lure')
+      Button
+        size: 96 19
+        anchors.right: parent.right
+        anchors.top: cavebotWalkButton.bottom
+        text: End Lure
+        @onClick: modules.game_helper.cavebotAddCurrentPosition('End Lure')
+      Button
+        id: cavebotDynStartButton
+        size: 96 19
+        anchors.left: parent.left
+        anchors.top: cavebotStartLureButton.bottom
+        text: Dyn. Start
+        @onClick: modules.game_helper.cavebotAddCurrentPosition('Dyn.Start')
+      Button
+        size: 96 19
+        anchors.right: parent.right
+        anchors.top: cavebotStartLureButton.bottom
+        text: Dyn. End
+        @onClick: modules.game_helper.cavebotAddCurrentPosition('Dyn.End')
+      Button
+        id: cavebotRopeTypeButton
+        size: 96 19
+        anchors.left: parent.left
+        anchors.top: cavebotDynStartButton.bottom
+        text: Rope
+        @onClick: modules.game_helper.cavebotAddCurrentPosition('Rope')
+      Button
+        size: 96 19
+        anchors.right: parent.right
+        anchors.top: cavebotDynStartButton.bottom
+        text: Ladder
+        @onClick: modules.game_helper.cavebotAddCurrentPosition('Ladder')
+      Button
+        id: cavebotHoleButton
+        size: 96 19
+        anchors.left: parent.left
+        anchors.top: cavebotRopeTypeButton.bottom
+        text: Hole
+        @onClick: modules.game_helper.cavebotAddCurrentPosition('Hole')
+      Button
+        size: 96 19
+        anchors.right: parent.right
+        anchors.top: cavebotRopeTypeButton.bottom
+        text: Use
+        @onClick: modules.game_helper.cavebotAddCurrentPosition('Use')
+      Button
+        id: cavebotTeleportButton
+        size: 96 19
+        anchors.left: parent.left
+        anchors.top: cavebotHoleButton.bottom
+        text: Teleport
+        @onClick: modules.game_helper.cavebotAddCurrentPosition('Teleport')
+      Button
+        size: 96 19
+        anchors.right: parent.right
+        anchors.top: cavebotHoleButton.bottom
+        text: Label
+        @onClick: modules.game_helper.cavebotAddCurrentPosition('Label')
+      Button
+        id: cavebotGotoButton
+        size: 96 19
+        anchors.left: parent.left
+        anchors.top: cavebotTeleportButton.bottom
+        text: Go to
+        @onClick: modules.game_helper.cavebotAddCurrentPosition('Go to')
+      Button
+        size: 96 19
+        anchors.right: parent.right
+        anchors.top: cavebotTeleportButton.bottom
+        text: Script
+        @onClick: modules.game_helper.cavebotAddCurrentPosition('Script')
+      Button
+        size: 196 19
+        anchors.left: parent.left
+        anchors.top: cavebotGotoButton.bottom
+        text: + More...
+        @onClick: modules.game_helper.cavebotOpenScriptsWindow()
+
+    Label
+      id: cavebotDirectionTitle
+      anchors.top: cavebotTypeGrid.bottom
+      anchors.left: parent.left
+      margin-top: 2
+      text: "Direction:"
+      font: $var-cip-font
+      color: #c0c0c0
+      text-auto-resize: true
+
+    Panel
+      id: cavebotDirections
+      size: 86 57
+      anchors.top: cavebotDirectionTitle.bottom
+      anchors.left: parent.left
+
+      Button
+        size: 28 18
+        anchors.left: parent.left
+        anchors.top: parent.top
+        text: NW
+        @onClick: modules.game_helper.cavebotSetDirection('NW')
+      Button
+        size: 28 18
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.top: parent.top
+        text: N
+        @onClick: modules.game_helper.cavebotSetDirection('N')
+      Button
+        size: 28 18
+        anchors.right: parent.right
+        anchors.top: parent.top
+        text: NE
+        @onClick: modules.game_helper.cavebotSetDirection('NE')
+      Button
+        size: 28 18
+        anchors.left: parent.left
+        anchors.verticalCenter: parent.verticalCenter
+        text: W
+        @onClick: modules.game_helper.cavebotSetDirection('W')
+      Button
+        size: 28 18
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.verticalCenter: parent.verticalCenter
+        text: C
+        @onClick: modules.game_helper.cavebotSetDirection('C')
+      Button
+        size: 28 18
+        anchors.right: parent.right
+        anchors.verticalCenter: parent.verticalCenter
+        text: E
+        @onClick: modules.game_helper.cavebotSetDirection('E')
+      Button
+        size: 28 18
+        anchors.left: parent.left
+        anchors.bottom: parent.bottom
+        text: SW
+        @onClick: modules.game_helper.cavebotSetDirection('SW')
+      Button
+        size: 28 18
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: parent.bottom
+        text: S
+        @onClick: modules.game_helper.cavebotSetDirection('S')
+      Button
+        size: 28 18
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        text: SE
+        @onClick: modules.game_helper.cavebotSetDirection('SE')
+
+    Label
+      anchors.top: cavebotTypeGrid.bottom
+      anchors.left: cavebotDirections.right
+      margin-left: 8
+      margin-top: 2
+      text: "Waypoint Mode:"
+      font: $var-cip-font
+      color: #c0c0c0
+      text-auto-resize: true
+    OptionCheckBox
+      id: cavebotModeReplace
+      size: 14 14
+      anchors.left: cavebotDirections.right
+      anchors.top: cavebotDirectionTitle.bottom
+      margin-left: 8
+      @onCheckChange: if self:isChecked() then modules.game_helper.cavebotSetWaypointMode('Replace') end
+    Label
+      size: 64 14
+      anchors.left: cavebotDirections.right
+      anchors.top: cavebotDirectionTitle.bottom
+      margin-left: 27
+      text: Replace
+      font: $var-cip-font
+      text-auto-resize: true
+    OptionCheckBox
+      id: cavebotModeAdd
+      size: 14 14
+      anchors.left: cavebotDirections.right
+      anchors.top: cavebotModeReplace.bottom
+      margin-left: 8
+      margin-top: 2
+      checked: true
+      @onCheckChange: if self:isChecked() then modules.game_helper.cavebotSetWaypointMode('Add') end
+    Label
+      size: 64 14
+      anchors.left: cavebotDirections.right
+      anchors.top: cavebotDirectionTitle.bottom
+      margin-left: 27
+      margin-top: 16
+      text: Add
+      font: $var-cip-font
+      text-auto-resize: true
+    OptionCheckBox
+      id: cavebotModeInsert
+      size: 14 14
+      anchors.left: cavebotDirections.right
+      anchors.top: cavebotModeAdd.bottom
+      margin-left: 8
+      margin-top: 2
+      @onCheckChange: if self:isChecked() then modules.game_helper.cavebotSetWaypointMode('Insert') end
+    Label
+      size: 64 14
+      anchors.left: cavebotDirections.right
+      anchors.top: cavebotDirectionTitle.bottom
+      margin-left: 27
+      margin-top: 32
+      text: Insert
+      font: $var-cip-font
+      text-auto-resize: true
+
+    Label
+      size: 104 16
+      anchors.left: parent.left
+      anchors.verticalCenter: cavebotDeleteButton.verticalCenter
+      text: "Waypoint Actions:"
+      font: $var-cip-font
+      color: #c0c0c0
+      text-auto-resize: true
+    Button
+      id: cavebotDeleteButton
+      size: 45 20
+      anchors.left: parent.left
+      anchors.bottom: parent.bottom
+      margin-left: 105
+      text: Delete
+      @onClick: modules.game_helper.cavebotRemoveSelected()
+    Button
+      id: cavebotClearButton
+      size: 42 20
+      anchors.right: parent.right
+      anchors.bottom: parent.bottom
+      text: Clear
+      @onClick: modules.game_helper.cavebotClear()
+
+  Panel
+    id: cavebotToolbar
+    height: 23
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: cavebotOptions.top
+    margin-bottom: 5
+
+    Button
+      size: 52 20
+      anchors.left: parent.left
+      anchors.top: parent.top
+      text: Load
+      @onClick: modules.game_helper.cavebotLoadScript()
+    Button
+      size: 52 20
+      anchors.left: prev.right
+      anchors.top: parent.top
+      margin-left: 4
+      text: Save
+      @onClick: modules.game_helper.cavebotSaveScript()
+    Button
+      size: 64 20
+      anchors.left: prev.right
+      anchors.top: parent.top
+      margin-left: 4
+      text: Settings
+      @onClick: modules.game_helper.cavebotShowInfo('CaveBot settings')
+    Button
+      size: 92 20
+      anchors.left: prev.right
+      anchors.top: parent.top
+      margin-left: 4
+      text: Special Areas
+      @onClick: modules.game_helper.cavebotShowInfo('Special Areas')
+    Button
+      size: 78 20
+      anchors.right: parent.right
+      anchors.top: parent.top
+      text: Learn More
+      @onClick: modules.game_helper.cavebotShowInfo('Select a waypoint type and direction.')
+
+  OnePixelDownFrame
+    id: cavebotOptions
+    height: 68
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: cavebotStatusFrame.top
+    margin-bottom: 5
+
+    OptionCheckBox
+      id: cavebotWaypointColorsCheckBox
+      size: 14 14
+      anchors.left: parent.left
+      anchors.top: parent.top
+      margin-left: 7
+      margin-top: 6
+      checked: true
+      @onCheckChange: modules.game_helper.cavebotSetOption('waypointColors', self:isChecked())
+    Label
+      size: 200 16
+      anchors.left: parent.left
+      anchors.top: parent.top
+      margin-left: 26
+      margin-top: 5
+      text: Enable Waypoint Colors
+      font: $var-cip-font
+      color: #c0c0c0
+
+    OptionCheckBox
+      id: cavebotEncryptCheckBox
+      size: 14 14
+      anchors.left: parent.left
+      anchors.top: parent.top
+      margin-left: 7
+      margin-top: 27
+      @onCheckChange: modules.game_helper.cavebotSetOption('encryptRoute', self:isChecked())
+    Label
+      size: 200 16
+      anchors.left: parent.left
+      anchors.top: parent.top
+      margin-left: 26
+      margin-top: 26
+      text: Encrypt CaveBot on Save
+      font: $var-cip-font
+      color: #c0c0c0
+
+    OptionCheckBox
+      id: cavebotStartNearestCheckBox
+      size: 14 14
+      anchors.left: parent.left
+      anchors.top: parent.top
+      margin-left: 7
+      margin-top: 48
+      checked: true
+      @onCheckChange: modules.game_helper.cavebotSetOption('startNearest', self:isChecked())
+    Label
+      size: 210 16
+      anchors.left: parent.left
+      anchors.top: parent.top
+      margin-left: 26
+      margin-top: 47
+      text: Start From Nearest Waypoint
+      font: $var-cip-font
+      color: #c0c0c0
+
+    OptionCheckBox
+      id: cavebotAutoRecorderCheckBox
+      size: 14 14
+      anchors.left: parent.left
+      anchors.top: parent.top
+      margin-left: 300
+      margin-top: 6
+      @onCheckChange: modules.game_helper.cavebotSetOption('autoRecorder', self:isChecked())
+    Label
+      size: 120 16
+      anchors.left: parent.left
+      anchors.top: parent.top
+      margin-left: 319
+      margin-top: 5
+      text: Auto Recorder
+      font: $var-cip-font
+      color: #c0c0c0
+    OptionCheckBox
+      id: cavebotDebugHudCheckBox
+      size: 14 14
+      anchors.left: parent.left
+      anchors.top: parent.top
+      margin-left: 300
+      margin-top: 27
+      @onCheckChange: modules.game_helper.cavebotSetOption('debugHud', self:isChecked())
+    Label
+      size: 120 16
+      anchors.left: parent.left
+      anchors.top: parent.top
+      margin-left: 319
+      margin-top: 26
+      text: Enable Debug HUD
+      font: $var-cip-font
+      color: #c0c0c0
+    Button
+      id: cavebotSettingsButton
+      size: 56 18
+      anchors.right: parent.right
+      anchors.verticalCenter: cavebotDebugHudCheckBox.verticalCenter
+      margin-right: 7
+      text: NONE
+      @onClick: modules.game_helper.cavebotOpenSettings()
+
+    OptionCheckBox
+      id: cavebotEnableCheckBox
+      anchors.left: cavebotToggleValue.right
+      anchors.verticalCenter: cavebotToggleValue.verticalCenter
+      margin-left: 8
+      @onCheckChange: modules.game_helper.onCavebotEnableChange(self:isChecked())
+    Label
+      id: cavebotToggleTitle
+      anchors.left: parent.left
+      anchors.top: parent.top
+      margin-left: 319
+      margin-top: 47
+      text: "Cavebot:"
+      font: $var-cip-font
+      color: #c0c0c0
+      text-auto-resize: true
+    Label
+      id: cavebotToggleValue
+      anchors.left: cavebotToggleTitle.right
+      anchors.verticalCenter: cavebotToggleTitle.verticalCenter
+      margin-left: 4
+      text: "Off"
+      font: $var-cip-font
+      color: #ff3030
+      text-auto-resize: true
+    OptionCheckBox
+      id: cavebotLoopCheckBox
+      anchors.left: parent.left
+      anchors.top: parent.top
+      margin-left: 450
+      margin-top: 48
+      checked: true
+      @onCheckChange: modules.game_helper.onCavebotLoopChange(self:isChecked())
+    fakeCheckBox
+      id: cavebotRecordingCheckBox
+      visible: false
+      @onCheckChange: modules.game_helper.onCavebotRecordingChange(self:isChecked())
+    Label
+      id: cavebotHelperStatusValue
+      visible: false
+    Label
+      id: cavebotWaypointCount
+      visible: false
+
+  OnePixelDownFrame
+    id: cavebotStatusFrame
+    height: 29
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+
+    Label
+      id: cavebotStatus
+      anchors.left: parent.left
+      anchors.verticalCenter: parent.verticalCenter
+      margin-left: 8
+      text: State: STOPPED
+      font: $var-cip-font
+      color: #79aaff
+      text-auto-resize: true
+    Label
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      margin-right: 8
+      text: Route compatible
+      font: $var-cip-font
+      color: #75df75
+      text-auto-resize: true
 
 HelperWindow < MainLogoWindow
   id: helperWindow

@@ -236,13 +236,17 @@ local function isFamiliar(creature)
 	return familiarNames[name:lower()] == true
 end
 
+local function isCavebotIgnored(creature)
+	return HelperCavebot and HelperCavebot.isCreatureIgnored and HelperCavebot.isCreatureIgnored(creature) or false
+end
+
 local function refreshVisibleSpectators(position)
 	if not position then
 		return
 	end
 
 	for _, creature in ipairs(g_map.getSpectators(position, false) or {}) do
-		if creature and creature.isMonster and creature:isMonster() and not creature:isDead() and not isFamiliar(creature) then
+		if creature and creature.isMonster and creature:isMonster() and not creature:isDead() and not isFamiliar(creature) and not isCavebotIgnored(creature) then
 			local creatureId = creature:getId()
 
 			if not spectators[creatureId] then
@@ -769,7 +773,7 @@ local function buildBestTargetAreaCreatureList(position)
 	local positionIndex = {}
 
 	for _, creature in pairs(spectators) do
-		if isMapCreature(creature) and not creature:isDead() and creature.isMonster and creature:isMonster() and not isFamiliar(creature) then
+		if isMapCreature(creature) and not creature:isDead() and creature.isMonster and creature:isMonster() and not isFamiliar(creature) and not isCavebotIgnored(creature) then
 			local creaturePos = creature:getPosition()
 
 			if creaturePos and creaturePos.z == position.z then
@@ -973,6 +977,10 @@ local function isLockedTargetValid(creature, position, minDist, maxDist, allCrea
 	end
 
 	if isFamiliar(creature) then
+		return false
+	end
+
+	if isCavebotIgnored(creature) then
 		return false
 	end
 
@@ -1338,7 +1346,7 @@ local function checkAutoTarget()
 	}
 
 	for _, creature in pairs(spectators) do
-		if isMapCreature(creature) and not creature:isDead() and creatureMatchesPriority(creature, allCreatures) then
+		if isMapCreature(creature) and not creature:isDead() and not isCavebotIgnored(creature) and creatureMatchesPriority(creature, allCreatures) then
 			local creaturePos = creature:getPosition()
 
 			if isWithinDistance(position, creaturePos, minDist, maxDist) and g_map.isSightClear(position, creaturePos) then

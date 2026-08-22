@@ -1,0 +1,152 @@
+BattlePassTrackerMenuOption < ThickCheckBox
+  text-offset: 18 1
+  text-align: left
+  color: white
+  background-color: alpha
+  font: verdana-11px-rounded
+  padding: 3 6
+
+  $hover:
+    background-color: #ffffff1a
+
+  $disabled:
+    color: #c0c0c0ff
+
+BattlePassTrackerMenu < PopupMenu
+  id: battlePassTrackerMenu
+  width: 200
+
+  BattlePassTrackerMenuOption
+    id: sortByType
+    !text: tr('Sort by Type')
+
+  BattlePassTrackerMenuOption
+    id: sortByProgress
+    !text: tr('Sort by Progress')
+
+  BattlePassTrackerMenuOption
+    id: sortByName
+    !text: tr('Sort by Name')
+
+  PopupMenuSeparator
+
+  BattlePassTrackerMenuOption
+    id: show10Missions
+    !text: tr('Show only 10 missions')
+
+  BattlePassTrackerMenuOption
+    id: showAllMissions
+    !text: tr('Show all missions')
+
+  BattlePassTrackerMenuOption
+    id: showCompleted
+    !text: tr('Show completed missions')
+
+BattlePassTrackerLevelSection < UIWidget
+  height: 56
+
+  UIWidget
+    id: levelBadge
+    size: 46 46
+    anchors.horizontalCenter: parent.horizontalCenter
+    anchors.top: parent.top
+    margin-top: 4
+    image-source: /images/game/battlepass/player-icon-level
+    phantom: true
+
+    Label
+      id: levelNumber
+      text: 0
+      anchors.bottom: parent.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      font: Verdana Bold-11px
+      color: white
+      text-align: center
+      margin-bottom: 3
+
+BattlePassTrackerSectionHeader < UIWidget
+  height: 16
+  margin-top: 5
+  font: verdana-11px-rounded
+  color: #a0a0a0
+  text-align: left
+
+BattlePassMissionRow < UIWidget
+  height: 30
+  layout: anchor
+
+  UIWidget
+    id: missionIcon
+    size: 14 14
+    anchors.left: parent.left
+    anchors.top: parent.top
+    margin-left: 4
+    margin-top: 5
+
+  UIWidget
+    id: missionName
+    anchors.left: missionIcon.right
+    anchors.right: parent.right
+    anchors.top: parent.top
+    height: 15
+    margin-left: 5
+    margin-right: 4
+    margin-top: 4
+    font: verdana-11px-rounded
+    text-overflow: true
+    text-align: left
+
+  ProgressBar
+    id: missionProgress
+    height: 4
+    anchors.left: missionIcon.right
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    margin-left: 5
+    margin-right: 4
+    margin-bottom: 4
+    background-color: #505050
+
+BattlePassTracker < MiniWindow
+  id: battlePassTracker
+  @onOpen: modules.game_battlepasstracker.onMiniWindowOpen()
+  @onClose: modules.game_battlepasstracker.onMiniWindowClose()
+
+  UIWidget
+    id: miniwindowIcon
+    anchors.top: miniwindowHeader.top
+    anchors.left: miniwindowHeader.left
+    margin-top: 2
+    margin-left: 4
+    size: 12 12
+    image-source: /images/game/battlepass/mainIcon1
+    image-smooth: false
+
+  Label
+    id: miniwindowTitle
+    anchors.top: miniwindowHeader.top
+    anchors.left: miniwindowHeader.left
+    anchors.right: miniwindowHeader.right
+    margin-top: 2
+    margin-left: 20
+    margin-right: 50
+    font: verdana-11px-monochrome
+    height: 13
+    !text: tr('Battle Pass Tracker')
+    color: #9d9d9dff
+
+  MiniWindowContents
+    id: contentsPanel
+    anchors.top: miniwindowTopBar.bottom
+    anchors.left: parent.left
+    anchors.right: miniwindowScrollBar.left
+    anchors.bottom: parent.bottom
+    margin-left: 3
+    margin-top: -2
+    margin-right: 1
+    vertical-scrollbar: miniwindowScrollBar
+    padding-left: 3
+    padding-right: 3
+    padding-bottom: 3
+    layout: verticalBox

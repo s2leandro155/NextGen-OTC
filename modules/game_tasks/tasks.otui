@@ -1,0 +1,2615 @@
+TaskTrackerWidget < UIWidget
+  size: 80 72
+  anchors.bottom: parent.bottom
+  anchors.right: parent.right
+  margin-bottom: 10
+  margin-right: 10
+  phantom: false
+  image-source: /images/ui/button-9grid-idle.png
+  image-clip: 0 0 98 40
+  image-border: 10
+
+  UIWidget
+    id: highlight
+    anchors.fill: parent
+    image-source: /images/store/rectangle-highlight
+    image-clip: 0 0 108 22
+    image-border: 10
+    opacity: 0.0
+    phantom: true
+
+  UICreature
+    id: creature
+    anchors.top: parent.top
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-top: 5
+    size: 50 50
+    phantom: true
+
+  Label
+    id: counter
+    anchors.top: creature.bottom
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-top: 2
+    font: verdana-11px-rounded
+    color: #FFFFFF
+    text-align: center
+    text-auto-resize: true
+    phantom: true
+
+TaskExerciseItemWidget < UIWidget
+  size: 66 66
+  image-source: /images/ui/item66
+  clipping: false
+  overflow: visible
+
+  UIWidget
+    id: selected
+    anchors.fill: parent
+    image-source: /images/inventory/containerslot_goldenborder
+    image-border: 4
+    visible: false
+    phantom: true
+
+  UIItem
+    id: item
+    anchors.fill: parent
+    virtual: true
+    phantom: true
+
+  UIWidget
+    id: checkmark
+    image-source: /images/store/icon-yes
+    anchors.top: parent.top
+    anchors.right: parent.right
+    margin-top: 5
+    margin-right: 5
+    visible: false
+    phantom: true
+
+  Label
+    id: recommendedLabel
+    text: Recommended
+    color: #00FF00
+    font: cipsoftFont
+    text-align: center
+    text-auto-resize: true
+    anchors.top: parent.bottom
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-top: 5
+    visible: false
+    phantom: true
+
+TaskExerciseWindow < UIWindow
+  size: 560 190
+  anchors.centerIn: parent
+  image-source: /images/ui/window_headless.png
+  image-clip: 0 0 256 239
+  image-border: 40
+  @onEscape: modules.game_tasks.hideExerciseWindow()
+
+  Label
+    id: instructionLabel
+    anchors.top: parent.top
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-top: 15
+    !text: tr('Select your exercise weapon reward\nChoose one exercise weapon as your task reward')
+    text-align: center
+    font: verdana-11px-monochrome
+    color: #C0C0C0
+    size: 500 40
+    text-wrap: true
+
+  Panel
+    id: exerciseGrid
+    anchors.top: parent.top
+    anchors.left: parent.left
+    margin-left: 19
+    margin-top: 68
+    size: 530 80
+    clipping: false
+    layout:
+      type: grid
+      cell-size: 66 66
+      cell-spacing: 9
+      num-lines: 1
+      flow: true
+      fit-children: true
+
+  HorizontalSeparator
+    id: separator
+    anchors.top: exerciseGrid.bottom
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-top: 16
+    size: 528 2
+
+  UIWidget
+    image-source: /images/game/tutorial/backdrop_crest
+    anchors.bottom: parent.top
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-bottom: -20
+
+  Button
+    id: close
+    anchors.top: separator.bottom
+    anchors.right: parent.right
+    margin-top: 9
+    margin-right: 16
+    !text: tr('Cancel')
+    font: cipsoftFont
+    color: #F4F4F4
+    size: 50 20
+    @onClick: modules.game_tasks.hideExerciseWindow()
+
+  Button
+    id: confirm
+    anchors.top: separator.bottom
+    anchors.right: close.left
+    margin-top: 9
+    margin-right: 5
+    !text: tr('Confirm')
+    font: cipsoftFont
+    color: #F4F4F4
+    size: 63 20
+    image-source: /images/ui/buttons-blue
+    image-clip: 0 0 43 20
+    @onClick: modules.game_tasks.confirmExerciseReward()
+    $pressed:
+      image-clip: 0 20 43 20
+
+TaskTabButton < ButtonBox
+  image-source: images/button_phantom
+  image-clip: 1 0 20 23
+  image-border: 3
+  change-cursor-image: false
+  padding-top: 0
+  padding-left: 5
+  size: 84 65
+  text-offset: 84 0
+  text-align: left
+  color: #00000000
+  @onCheckChange: |
+    if self.ignoreCallback then
+      return
+    end
+    if not(self:isChecked()) then
+      self.ignoreCallback = true
+      self:setChecked(true)
+      self.ignoreCallback = nil
+      return
+    end
+    for _, c in ipairs(self:getParent():getChildren()) do
+      if c:isChecked() and c ~= self then
+        c.ignoreCallback = true
+        c:setChecked(false)
+        c.ignoreCallback = nil
+      end
+    end
+    local stage = modules.game_tasks.getCurrentTaskSelectedStage()
+    modules.game_tasks.requestCategory(stage)
+    modules.game_tasks.reloadPageContent(false, true)
+
+  @onSetup: |
+    local icon = self:getChildById('icon')
+    icon:setImageSource(self.gifSource)
+    if self.gifFrames > 1 and icon.setGifDuration then
+      icon:setGifDuration(100)
+      icon:setGifSource(self.gifSource)
+      icon:setGifFrames(self.gifFrames)
+      icon:setGifRect(torect("0 0 65 64"))
+      icon:setImageClip(torect("0 0 65 64"))
+    end
+
+  $hover !disabled:
+    image-clip: 1 0 20 23
+
+  $checked:
+    image-clip: 0 46 22 23
+    text-offset: 75 2
+    change-cursor-image: false
+    padding-top: 1
+    color: #C0C0C0
+    padding-left: 6
+    size: 170 65
+
+  UIWidget
+    id: icon
+    anchors.verticalCenter: parent.verticalCenter
+    anchors.left: parent.left
+    size: 65 64
+    phantom: true
+
+TaskStarIcon < UIWidget
+  image-source: images/task_star
+  image-clip: 0 0 9 10
+  gif-frames: 16
+  gif-duration: 100
+  gif-rect: 9 10
+  size: 9 10
+  enabled: false
+
+  $disabled:
+    gif-frames: 0
+    gif-duration: 0
+    image-source: /images/game/prey/prey_nostar
+    image-clip: 0 0 9 10
+
+TaskHideableStarIcon < UIWidget
+  image-source: images/task_star
+  image-clip: 0 0 9 10
+  gif-frames: 16
+  gif-duration: 100
+  gif-rect: 9 10
+  size: 9 10
+
+  $disabled:
+    gif-frames: 0
+    gif-duration: 0
+    image-source: images/task_none_icon
+    image-clip: 0 0 9 10
+
+TaskElementHallBlock < UIWidget
+  image-source: /images/ui/panel_side
+  image-border: 4
+  size: 215 198
+  border-width: 0
+  border-color: #c0c0c0ff
+
+  $hover:
+    border-width: 1
+
+  UIWidget
+    id: background
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-left: 10
+    margin-right: 10
+    anchors.top: parent.top
+    margin-top: 10
+    image-source: images/hall_background
+    phantom: true
+    size: 195 143
+    border-width: 1
+    border-color: #ffbf00A0
+
+  UIWidget
+    id: icon
+    size: 32 32
+    anchors.horizontalCenter: background.horizontalCenter
+    anchors.bottom: background.bottom
+    margin-bottom: 10
+    phantom: true
+
+  UIWidget
+    id: backgroundGrid
+    anchors.fill: background
+    image-source: images/hunt_background_grid
+    image-repeated: true
+    phantom: true
+    opacity: 0.5
+    margin: 1
+    visible: false
+
+  UIWidget
+    id: locker
+    size: 9 14
+    anchors.verticalCenter: title.verticalCenter
+    anchors.right: title.left
+    margin-right: 5
+    visible: false
+    image-source: images/locker_icon
+
+  UIWidget
+    id: yes
+    size: 12 9
+    anchors.verticalCenter: title.verticalCenter
+    anchors.right: title.left
+    margin-right: 5
+    visible: false
+    image-source: images/icon_yes
+
+  UIWidget
+    id: title
+    anchors.horizontalCenter: parent.horizontalCenter
+    anchors.top: background.bottom
+    text-auto-resize: true
+    margin-top: 5
+    color: #C0C0C0
+    margin-left: 5
+    margin-right: 5
+    phantom: true
+    !text: 'Fearless Hall'
+
+  UIWidget
+    id: status
+    anchors.horizontalCenter: title.horizontalCenter
+    anchors.top: title.bottom
+    margin-top: 5
+    text-auto-resize: true
+    !text: 'Done'
+    color: #7be7dcff
+    font: verdana-11px-rounded
+    phantom: true
+
+TaskElementBlock < UIWidget
+  image-source: /images/ui/panel_side
+  image-border: 4
+  size: 215 198
+  border-width: 0
+  border-color: #c0c0c0ff
+
+  $hover:
+    border-width: 1
+
+  UIWidget
+    id: background
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-left: 10
+    margin-right: 10
+    anchors.top: parent.top
+    margin-top: 10
+    image-source: images/hunt_background_0
+    phantom: true
+    size: 195 96
+
+  UICreature
+    id: creature1
+    size: 48 48
+    anchors.verticalCenter: background.verticalCenter
+    anchors.left: background.left
+    margin-left: 10
+    margin-bottom: 10
+    phantom: true
+
+  UICreature
+    id: creature3
+    size: 48 48
+    anchors.verticalCenter: background.verticalCenter
+    anchors.right: background.right
+    margin-right: 10
+    margin-bottom: 10
+    phantom: true
+
+  UICreature
+    id: creature2
+    size: 64 64
+    anchors.centerIn: background
+    phantom: true
+
+  UIWidget
+    id: backgroundGrid
+    anchors.fill: background
+    image-source: images/hunt_background_grid
+    image-repeated: true
+    phantom: true
+    opacity: 0.5
+    margin: 1
+    visible: false
+
+  UIWidget
+    id: locker
+    size: 9 14
+    anchors.verticalCenter: title.verticalCenter
+    anchors.right: title.left
+    margin-right: 5
+    visible: false
+    image-source: images/locker_icon
+
+  UIWidget
+    id: yes
+    size: 12 9
+    anchors.verticalCenter: title.verticalCenter
+    anchors.right: title.left
+    margin-right: 5
+    visible: false
+    image-source: images/icon_yes
+
+  UIWidget
+    id: title
+    anchors.horizontalCenter: parent.horizontalCenter
+    anchors.top: background.bottom
+    text-Horizontal-auto-resize: true
+    margin-top: 5
+    color: #C0C0C0
+    text-align: center
+    text-truncate: true
+    margin-left: 5
+    margin-right: 5
+    phantom: true
+
+  UIWidget
+    id: starBackground
+    size: 74 16
+    anchors.horizontalCenter: parent.horizontalCenter
+    anchors.top: title.bottom
+    margin-top: 5
+    image-source: images/task_star_background
+    image-clip: 0 0 74 16
+    gif-frames: 15
+    gif-duration: 100
+    gif-rect: 74 16
+    phantom: true
+
+    TaskStarIcon
+      id: star1
+      anchors.top: parent.top
+      anchors.left: parent.left
+      margin-left: 12
+      margin-top: 2
+      phantom: true
+
+    TaskStarIcon
+      id: star2
+      anchors.verticalCenter: prev.verticalCenter
+      anchors.left: prev.right
+      margin-left: 2
+      phantom: true
+
+    TaskStarIcon
+      id: star3
+      anchors.verticalCenter: prev.verticalCenter
+      anchors.left: prev.right
+      margin-left: 2
+      phantom: true
+
+    TaskStarIcon
+      id: star4
+      anchors.verticalCenter: prev.verticalCenter
+      anchors.left: prev.right
+      margin-left: 2
+      phantom: true
+
+    TaskStarIcon
+      id: star5
+      anchors.verticalCenter: prev.verticalCenter
+      anchors.left: prev.right
+      margin-left: 2
+      phantom: true
+
+  UIWidget
+    id: exp
+    image-source: images/task_exp_background
+    image-clip: 0 0 98 16
+    gif-frames: 20
+    gif-duration: 100
+    gif-rect: 98 16
+    size: 98 16
+    anchors.top: starBackground.bottom
+    anchors.left: parent.left
+    margin-left: 5
+    margin-top: 8
+    phantom: true
+
+    TaskStarIcon
+      id: star1
+      anchors.top: parent.top
+      anchors.left: parent.left
+      margin-left: 32
+      margin-top: 3
+      phantom: true
+
+    TaskStarIcon
+      id: star2
+      anchors.verticalCenter: prev.verticalCenter
+      anchors.left: prev.right
+      margin-left: 4
+      phantom: true
+
+    TaskStarIcon
+      id: star3
+      anchors.verticalCenter: prev.verticalCenter
+      anchors.left: prev.right
+      margin-left: 4
+      phantom: true
+
+    TaskStarIcon
+      id: star4
+      anchors.verticalCenter: prev.verticalCenter
+      anchors.left: prev.right
+      margin-left: 4
+      phantom: true
+
+    TaskStarIcon
+      id: star5
+      anchors.verticalCenter: prev.verticalCenter
+      anchors.left: prev.right
+      margin-left: 4
+      phantom: true
+
+  UIWidget
+    id: loot
+    image-source: images/task_loot_background
+    image-clip: 0 0 99 21
+    gif-frames: 20
+    gif-duration: 100
+    gif-rect: 99 21
+    size: 99 21
+    anchors.top: starBackground.bottom
+    anchors.right: parent.right
+    margin-right: 10
+    margin-top: 5
+    phantom: true
+
+    TaskStarIcon
+      id: star1
+      anchors.top: parent.top
+      anchors.left: parent.left
+      margin-left: 32
+      margin-top: 6
+      phantom: true
+
+    TaskStarIcon
+      id: star2
+      anchors.verticalCenter: prev.verticalCenter
+      anchors.left: prev.right
+      margin-left: 4
+      phantom: true
+
+    TaskStarIcon
+      id: star3
+      anchors.verticalCenter: prev.verticalCenter
+      anchors.left: prev.right
+      margin-left: 4
+      phantom: true
+
+    TaskStarIcon
+      id: star4
+      anchors.verticalCenter: prev.verticalCenter
+      anchors.left: prev.right
+      margin-left: 4
+      phantom: true
+
+    TaskStarIcon
+      id: star5
+      anchors.verticalCenter: prev.verticalCenter
+      anchors.left: prev.right
+      margin-left: 4
+      phantom: true
+
+  UIWidget
+    id: killsTitle
+    anchors.left: parent.left
+    anchors.bottom: parent.bottom
+    margin-left: 10
+    margin-bottom: 8
+    !text: 'Kills:'
+    color: #C0C0C0
+    phantom: true
+
+  UIWidget
+    id: kills
+    image-source: /images/ui/textedit
+    image-border: 2
+    anchors.verticalCenter: killsTitle.verticalCenter
+    anchors.left: killsTitle.right
+    margin-left: 5
+    size: 80 17
+    color: #C0C0C0
+    phantom: true
+
+    UIWidget
+      id: text
+      color: #C0C0C0
+      anchors.right: icon.left
+      margin-right: 5
+      anchors.verticalCenter: parent.verticalCenter
+      text-horizontal-auto-resize: true
+      !text: '35,000'
+      phantom: true
+
+    UIWidget
+      id: icon
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.right: parent.right
+      margin-right: 5
+      image-source: images/task_kills_icon
+      image-clip: 0 0 13 11
+      gif-frames: 7
+      gif-duration: 100
+      gif-rect: 13 11
+      size: 13 11
+      phantom: false
+      !tooltip: 'Total number of monsters you need to eliminate to complete the Task.'
+
+  UIWidget
+    id: status
+    anchors.right: parent.right
+    anchors.bottom: kills.bottom
+    margin-right: 10
+    text-auto-resize: true
+    !text: 'Done'
+    color: #7be7dcff
+    font: verdana-11px-rounded
+    phantom: true
+
+TaskItem < UIWidget
+  id: preview
+  image-source: images/ui/containerslot
+  image-border: 3
+  size: 34 34
+
+  UIItem
+    id: item
+    anchors.centerIn: parent
+    virtual: false
+    phantom: true
+    size: 32 32
+    item-id: 9058
+    item-count: 100
+    count-show: false
+
+  UIWidget
+    id: icon
+    anchors.centerIn: parent
+    size: 32 32
+    phantom: true
+    visible: false
+
+  UIWidget
+    id: count
+    font: verdana-11px-rounded
+    anchors.bottom: parent.bottom
+    anchors.right: parent.right
+    margin-right: 2
+    text-align: right
+    text-horizontal-auto-resize: true
+    phantom: true
+    color: white
+    !text: '0'
+
+  UIWidget
+    id: chance
+    font: verdana-11px-rounded
+    anchors.top: parent.top
+    anchors.left: parent.left
+    margin-left: 1
+    margin-top: 1
+    text-align: left
+    text-horizontal-auto-resize: true
+    phantom: true
+    color: #FFD700
+    visible: false
+    !text: ''
+
+TaskPremiumItem < UIWidget
+  id: preview
+  image-source: images/ui/containerslot
+  image-border: 3
+  size: 34 34
+
+  UIItem
+    id: item
+    anchors.centerIn: parent
+    virtual: false
+    phantom: true
+    color: white
+    size: 32 32
+    item-id: 40763
+    item-count: 100
+    count-show: false
+
+  UIWidget
+    id: icon
+    anchors.centerIn: parent
+    size: 32 32
+    phantom: true
+    visible: false
+
+  UIWidget
+    id: count
+    font: verdana-11px-rounded
+    anchors.bottom: parent.bottom
+    anchors.right: parent.right
+    margin-right: 2
+    text-align: right
+    text-horizontal-auto-resize: true
+    phantom: true
+    color: #C0C0C0
+    !text: '0'
+
+  UIWidget
+    id: chance
+    font: verdana-11px-rounded
+    anchors.top: parent.top
+    anchors.left: parent.left
+    margin-left: 1
+    margin-top: 1
+    text-align: left
+    text-horizontal-auto-resize: true
+    phantom: true
+    color: #FFD700
+    visible: false
+    !text: ''
+
+  UIWidget
+    id: effect
+    anchors.fill: parent
+    image-source: images/battlepass_sloteffect
+    opacity: 0.5
+    phantom: true
+    gif-frames: 28
+    gif-duration: 75
+    gif-rect: 34 34
+    size: 34 34
+    phantom: true
+
+  UIWidget
+    id: ribbon
+    anchors.fill: parent
+    image-source: images/battlepass_slotribbon
+    phantom: true
+    size: 34 34
+
+TaskMonsterBlock < UIWidget
+  image-source: /images/ui/panel_side
+  image-border: 4
+  width: 85
+
+  UIWidget
+    id: title
+    !text: ''
+    text-truncate: true
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.top: parent.top
+    margin-top: 5
+    margin-left: 3
+    margin-right: 3
+    color: #C0C0C0
+    phantom: true
+
+  UIWidget
+    id: background
+    size: 68 68
+    anchors.horizontalCenter: parent.horizontalCenter
+    anchors.top: parent.top
+    margin-top: 22
+    image-source: /images/ui/textedit
+    image-border: 2
+    phantom: true
+
+  UICreature
+    id: creature
+    size: 56 56
+    anchors.centerIn: background
+    animate: true
+    phantom: true
+
+  UIWidget
+    id: starBackground
+    size: 74 16
+    anchors.horizontalCenter: parent.horizontalCenter
+    anchors.bottom: parent.bottom
+    margin-bottom: 5
+    image-source: images/task_star_background
+    image-clip: 0 0 74 16
+    gif-frames: 15
+    gif-duration: 100
+    gif-rect: 74 16
+    phantom: true
+
+    TaskStarIcon
+      id: star1
+      anchors.top: parent.top
+      anchors.left: parent.left
+      margin-left: 12
+      margin-top: 2
+      phantom: true
+
+    TaskStarIcon
+      id: star2
+      anchors.verticalCenter: prev.verticalCenter
+      anchors.left: prev.right
+      margin-left: 2
+      phantom: true
+
+    TaskStarIcon
+      id: star3
+      anchors.verticalCenter: prev.verticalCenter
+      anchors.left: prev.right
+      margin-left: 2
+      phantom: true
+
+    TaskStarIcon
+      id: star4
+      anchors.verticalCenter: prev.verticalCenter
+      anchors.left: prev.right
+      margin-left: 2
+      phantom: true
+
+    TaskStarIcon
+      id: star5
+      anchors.verticalCenter: prev.verticalCenter
+      anchors.left: prev.right
+      margin-left: 2
+      phantom: true
+
+  UIWidget
+    id: mask
+    image-source: images/gray_grid
+    image-repeated: true
+    anchors.fill: parent
+    opacity: 0.75
+    margin: 2
+
+  UIWidget
+    id: icon
+    image-source: images/icons_minibot
+    image-clip: 117 0 10 10
+    size: 10 10
+    anchors.top: parent.top
+    anchors.right: parent.right
+    margin-top: 25
+    margin-right: 13
+    !tooltip: 'This creature cannot be found in the selected Hunt.'
+
+TaskHuntOption < UIWidget
+  height: 18
+
+  UIWidget
+    id: star1
+    anchors.verticalCenter: parent.verticalCenter
+    anchors.right: parent.right
+    margin-right: 3
+    image-source: images/icon_star_inactive
+    size: 9 10
+    phantom: true
+
+  UIWidget
+    id: star2
+    anchors.verticalCenter: parent.verticalCenter
+    anchors.right: prev.left
+    margin-right: 2
+    image-source: images/icon_star_inactive
+    size: 9 10
+    phantom: true
+
+  UIWidget
+    id: star3
+    anchors.verticalCenter: parent.verticalCenter
+    anchors.right: prev.left
+    margin-right: 2
+    image-source: images/icon_star_inactive
+    size: 9 10
+    phantom: true
+
+  UIWidget
+    id: star4
+    anchors.verticalCenter: parent.verticalCenter
+    anchors.right: prev.left
+    margin-right: 2
+    image-source: images/icon_star_inactive
+    size: 9 10
+    phantom: true
+
+  UIWidget
+    id: star5
+    anchors.verticalCenter: parent.verticalCenter
+    anchors.right: prev.left
+    margin-right: 2
+    image-source: images/icon_star_inactive
+    size: 9 10
+    phantom: true
+
+  UIWidget
+    id: text
+    anchors.left: parent.left
+    anchors.verticalCenter: parent.verticalCenter
+    text-truncate: true
+    margin-right: 5
+    color: #C0C0C0
+    text-align: left
+    margin-left: 5
+    phantom: true
+
+TaskResumeEntry < UIWidget
+  height: 15
+  $alternate:
+    background-color: #484848
+
+  UIWidget
+    id: name
+    anchors.top: parent.top
+    anchors.bottom: parent.bottom
+    anchors.left: parent.left
+    text-horizontal-auto-resize: true
+    color: #C0C0C0
+    margin-left: 5
+    !text: 'Demon'
+
+  UIWidget
+    id: iconYes
+    size: 12 9
+    image-source: images/icon_yes
+    anchors.verticalCenter: parent.verticalCenter
+    anchors.right: parent.right
+    margin-right: 5
+    phantom: true
+    visible: false
+
+  UIWidget
+    id: iconTimer
+    size: 10 13
+    image-source: images/icon_timer
+    anchors.verticalCenter: parent.verticalCenter
+    anchors.right: parent.right
+    margin-right: 5
+    phantom: true
+    visible: false
+
+  UIWidget
+    id: iconNo
+    size: 10 8
+    image-source: images/icon_no
+    anchors.verticalCenter: parent.verticalCenter
+    anchors.right: parent.right
+    margin-right: 5
+    phantom: true
+    visible: false
+
+  UIWidget
+    id: value
+    anchors.top: parent.top
+    anchors.bottom: parent.bottom
+    anchors.right: parent.right
+    text-horizontal-auto-resize: true
+    color: #C0C0C0
+    margin-right: 22
+    !text: '100%'
+
+  UIWidget
+    id: second
+    anchors.top: parent.top
+    anchors.bottom: parent.bottom
+    anchors.right: value.left
+    text-horizontal-auto-resize: true
+    color: #dddf8aff
+    margin-right: 5
+    !text: '(Repeating)'
+    visible: false
+
+MainWindow
+  id: tasksWindow
+  !text: 'Tasks'
+  size: 911 650
+  @onEnter: |
+    if self.main.gridPanel:isVisible() then
+      modules.game_tasks.reloadPageContent(true, true)
+    end
+
+  @onEscape: |
+    modules.game_tasks.hide()
+
+  UIWidget
+    size: 145 56
+    anchors.top: parent.top
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-top: -63
+    image-source: /images/game/tutorial/backdrop_crestr
+    phantom: true
+
+  UIWidget
+    id: main
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.top: parent.top
+    anchors.bottom: separator.top
+    margin-bottom: 10
+
+    UIWidget
+      id: gridPanel
+      anchors.fill: parent
+      visible: false
+
+      UIWidget
+        id: tabs
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        height: 65
+        image-source: images/button_phantom
+        image-border: 3
+        image-clip: 1 44 20 24
+        padding: 1
+        layout:
+          type: horizontalBox
+
+        TaskTabButton
+          !text: 'Greenhorn'
+          &gifFrames: 1
+          &gifSource: 'images/icon_1'
+
+        TaskTabButton
+          !text: 'Adventurer'
+          &gifFrames: 1
+          &gifSource: 'images/icon_2'
+
+        TaskTabButton
+          !text: 'Hunter'
+          &gifFrames: 15
+          &gifSource: 'images/icon_3'
+
+        TaskTabButton
+          !text: 'Scrapper'
+          &gifFrames: 15
+          &gifSource: 'images/icon_4'
+
+        TaskTabButton
+          !text: 'Warlord'
+          &gifFrames: 15
+          &gifSource: 'images/icon_5'
+
+        Button
+          id: taskStore
+          size: 72 63
+          text: ''
+          image-source: images/button_phantom
+          image-clip: 1 44 20 24
+          image-border: 3
+          tooltip: Open the Task Coin store
+          @onClick: modules.game_tasks.showTaskStore()
+
+          $hover:
+            image-clip: 0 46 22 23
+
+          $pressed:
+            image-clip: 0 46 22 23
+            opacity: 0.85
+
+          UIWidget
+            id: storeIcon
+            anchors.centerIn: parent
+            size: 54 54
+            image-source: images/task_store_icon
+            image-auto-resize: true
+            phantom: true
+
+      UIWidget
+        id: filters
+        image-source: images/ui/window_light
+        image-border-left: 2
+        image-border-right: 2
+        image-border-top: 27
+        image-border-bottom: 4
+        phantom: true
+        padding-top: 22
+        padding-left: 7
+        padding-right: 7
+        padding-bottom: 7
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: tabs.bottom
+        margin-top: 5
+        height: 90
+        visible: false
+
+        Label
+          id: title
+          !text: 'Filters'
+          anchors.top: parent.top
+          anchors.horizontalCenter: parent.horizontalCenter
+          margin-top: 2
+          phantom: true
+          margin-top: -20
+          text-horizontal-auto-resize: true
+          color: #909090
+
+        UIWidget
+          id: flags
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.top: parent.top
+          margin-top: 5
+          image-source: images/ui/options_border
+          image-border: 2
+          height: 30
+          visible: false
+
+          CheckBox
+            id: showCompleted
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+            text-offset: 18 -2
+            !text: 'Show completed'
+            &defaultValue: true
+            color: #C0C0C0FF
+            margin-left: 5
+            width: 130
+            checked: true
+            @onCheckChange: |
+              modules.game_tasks.reloadPageContent(false, true)
+
+          CheckBox
+            id: showLocked
+            anchors.left: prev.right
+            anchors.verticalCenter: parent.verticalCenter
+            text-offset: 18 -2
+            !text: 'Show locked'
+            &defaultValue: true
+            color: #C0C0C0FF
+            margin-left: 10
+            width: 110
+            checked: true
+            @onCheckChange: |
+              modules.game_tasks.reloadPageContent(false, true)
+
+          CheckBox
+            id: showActives
+            anchors.left: prev.right
+            anchors.verticalCenter: parent.verticalCenter
+            text-offset: 18 -2
+            !text: 'Show active'
+            &defaultValue: true
+            color: #C0C0C0FF
+            margin-left: 10
+            width: 110
+            checked: true
+            @onCheckChange: |
+              modules.game_tasks.reloadPageContent(false, true)
+
+          CheckBox
+            id: showAvailables
+            anchors.left: prev.right
+            anchors.verticalCenter: parent.verticalCenter
+            text-offset: 18 -2
+            !text: 'Show available'
+            &defaultValue: true
+            color: #C0C0C0FF
+            margin-left: 10
+            width: 130
+            checked: true
+            @onCheckChange: |
+              modules.game_tasks.reloadPageContent(false, true)
+
+        UIWidget
+          id: starsBackground
+          image-source: images/ui/options_border
+          image-border: 2
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.top: flags.bottom
+          margin-top: 3
+          height: 50
+          visible: false
+
+          UIWidget
+            id: starsTitle
+            !text: 'Difficulty:'
+            color: #C0C0C0
+            anchors.top: parent.top
+            anchors.left: parent.left
+            margin-top: 5
+            margin-left: 10
+            phantom: true
+
+          CheckBox
+            id: star0
+            anchors.left: starsTitle.right
+            anchors.top: parent.top
+            text-offset: 18 -2
+            !text: '0 Stars'
+            &defaultValue: true
+            color: #C0C0C0FF
+            margin-left: 10
+            margin-top: 5
+            width: 80
+            checked: true
+            @onCheckChange: |
+              modules.game_tasks.reloadPageContent(false, true)
+
+          CheckBox
+            id: star1
+            anchors.left: star0.right
+            anchors.top: star0.top
+            text-offset: 18 -2
+            !text: '1 Star'
+            &defaultValue: true
+            color: #C0C0C0FF
+            margin-left: 5
+            width: 75
+            checked: true
+            @onCheckChange: |
+              modules.game_tasks.reloadPageContent(false, true)
+
+          CheckBox
+            id: star2
+            anchors.left: star1.right
+            anchors.top: star1.top
+            text-offset: 18 -2
+            !text: '2 Stars'
+            &defaultValue: true
+            color: #C0C0C0FF
+            margin-left: 5
+            width: 80
+            checked: true
+            @onCheckChange: |
+              modules.game_tasks.reloadPageContent(false, true)
+
+          CheckBox
+            id: star3
+            anchors.left: star2.right
+            anchors.top: star2.top
+            text-offset: 18 -2
+            !text: '3 Stars'
+            &defaultValue: true
+            color: #C0C0C0FF
+            margin-left: 5
+            width: 80
+            checked: true
+            @onCheckChange: |
+              modules.game_tasks.reloadPageContent(false, true)
+
+          CheckBox
+            id: star4
+            anchors.left: star3.right
+            anchors.top: star3.top
+            text-offset: 18 -2
+            !text: '4 Stars'
+            &defaultValue: true
+            color: #C0C0C0FF
+            margin-left: 5
+            width: 80
+            checked: true
+            @onCheckChange: |
+              modules.game_tasks.reloadPageContent(false, true)
+
+          CheckBox
+            id: star5
+            anchors.left: star4.right
+            anchors.top: star4.top
+            text-offset: 18 -2
+            !text: '5 Stars'
+            &defaultValue: true
+            color: #C0C0C0FF
+            margin-left: 5
+            width: 80
+            checked: true
+            @onCheckChange: |
+              modules.game_tasks.reloadPageContent(false, true)
+
+      Panel
+        id: list
+        image-source: images/task_list_background
+        padding: 1
+        image-border: 4
+        focusable: true
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.top: tabs.bottom
+        margin-top: 5
+        margin-bottom: 39
+        padding: 5
+        layout:
+          type: grid
+          cell-size: 215 198
+          cell-spacing: 3
+          flow: true
+
+      Button
+        id: searchButton
+        anchors.bottom: parent.bottom
+        anchors.right: parent.right
+        image-source: images/button_phantom
+        font: cipsoftFont
+        color: white
+        size: 22 22
+        icon: images/store_result
+        @onClick: |
+          modules.game_tasks.reloadPageContent(true, true)
+
+      TextEdit
+        id: search
+        anchors.verticalCenter: searchButton.verticalCenter
+        anchors.right: searchButton.left
+        !placeholder: 'Search task by name'
+        placeholder-color: #707070
+        color: #C0C0C0
+        margin-right: 5
+        width: 200
+
+      UIWidget
+        id: searchLabel
+        !text: 'Search:'
+        color: #C0C0C0
+        phantom: true
+        anchors.right: search.left
+        anchors.verticalCenter: search.verticalCenter
+        margin-right: 10
+
+      UIWidget
+        id: pages
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.verticalCenter: search.verticalCenter
+        text-horizontal-auto-resize: true
+        color: #C0C0C0
+        !text: 'Page: 1/1'
+
+      UIButton
+        id: nextPage
+        anchors.verticalCenter: pages.verticalCenter
+        anchors.left: pages.right
+        image-source: images/game/cyclopedia/button_next_page
+        image-clip: 0 0 18 18
+        font: cipsoftFont
+        color: white
+        size: 20 20
+        margin-left: 10
+        change-cursor-image: true
+        enabled: false
+        @onClick: |
+          modules.game_tasks.switchPage(1)
+
+        $pressed:
+          image-clip: 0 36 18 18
+
+        $disabled:
+          image-clip: 0 18 18 18
+
+      UIButton
+        id: prevPage
+        anchors.verticalCenter: pages.verticalCenter
+        anchors.right: pages.left
+        image-source: images/game/cyclopedia/button_prev_page
+        image-clip: 0 0 18 18
+        font: cipsoftFont
+        color: white
+        size: 20 20
+        margin-right: 10
+        change-cursor-image: true
+        enabled: false
+        @onClick: |
+          modules.game_tasks.switchPage(-1)
+
+        $pressed:
+          image-clip: 0 36 18 18
+
+        $disabled:
+          image-clip: 0 18 18 18
+
+    UIWidget
+      id: selectedPanel
+      anchors.fill: parent
+      visible: false
+
+      UIWidget
+        id: preview
+        image-source: images/ui/window_light
+        image-border-left: 2
+        image-border-right: 2
+        image-border-top: 27
+        image-border-bottom: 4
+        phantom: true
+        padding-top: 22
+        padding-left: 7
+        padding-right: 7
+        padding-bottom: 7
+        anchors.left: parent.left
+        anchors.top: parent.top
+        size: 200 345
+
+        Label
+          id: title
+          !text: ''
+          anchors.top: parent.top
+          anchors.horizontalCenter: parent.horizontalCenter
+          margin-top: 2
+          phantom: true
+          margin-top: -20
+          text-horizontal-auto-resize: true
+          color: #909090
+
+        UIWidget
+          id: background
+          anchors.horizontalCenter: parent.horizontalCenter
+          anchors.top: parent.top
+          margin-top: 10
+          image-source: images/task_pedestal
+          image-clip: 0 0 69 72
+          gif-frames: 7
+          gif-duration: 100
+          gif-rect: 69 72
+          size: 69 72
+
+        UICreature
+          id: creature
+          size: 64 64
+          anchors.centerIn: background
+          margin-bottom: 20
+          margin-right: 20
+          animate: true
+          idleanimate: true
+          phantom: true
+
+        UIWidget
+          id: progress
+          anchors.horizontalCenter: parent.horizontalCenter
+          anchors.top: background.bottom
+          margin-top: 5
+          size: 175 25
+
+          UIWidget
+            id: bar
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            width: 0
+            background-color: #00ff2aff
+            margin-left: 7
+            margin-top: 7
+            margin-bottom: 7
+
+          UIWidget
+            id: border
+            image-source: images/task_progress_bar
+            anchors.fill: parent
+
+          UIWidget
+            id: text
+            anchors.fill: parent
+            text-align: center
+            !text: '0 / 10,000'
+            color: #e1e1e1
+            margin-top: 2
+            font: verdana-11px-rounded
+
+        ScrollablePanel
+          id: list
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.bottom: parent.bottom
+          anchors.top: progress.bottom
+          margin-top: 25
+          image-source: images/ui/miniwindow_gray
+          image-border: 4
+          vertical-scrollbar: listScrollBar
+          padding: 2
+          padding-right: 15
+          height: 178
+          layout:
+            type: verticalBox
+
+        VerticalScrollBar
+          id: listScrollBar
+          anchors.top: list.top
+          anchors.bottom: list.bottom
+          anchors.right: list.right
+          margin-top: 2
+          margin-right: 2
+          margin-bottom: 2
+          step: 10
+          pixels-scroll: true
+
+        UIWidget
+          id: title
+          anchors.left: list.left
+          anchors.bottom: list.top
+          margin-bottom: 5
+          !text: 'Recommended hunts:'
+          color: #C0C0C0
+          phantom: true
+
+      UIWidget
+        id: actions
+        image-source: images/ui/window_light
+        image-border-left: 2
+        image-border-right: 2
+        image-border-top: 27
+        image-border-bottom: 4
+        phantom: true
+        padding-top: 22
+        padding-left: 7
+        padding-right: 7
+        padding-bottom: 7
+        anchors.bottom: parent.bottom
+        anchors.right: parent.right
+        anchors.top: preview.bottom
+        margin-top: 5
+        width: 420
+
+        Label
+          id: title
+          !text: 'Rewards'
+          anchors.top: parent.top
+          anchors.horizontalCenter: parent.horizontalCenter
+          margin-top: 2
+          phantom: true
+          margin-top: -20
+          text-horizontal-auto-resize: true
+          color: #909090
+
+        UIWidget
+          id: firstColumn
+          anchors.left: parent.left
+          anchors.right: parent.horizontalCenter
+          anchors.top: parent.top
+          anchors.bottom: claim.top
+          margin-right: 3
+          margin-bottom: 5
+
+          Label
+            id: subtitle
+            !text: 'First Completion'
+            anchors.top: parent.top
+            anchors.horizontalCenter: parent.horizontalCenter
+            text-horizontal-auto-resize: true
+            color: #C0C0C0
+            font: verdana-11px-rounded
+
+          ScrollablePanel
+            id: list
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: subtitle.bottom
+            anchors.bottom: experience.top
+            margin-top: 3
+            margin-bottom: 3
+            image-source: images/ui/miniwindow_gray
+            image-border: 4
+            vertical-scrollbar: listScrollBar
+            padding: 5
+            padding-right: 15
+            layout:
+              type: grid
+              cell-size: 34 34
+              cell-spacing: 3
+              flow: true
+
+          VerticalScrollBar
+            id: listScrollBar
+            anchors.top: list.top
+            anchors.bottom: list.bottom
+            anchors.right: list.right
+            margin-top: 2
+            margin-right: 2
+            margin-bottom: 2
+            step: 10
+            pixels-scroll: true
+
+          FlatPanel
+            id: experience
+            padding: 1
+            height: 22
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            image-source: images/ui/containerslot
+            image-border: 3
+
+            UIWidget
+              id: text
+              anchors.right: parent.right
+              anchors.verticalCenter: parent.verticalCenter
+              text-align: right
+              margin-right: 23
+              color: #C0C0C0
+              text-horizontal-auto-resize: true
+              !text: '0'
+
+            UIWidget
+              id: icon
+              anchors.left: prev.right
+              anchors.verticalCenter: prev.verticalCenter
+              margin-left: 5
+              image-source: images/task_exp_icon
+              image-clip: 0 0 15 10
+              gif-frames: 20
+              gif-duration: 100
+              gif-rect: 15 10
+              size: 15 10
+
+        UIWidget
+          id: secondColumn
+          anchors.left: parent.horizontalCenter
+          anchors.right: parent.right
+          anchors.top: parent.top
+          anchors.bottom: claim.top
+          margin-left: 3
+          margin-bottom: 5
+
+          Label
+            id: subtitle
+            !text: 'Repetition'
+            anchors.top: parent.top
+            anchors.horizontalCenter: parent.horizontalCenter
+            text-horizontal-auto-resize: true
+            color: #C0C0C0
+            font: verdana-11px-rounded
+
+          ScrollablePanel
+            id: list
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: subtitle.bottom
+            anchors.bottom: experience.top
+            margin-top: 3
+            margin-bottom: 3
+            image-source: images/ui/miniwindow_gray
+            image-border: 4
+            vertical-scrollbar: listScrollBar
+            padding: 5
+            padding-right: 15
+            layout:
+              type: grid
+              cell-size: 34 34
+              cell-spacing: 3
+              flow: true
+
+          VerticalScrollBar
+            id: listScrollBar
+            anchors.top: list.top
+            anchors.bottom: list.bottom
+            anchors.right: list.right
+            margin-top: 2
+            margin-right: 2
+            margin-bottom: 2
+            step: 10
+            pixels-scroll: true
+
+          FlatPanel
+            id: experience
+            padding: 1
+            height: 22
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            image-source: images/ui/containerslot
+            image-border: 3
+
+            UIWidget
+              id: text
+              anchors.right: parent.right
+              anchors.verticalCenter: parent.verticalCenter
+              text-align: right
+              margin-right: 23
+              color: #C0C0C0
+              text-horizontal-auto-resize: true
+              !text: '0'
+
+            UIWidget
+              id: icon
+              anchors.left: prev.right
+              anchors.verticalCenter: prev.verticalCenter
+              margin-left: 5
+              image-source: images/task_exp_icon
+              image-clip: 0 0 15 10
+              gif-frames: 20
+              gif-duration: 100
+              gif-rect: 15 10
+              size: 15 10
+
+        UIWidget
+          id: firstCompletedOverlay
+          size: 64 64
+          anchors.horizontalCenter: firstColumn.horizontalCenter
+          anchors.verticalCenter: firstColumn.verticalCenter
+          image-source: /images/game/battlepass/completed
+          phantom: true
+          visible: false
+
+        UIButton
+          id: claim
+          anchors.horizontalCenter: parent.horizontalCenter
+          anchors.bottom: parent.bottom
+          !text: 'Cancel Task'
+          color: #C0C0C0
+          font: verdana-11px-rounded
+          size: 120 24
+          text-offset: 0 3
+          image-source: images/button_red
+          image-clip: 0 0 98 40
+          image-border: 3
+
+      UIWidget
+        id: creatures
+        image-source: images/ui/window_light
+        image-border-left: 2
+        image-border-right: 2
+        image-border-top: 27
+        image-border-bottom: 4
+        phantom: true
+        padding-top: 22
+        padding-left: 7
+        padding-right: 7
+        padding-bottom: 7
+        anchors.left: parent.left
+        anchors.bottom: parent.bottom
+        anchors.right: actions.left
+        anchors.top: preview.bottom
+        margin-top: 5
+        margin-right: 5
+
+        Label
+          id: title
+          !text: 'Monsters to kill'
+          anchors.top: parent.top
+          anchors.horizontalCenter: parent.horizontalCenter
+          margin-top: 2
+          phantom: true
+          margin-top: -20
+          text-horizontal-auto-resize: true
+          color: #909090
+
+        ScrollablePanel
+          id: list
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.bottom: parent.bottom
+          anchors.top: parent.top
+          image-source: images/task_list_background
+          image-border: 4
+          horizontal-scrollbar: listScrollBar
+          padding: 2
+          padding-bottom: 17
+          padding-left: 5
+          padding-top: 5
+          layout:
+            type: horizontalBox
+            spacing: 3
+
+        HorizontalScrollBar
+          id: listScrollBar
+          anchors.bottom: list.bottom
+          anchors.right: list.right
+          anchors.left: list.left
+          margin-left: 2
+          margin-right: 2
+          margin-bottom: 2
+          step: 10
+          pixels-scroll: true
+
+      UIWidget
+        id: overall
+        image-source: images/ui/window_light
+        image-border-left: 2
+        image-border-right: 2
+        image-border-top: 27
+        image-border-bottom: 4
+        phantom: true
+        padding-top: 22
+        padding-left: 7
+        padding-right: 7
+        padding-bottom: 7
+        anchors.left: preview.right
+        anchors.bottom: preview.bottom
+        anchors.right: parent.right
+        anchors.top: parent.top
+        margin-left: 5
+
+        Label
+          id: title
+          !text: 'Ferumbras Ascending'
+          anchors.top: parent.top
+          anchors.horizontalCenter: parent.horizontalCenter
+          margin-top: 2
+          phantom: true
+          margin-top: -20
+          text-horizontal-auto-resize: true
+          color: #909090
+
+        UIWidget
+          id: mapBorder
+          image-source: images/ui/3pixel_frame_borderimage
+          image-border: 3
+          anchors.top: parent.top
+          anchors.right: parent.right
+          anchors.left: parent.left
+          anchors.bottom: exp.top
+          margin-bottom: 10
+
+          UIMinimap
+            id: minimap
+            draggable: true
+            focusable: false
+            cross: true
+            color: black
+            anchors.fill: parent
+            margin: 1
+            min-zoom: 0
+
+          UIWidget
+            id: layersPanel
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            margin-right: 10
+            margin-bottom: 10
+            size: 20 68
+
+            UIWidget
+              id: automapLayers
+              image-source: images/automap/automap_indicator_maplayers
+              anchors.left: parent.left
+              anchors.bottom: parent.bottom
+              image-clip: 98 0 14 67
+              size: 14 67
+
+            UIWidget
+              image-source: images/ui/vertical_line_dark
+              margin-left: 2
+              margin-top: 4
+              margin-bottom: 4
+              anchors.left: automapLayers.right
+              anchors.top: parent.top
+              anchors.bottom: parent.bottom
+              width: 1
+
+            UIWidget
+              id: layersMark
+              anchors.left: prev.right
+              anchors.top: automapLayers.top
+              image-source: images/automap/automap_indicator_slider_left
+              margin-top: 28
+
+            Button
+              image-source: images/automap/automap_phantom
+              anchors.left: automapLayers.left
+              anchors.right: automapLayers.right
+              anchors.top: automapLayers.top
+              anchors.bottom: automapLayers.verticalCenter
+              opacity: 0.01
+              @onClick: |
+                local minimap = self:getParent():getParent():getChildById('minimap')
+                local position = minimap:getCameraPosition()
+                if position.z == 0 then
+                  return
+                end
+                position.z = position.z - 1
+                minimap:setCameraPosition(position)
+                self:getParent():getChildById('layersMark'):setMarginTop(((position.z + 1) * 4) - 3)
+                self:getParent():getChildById('automapLayers'):setImageClip((position.z * 14) .. ' 0 14 67')
+
+            Button
+              image-source: images/automap/automap_phantom
+              anchors.left: automapLayers.left
+              anchors.right: automapLayers.right
+              anchors.top: automapLayers.verticalCenter
+              anchors.bottom: automapLayers.bottom
+              opacity: 0.01
+              @onClick: |
+                local minimap = self:getParent():getParent():getChildById('minimap')
+                local position = minimap:getCameraPosition()
+                if position.z == 14 then
+                  return
+                end
+                position.z = position.z + 1
+                minimap:setCameraPosition(position)
+                self:getParent():getChildById('layersMark'):setMarginTop(((position.z + 1) * 4) - 3)
+                self:getParent():getChildById('automapLayers'):setImageClip((position.z * 14) .. ' 0 14 67')
+
+        UIWidget
+          id: exp
+          size: 168 20
+          anchors.bottom: parent.bottom
+          anchors.left: parent.left
+          margin-bottom: 5
+          margin-left: 5
+
+          UIWidget
+            id: title
+            !text: 'Experience:'
+            color: #C0C0C0
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+
+          UIWidget
+            id: background
+            image-source: images/ui/miniwindow_gray
+            image-border: 2
+            anchors.fill: parent
+            anchors.left: title.right
+            margin-left: 5
+
+          TaskHideableStarIcon
+            id: star1
+            anchors.top: parent.top
+            anchors.left: background.left
+            margin-left: 5
+            margin-top: 5
+            enabled: true
+
+          TaskHideableStarIcon
+            id: star2
+            anchors.verticalCenter: prev.verticalCenter
+            anchors.left: prev.right
+            margin-left: 4
+            enabled: true
+
+          TaskHideableStarIcon
+            id: star3
+            anchors.verticalCenter: prev.verticalCenter
+            anchors.left: prev.right
+            margin-left: 4
+
+          TaskHideableStarIcon
+            id: star4
+            anchors.verticalCenter: prev.verticalCenter
+            anchors.left: prev.right
+            margin-left: 4
+            enabled: false
+
+          TaskHideableStarIcon
+            id: star5
+            anchors.verticalCenter: prev.verticalCenter
+            anchors.left: prev.right
+            margin-left: 4
+            enabled: false
+
+          UIWidget
+            id: icon
+            margin-right: 3
+            margin-top: 1
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.right: parent.right
+            image-source: images/task_exp_icon
+            image-clip: 0 0 15 10
+            gif-frames: 20
+            gif-duration: 100
+            gif-rect: 15 10
+            size: 15 10
+
+        UIWidget
+          id: loot
+          size: 119 20
+          anchors.top: exp.top
+          anchors.left: exp.right
+          margin-left: 15
+
+          UIWidget
+            id: title
+            !text: 'Loot:'
+            color: #C0C0C0
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+
+          UIWidget
+            id: background
+            image-source: images/ui/miniwindow_gray
+            image-border: 2
+            anchors.fill: parent
+            anchors.left: title.right
+            margin-left: 5
+
+          TaskHideableStarIcon
+            id: star1
+            anchors.top: parent.top
+            anchors.left: background.left
+            margin-left: 5
+            margin-top: 5
+            enabled: true
+
+          TaskHideableStarIcon
+            id: star2
+            anchors.verticalCenter: prev.verticalCenter
+            anchors.left: prev.right
+            margin-left: 4
+            enabled: true
+
+          TaskHideableStarIcon
+            id: star3
+            anchors.verticalCenter: prev.verticalCenter
+            anchors.left: prev.right
+            margin-left: 4
+
+          TaskHideableStarIcon
+            id: star4
+            anchors.verticalCenter: prev.verticalCenter
+            anchors.left: prev.right
+            margin-left: 4
+            enabled: false
+
+          TaskHideableStarIcon
+            id: star5
+            anchors.verticalCenter: prev.verticalCenter
+            anchors.left: prev.right
+            margin-left: 4
+            enabled: false
+
+          UIWidget
+            id: icon
+            margin-right: 3
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.right: parent.right
+            image-source: images/task_loot_icon
+            image-clip: 0 0 11 15
+            gif-frames: 20
+            gif-duration: 100
+            gif-rect: 11 15
+            size: 11 15
+
+        UIWidget
+          id: soloLevel
+          size: 147 20
+          anchors.top: exp.top
+          anchors.left: loot.right
+          margin-left: 5
+          visible: false
+
+          UIWidget
+            id: title
+            !text: 'Solo level:'
+            color: #C0C0C0
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+
+          UIWidget
+            id: background
+            image-source: images/ui/miniwindow_gray
+            image-border: 2
+            anchors.fill: parent
+            anchors.left: title.right
+            margin-left: 5
+
+          UIWidget
+            id: value
+            anchors.verticalCenter: parent.verticalCenter
+            text-vertical-auto-resize: true
+            anchors.right: icon.left
+            margin-right: 5
+            !text: '450'
+            text-horizontal-auto-resize: true
+            color: #C0C0C0
+
+          UIWidget
+            id: icon
+            margin-right: 3
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.right: parent.right
+            image-source: images/task_solo_icon
+            image-clip: 0 0 15 13
+            gif-frames: 14
+            gif-duration: 100
+            gif-rect: 15 13
+            size: 15 13
+
+        UIWidget
+          id: partyLevel
+          size: 165 20
+          anchors.top: exp.top
+          anchors.left: soloLevel.right
+          margin-left: 5
+          visible: false
+
+          UIWidget
+            id: title
+            !text: 'Party level:'
+            color: #C0C0C0
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+
+          UIWidget
+            id: background
+            image-source: images/ui/miniwindow_gray
+            image-border: 2
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            anchors.right: parent.right
+            anchors.left: title.right
+            margin-left: 7
+
+          UIWidget
+            id: value
+            anchors.verticalCenter: parent.verticalCenter
+            text-vertical-auto-resize: true
+            anchors.right: icon.left
+            margin-right: 5
+            !text: '250'
+            text-horizontal-auto-resize: true
+            color: #C0C0C0
+
+          UIWidget
+            id: icon
+            margin-right: 3
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.right: parent.right
+            image-source: images/task_group_icon
+            image-clip: 0 0 15 13
+            gif-frames: 14
+            gif-duration: 100
+            gif-rect: 15 13
+            size: 15 13
+
+    UIWidget
+      id: rewardPanel
+      anchors.fill: parent
+      visible: false
+
+      UIWidget
+        id: main
+        image-source: images/ui/window_light
+        image-border-left: 2
+        image-border-right: 2
+        image-border-top: 27
+        image-border-bottom: 4
+        phantom: true
+        padding-top: 22
+        padding-left: 7
+        padding-right: 7
+        padding-bottom: 7
+        anchors.left: parent.left
+        anchors.top: parent.top
+        margin-top: 5
+        size: 272 274
+
+        Label
+          id: title
+          !text: 'Victory Hall'
+          anchors.top: parent.top
+          anchors.horizontalCenter: parent.horizontalCenter
+          margin-top: 2
+          phantom: true
+          margin-top: -20
+          text-horizontal-auto-resize: true
+          color: #909090
+
+        UIWidget
+          id: image
+          anchors.horizontalCenter: parent.horizontalCenter
+          anchors.bottom: parent.bottom
+          size: 258 225
+          margin-bottom: 5
+
+        UIWidget
+          id: text
+          font: verdana-11px-rounded
+          anchors.horizontalCenter: parent.horizontalCenter
+          anchors.top: parent.top
+          text-auto-resize: true
+          !text: 'Sovereign'
+          color: #efffbaff
+          margin-top: 5
+
+        TaskStarIcon
+          id: star_left_1
+          anchors.verticalCenter: text.verticalCenter
+          anchors.right: text.left
+          margin-right: 5
+          margin-bottom: 1
+          enabled: true
+
+        TaskStarIcon
+          id: star_left_2
+          anchors.verticalCenter: text.verticalCenter
+          anchors.right: prev.left
+          margin-right: 2
+          margin-bottom: 1
+          enabled: true
+
+        TaskStarIcon
+          id: star_left_3
+          anchors.verticalCenter: text.verticalCenter
+          anchors.right: prev.left
+          margin-right: 2
+          margin-bottom: 1
+          enabled: true
+
+        TaskStarIcon
+          id: star_left_4
+          anchors.verticalCenter: text.verticalCenter
+          anchors.right: prev.left
+          margin-right: 2
+          margin-bottom: 1
+          enabled: true
+
+        TaskStarIcon
+          id: star_left_5
+          anchors.verticalCenter: text.verticalCenter
+          anchors.right: prev.left
+          margin-right: 2
+          margin-bottom: 1
+          enabled: true
+
+        TaskStarIcon
+          id: star_right_1
+          anchors.verticalCenter: text.verticalCenter
+          anchors.left: text.right
+          margin-left: 5
+          margin-bottom: 1
+          enabled: true
+
+        TaskStarIcon
+          id: star_right_2
+          anchors.verticalCenter: text.verticalCenter
+          anchors.left: prev.right
+          margin-left: 2
+          margin-bottom: 1
+          enabled: true
+
+        TaskStarIcon
+          id: star_right_3
+          anchors.verticalCenter: text.verticalCenter
+          anchors.left: prev.right
+          margin-left: 2
+          margin-bottom: 1
+          enabled: true
+
+        TaskStarIcon
+          id: star_right_4
+          anchors.verticalCenter: text.verticalCenter
+          anchors.left: prev.right
+          margin-left: 2
+          margin-bottom: 1
+          enabled: true
+
+        TaskStarIcon
+          id: star_right_5
+          anchors.verticalCenter: text.verticalCenter
+          anchors.left: prev.right
+          margin-left: 2
+          margin-bottom: 1
+          enabled: true
+
+      UIWidget
+        id: rewards
+        image-source: images/ui/window_light
+        image-border-left: 2
+        image-border-right: 2
+        image-border-top: 27
+        image-border-bottom: 4
+        phantom: true
+        padding-top: 22
+        padding-left: 10
+        padding-right: 10
+        padding-bottom: 7
+        anchors.left: main.left
+        anchors.right: main.right
+        anchors.bottom: parent.bottom
+        anchors.top: main.bottom
+        margin-top: 5
+
+        Label
+          id: title
+          !text: 'Rewards'
+          anchors.top: parent.top
+          anchors.horizontalCenter: parent.horizontalCenter
+          margin-top: 2
+          phantom: true
+          margin-top: -20
+          text-horizontal-auto-resize: true
+          color: #909090
+
+        ScrollablePanel
+          id: list
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.top: parent.top
+          anchors.bottom: claim.top
+          margin-bottom: 5
+          image-source: images/ui/miniwindow_gray
+          image-border: 4
+          vertical-scrollbar: listScrollBar
+          padding: 8
+          padding-right: 15
+          layout:
+            type: grid
+            cell-size: 34 34
+            cell-spacing: 4
+            flow: true
+
+        VerticalScrollBar
+          id: listScrollBar
+          anchors.top: list.top
+          anchors.bottom: list.bottom
+          anchors.right: list.right
+          margin-top: 2
+          margin-right: 2
+          margin-bottom: 2
+          step: 10
+          pixels-scroll: true
+
+        UIButton
+          id: claim
+          anchors.right: parent.right
+          anchors.bottom: parent.bottom
+          !text: 'Locked'
+          color: #C0C0C0
+          font: verdana-11px-rounded
+          size: 100 24
+          text-offset: 0 3
+          image-source: images/button_red
+          image-clip: 0 0 98 40
+          image-border: 3
+
+      UIWidget
+        id: overview
+        image-source: images/ui/window_light
+        image-border-left: 2
+        image-border-right: 2
+        image-border-top: 27
+        image-border-bottom: 4
+        phantom: true
+        padding-top: 22
+        padding-left: 10
+        padding-right: 10
+        padding-bottom: 10
+        anchors.top: main.top
+        anchors.left: main.right
+        anchors.right: parent.right
+        anchors.bottom: rewards.bottom
+        margin-left: 5
+
+        Label
+          id: title
+          !text: 'Overview'
+          anchors.top: parent.top
+          anchors.horizontalCenter: parent.horizontalCenter
+          margin-top: 2
+          phantom: true
+          margin-top: -20
+          text-horizontal-auto-resize: true
+          color: #909090
+
+        UIWidget
+          id: description
+          anchors.left: parent.left
+          anchors.top: parent.top
+          anchors.right: parent.right
+          text-vertical-auto-resize: true
+          text-align: topLeft
+          text-wrap: true
+          color: #C0C0C0
+
+        ScrollablePanel
+          id: list
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.bottom: parent.bottom
+          anchors.top: description.bottom
+          margin-top: 10
+          image-source: images/ui/miniwindow_gray
+          image-border: 4
+          vertical-scrollbar: listScrollBar
+          padding: 2
+          padding-right: 15
+          padding-top: 3
+          height: 178
+          layout:
+            type: verticalBox
+
+        VerticalScrollBar
+          id: listScrollBar
+          anchors.top: list.top
+          anchors.bottom: list.bottom
+          anchors.right: list.right
+          margin-top: 2
+          margin-right: 2
+          margin-bottom: 2
+          step: 10
+          pixels-scroll: true
+
+    UIWidget
+      id: loading
+      anchors.fill: parent
+
+      UIWidget
+        !text: 'Loading, please wait...'
+        anchors.centerIn: parent
+        color: #C0C0C0
+        phantom: true
+
+  HorizontalSeparator
+    id: separator
+    anchors.left: parent.left
+    anchors.bottom: close.top
+    anchors.right: parent.right
+    margin-bottom: 10
+
+  Button
+    id: close
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    font: cipsoftFont
+    color: white
+    width: 65
+    margin-top: 10
+    !text: 'Close'
+    @onClick: |
+      modules.game_tasks.hide()
+
+  CheckBox
+    id: trackerCheckbox
+    anchors.left: parent.left
+    anchors.bottom: parent.bottom
+    margin-left: 10
+    width: 95
+    font: verdana-11px-rounded
+    color: #C0C0C0
+    !text: 'Show Tracker'
+    @onCheckChange: modules.game_tasks.toggleTracker(self:isChecked())
+
+  UIWidget
+    id: difficultyLabel
+    anchors.horizontalCenter: filterStar3.horizontalCenter
+    anchors.bottom: filterStar3.top
+    margin-bottom: 2
+    !text: 'Difficulty:'
+    color: #C0C0C0
+    font: verdana-11px-rounded
+    text-horizontal-auto-resize: true
+    phantom: true
+
+  CheckBox
+    id: filterStar1
+    anchors.left: trackerCheckbox.right
+    anchors.verticalCenter: trackerCheckbox.verticalCenter
+    margin-left: 30
+    width: 40
+    font: verdana-11px-rounded
+    color: #C0C0C0
+    text-offset: 28 -1
+    !text: '1'
+    checked: true
+    @onCheckChange: modules.game_tasks.reloadPageContent(false, true)
+
+    TaskHideableStarIcon
+      anchors.left: parent.left
+      anchors.verticalCenter: parent.verticalCenter
+      margin-left: 15
+      phantom: true
+
+  CheckBox
+    id: filterStar2
+    anchors.left: filterStar1.right
+    anchors.verticalCenter: filterStar1.verticalCenter
+    margin-left: 4
+    width: 40
+    font: verdana-11px-rounded
+    color: #C0C0C0
+    text-offset: 28 -1
+    !text: '2'
+    checked: true
+    @onCheckChange: modules.game_tasks.reloadPageContent(false, true)
+
+    TaskHideableStarIcon
+      anchors.left: parent.left
+      anchors.verticalCenter: parent.verticalCenter
+      margin-left: 15
+      phantom: true
+
+  CheckBox
+    id: filterStar3
+    anchors.left: filterStar2.right
+    anchors.verticalCenter: filterStar2.verticalCenter
+    margin-left: 4
+    width: 40
+    font: verdana-11px-rounded
+    color: #C0C0C0
+    text-offset: 28 -1
+    !text: '3'
+    checked: true
+    @onCheckChange: modules.game_tasks.reloadPageContent(false, true)
+
+    TaskHideableStarIcon
+      anchors.left: parent.left
+      anchors.verticalCenter: parent.verticalCenter
+      margin-left: 15
+      phantom: true
+
+  CheckBox
+    id: filterStar4
+    anchors.left: filterStar3.right
+    anchors.verticalCenter: filterStar3.verticalCenter
+    margin-left: 4
+    width: 40
+    font: verdana-11px-rounded
+    color: #C0C0C0
+    text-offset: 28 -1
+    !text: '4'
+    checked: true
+    @onCheckChange: modules.game_tasks.reloadPageContent(false, true)
+
+    TaskHideableStarIcon
+      anchors.left: parent.left
+      anchors.verticalCenter: parent.verticalCenter
+      margin-left: 15
+      phantom: true
+
+  CheckBox
+    id: filterStar5
+    anchors.left: filterStar4.right
+    anchors.verticalCenter: filterStar4.verticalCenter
+    margin-left: 4
+    width: 40
+    font: verdana-11px-rounded
+    color: #C0C0C0
+    text-offset: 28 -1
+    !text: '5'
+    checked: true
+    @onCheckChange: modules.game_tasks.reloadPageContent(false, true)
+
+    TaskHideableStarIcon
+      anchors.left: parent.left
+      anchors.verticalCenter: parent.verticalCenter
+      margin-left: 15
+      phantom: true
+
+  CheckBox
+    id: filterShowCompleted
+    anchors.left: filterStar5.right
+    anchors.verticalCenter: difficultyLabel.verticalCenter
+    margin-left: 50
+    width: 110
+    font: verdana-11px-rounded
+    color: #C0C0C0
+    !text: 'Show completed'
+    checked: true
+    @onCheckChange: modules.game_tasks.reloadPageContent(false, true)
+
+  CheckBox
+    id: filterShowLocked
+    anchors.left: filterShowCompleted.right
+    anchors.verticalCenter: filterShowCompleted.verticalCenter
+    margin-left: 15
+    width: 100
+    font: verdana-11px-rounded
+    color: #C0C0C0
+    !text: 'Show locked'
+    checked: true
+    @onCheckChange: modules.game_tasks.reloadPageContent(false, true)
+
+  CheckBox
+    id: filterShowActive
+    anchors.left: filterStar5.right
+    anchors.verticalCenter: filterStar5.verticalCenter
+    margin-left: 50
+    width: 110
+    font: verdana-11px-rounded
+    color: #C0C0C0
+    !text: 'Show active'
+    checked: true
+    @onCheckChange: modules.game_tasks.reloadPageContent(false, true)
+
+  CheckBox
+    id: filterShowAvailable
+    anchors.left: filterShowActive.right
+    anchors.verticalCenter: filterShowActive.verticalCenter
+    margin-left: 15
+    width: 110
+    font: verdana-11px-rounded
+    color: #C0C0C0
+    !text: 'Show available'
+    checked: true
+    @onCheckChange: modules.game_tasks.reloadPageContent(false, true)
+
+  FlatPanel
+    id: taskPointsBalance
+    anchors.right: close.left
+    anchors.verticalCenter: close.verticalCenter
+    margin-right: 5
+    height: 20
+    width: 85
+    padding: 1
+    image-source: images/ui/containerslot
+    image-border: 3
+    !tooltip: tr('Task Coins earned from Tasks')
+    tooltip-delayed: true
+
+    UIWidget
+      id: icon
+      anchors.left: parent.left
+      anchors.verticalCenter: parent.verticalCenter
+      margin-left: 2
+      size: 14 14
+      image-source: images/preyhuntingtask-tokens
+
+    UIWidget
+      id: text
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      margin-right: 4
+      text-align: right
+      text-horizontal-auto-resize: true
+      color: #C0C0C0
+      font: verdana-11px-rounded
+      !text: '0'
+
+  Button
+    id: back
+    anchors.right: taskPointsBalance.left
+    anchors.bottom: parent.bottom
+    font: cipsoftFont
+    color: white
+    width: 65
+    margin-right: 5
+    !text: 'Back'
+    visible: false
+    @onClick: |
+      modules.game_tasks.backToGrid()

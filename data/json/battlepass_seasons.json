@@ -1,0 +1,15 @@
+{
+    "_comment": "Client-side Battle Pass season calendar. Season 1 mirrors the server window (battlePassStartDate/battlePassEndDate in config.lua): 63 days, separated by a 60-day gap. The client derives the active season locally from the current system time so the UI no longer depends on a server opcode to know when to show the button.",
+    "length_days": 63,
+    "gap_days": 60,
+    "seasons": [
+        { "id": 4, "start": "2026-05-14", "end": "2026-07-10" },
+        { "id": 5, "start": "2026-10-09", "end": "2026-12-11" },
+        { "id": 6, "start": "2027-02-09", "end": "2027-04-13" }
+    ],
+    "mission_unlock": {
+        "_comment": "Mirrors the server schedule on plain 7-day weeks: week 1 exposes 4 missions, and new missions unlock every 7 days from the season start. The exact per-week counts are non-linear (see BattlePass.getExposedMissionCount), so only the cadence is described here. Missions that have not unlocked yet are ignored by progress counters.",
+        "base_count": 4,
+        "week_interval_days": 7
+    }
+}

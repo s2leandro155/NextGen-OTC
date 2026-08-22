@@ -1,9 +1,15 @@
 Module
   name: game_helper
-  description: Helper
-  author: CrystalOTC
-  scripts: [ helper_healer, helper_heal_friend, helper_target, helper_posture, helper_shooter, helper_tools, helper_conditions, helper_autoparty, helper_cavebot, helper_config, game_helper ]
+  description: Tyron Helper adapted for CrystalOTC
+  author: Tyron / CrystalOTC adaptation
+  sandboxed: true
+  reloadable: true
+  scripts: [ helper_posture, helper_cavebot, helper, knight, paladin, sorcerer, druid, monk ]
+  autoload: true
+  autoload-priority: 1200
   dependencies:
+    - game_interface
+    - game_mainpanel
     - game_actionbar
     - game_cyclopedia
   @onLoad: init()

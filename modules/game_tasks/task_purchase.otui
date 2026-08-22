@@ -1,0 +1,57 @@
+MainWindow
+  id: purchaseDialogWindow
+  !text: 'Compra realizada com sucesso'
+  size: 350 150
+
+  UIWidget
+    id: descriptionBackground
+    anchors.left: parent.left
+    anchors.top: parent.top
+    anchors.bottom: parent.bottom
+    image-source: /images/ui/textedit
+    image-border: 2
+    width: 200
+
+  Label
+    id: description
+    anchors.fill: descriptionBackground
+    text-wrap: true
+    text-vertical-auto-resize: true
+    color: #C0C0C0FF
+    margin: 5
+
+  Button
+    id: button
+    anchors.right: parent.right
+    anchors.top: parent.top
+    anchors.bottom: parent.bottom
+    image-source: /images/store/button_blue
+    image-clip: 0 0 98 40
+    width: 110
+
+    $pressed !disabled:
+      text-offset: 1 1
+      image-clip: 98 0 98 40
+
+    $disabled:
+      text-offset: 1 1
+      image-source: /images/ui/button
+      image-clip: 0 0 22 23
+      color: #6F6D6AFF
+
+    $hover !disabled:
+      image-clip: 0 0 98 40
+
+  UIWidget
+    id: chest
+    anchors.centerIn: button
+    phantom: true
+    size: 108 108
+
+  UIWidget
+    id: dragon
+    anchors.horizontalCenter: parent.horizontalCenter
+    anchors.bottom: parent.top
+    margin-bottom: 24
+    phantom: true
+    size: 192 70

@@ -1,0 +1,8 @@
+Module
+  name: game_battlepasstracker
+  description: Battle Pass Tracker
+  author: Rubinot
+  sandboxed: true
+  scripts: [ battlepasstracker ]
+  @onLoad: initialize()
+  @onUnload: terminate()

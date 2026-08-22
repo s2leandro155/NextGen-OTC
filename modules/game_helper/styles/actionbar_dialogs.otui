@@ -1,0 +1,701 @@
+ActionBarHotkeyWindow < MainWindow
+  id: assignHotkeyWindow
+  size: 402 290
+  @onEscape: self:destroy()
+
+  Label
+    id: chatMode
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    height: 30
+    text-auto-resize: false
+    text-align: center
+
+  Label
+    id: primaryLabel
+    anchors.top: chatMode.bottom
+    anchors.left: parent.left
+    height: 16
+    !text: tr('Primary key')
+
+  Panel
+    id: display
+    anchors.top: primaryLabel.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    height: 33
+    text-auto-resize: false
+    text-align: center
+    border-width-top: 1
+    border-color-top: black
+    border-width-left: 1
+    border-color-left: black
+    border-width-bottom: 1
+    border-color-bottom: #747474
+    border-width-right: 1
+    border-color-right: #747474
+
+  Label
+    id: secondaryLabel
+    anchors.top: display.bottom
+    anchors.left: parent.left
+    height: 16
+    margin-top: 4
+    !text: tr('Secondary key')
+
+  Panel
+    id: displaySecondary
+    anchors.top: secondaryLabel.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    height: 33
+    text-auto-resize: false
+    text-align: center
+    border-width-top: 1
+    border-color-top: black
+    border-width-left: 1
+    border-color-left: black
+    border-width-bottom: 1
+    border-color-bottom: #747474
+    border-width-right: 1
+    border-color-right: #747474
+
+  Label
+    id: desc
+    anchors.top: displaySecondary.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    height: 30
+    margin-top: 5
+    text-wrap: true
+    text-auto-resize: false
+
+  Label
+    id: warning
+    anchors.top: desc.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    height: 30
+    color: #f75f5f
+    text-auto-resize: false
+    text-align: center
+    visible: false
+
+  HorizontalSeparator
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: hotkeyFooter.top
+    margin-bottom: 5
+
+  Panel
+    id: hotkeyFooter
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    height: 22
+
+    Button
+      id: buttonClose
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      !text: tr('Cancel')
+      margin-right: 5
+
+    Button
+      id: buttonClear
+      anchors.right: buttonClose.left
+      anchors.verticalCenter: parent.verticalCenter
+      !text: tr('Clear')
+      margin-right: 5
+
+    Button
+      id: buttonOk
+      anchors.right: buttonClear.left
+      anchors.verticalCenter: parent.verticalCenter
+      !text: tr('Ok')
+      margin-right: 5
+
+ActionBarTextWindow < MainWindow
+  id: assignTextWindow
+  size: 275 157
+  @onEscape: self:destroy()
+
+  Label
+    anchors.top: parent.top
+    anchors.left: parent.left
+    !text: tr('Text:')
+    margin-top: 5
+
+  TextEdit
+    id: text
+    anchors.top: prev.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 5
+    placeholder: Type to search
+    placeholder-color: #6E706F
+
+  InsetPanel
+    id: tickPanel
+    anchors.top: text.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    height: 22
+    margin-top: 6
+
+    CheckBox
+      id: tick
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      margin-left: 5
+      !text: tr('Send automatically')
+      font: verdana-11px-monochrome
+      color: #C0C0C0
+
+  HorizontalSeparator
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: textFooter.top
+    margin-bottom: 5
+
+  Panel
+    id: textFooter
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    height: 22
+
+    Button
+      id: buttonClose
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      !text: tr('Cancel')
+      margin-right: 5
+
+    Button
+      id: buttonApply
+      anchors.right: buttonClose.left
+      anchors.verticalCenter: parent.verticalCenter
+      !text: tr('Apply')
+      margin-right: 5
+      enabled: false
+
+    Button
+      id: buttonOk
+      anchors.right: buttonApply.left
+      anchors.verticalCenter: parent.verticalCenter
+      !text: tr('Ok')
+      margin-right: 5
+      enabled: false
+
+ActionBarObjectWindow < MainWindow
+  id: assignObjectWindow
+  size: 275 198
+  @onEscape: self:destroy()
+
+  InsetPanel
+    id: itemPanel
+    anchors.top: parent.top
+    anchors.left: parent.left
+    width: 72
+    height: 72
+
+    Item
+      id: item
+      anchors.centerIn: parent
+      size: 64 64
+      virtual: true
+
+  Panel
+    id: checkboxGroup
+    anchors.top: parent.top
+    anchors.left: itemPanel.right
+    anchors.right: parent.right
+    margin-left: 9
+    height: 120
+
+    CheckBox
+      id: UseOnYourself
+      anchors.top: parent.top
+      anchors.left: parent.left
+      anchors.right: parent.right
+      !text: tr('Use on yourself')
+
+    CheckBox
+      id: UseOnTarget
+      anchors.top: UseOnYourself.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 2
+      !text: tr('Use on target')
+
+    CheckBox
+      id: SelectUseTarget
+      anchors.top: UseOnTarget.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 2
+      !text: tr('With crosshair')
+
+    CheckBox
+      id: UseAtCursorPosition
+      anchors.top: SelectUseTarget.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 2
+      !text: tr('Use at cursor position')
+
+    CheckBox
+      id: Equip
+      anchors.top: UseAtCursorPosition.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 2
+      !text: tr('Equip/Unequip')
+
+    CheckBox
+      id: SmartMode
+      anchors.top: Equip.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 4
+      margin-left: 16
+      !text: tr('Smart mode')
+      enabled: false
+
+    CheckBox
+      id: Use
+      anchors.top: SmartMode.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 2
+      !text: tr('Use')
+
+  Button
+    id: selectObjectButton
+    anchors.top: itemPanel.bottom
+    anchors.left: parent.left
+    margin-top: 5
+    width: 72
+    !text: tr('Select Object')
+
+  HorizontalSeparator
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: objectFooter.top
+    margin-bottom: 5
+
+  Panel
+    id: objectFooter
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    height: 22
+
+    Button
+      id: buttonClose
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      !text: tr('Cancel')
+      margin-right: 5
+
+    Button
+      id: buttonApply
+      anchors.right: buttonClose.left
+      anchors.verticalCenter: parent.verticalCenter
+      !text: tr('Apply')
+      margin-right: 5
+      enabled: false
+
+    Button
+      id: buttonOk
+      anchors.right: buttonApply.left
+      anchors.verticalCenter: parent.verticalCenter
+      !text: tr('Ok')
+      margin-right: 5
+      enabled: false
+
+ActionBarSpellsWindow < MainWindow
+  id: assignSpellsWindow
+  size: 375 617
+  @onEscape: self:destroy()
+
+  UIWidget
+    id: image
+    anchors.top: parent.top
+    anchors.left: parent.left
+    size: 30 30
+
+  Label
+    id: preview
+    anchors.top: parent.top
+    anchors.left: image.right
+    anchors.right: parent.right
+    height: 30
+    margin-left: 15
+    text-auto-resize: false
+    text-wrap: true
+    !text: tr('No spell selected')
+
+  HorizontalSeparator
+    anchors.top: image.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 2
+
+  TextEdit
+    id: searchText
+    anchors.top: prev.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 5
+    placeholder: Search by name
+    placeholder-color: #6E706F
+
+  UIWidget
+    id: buttonClearSearchText
+    anchors.right: searchText.right
+    anchors.top: searchText.top
+    margin-top: 1
+    margin-right: 2
+    image-source: /game_cyclopedia/images/button_clear_search
+    image-color: white
+    opacity: 0.8
+    $hover:
+      opacity: 1.0
+      image-color: white
+    $pressed:
+      opacity: 1.0
+      image-color: gray
+
+  ScrollablePanel
+    id: spellList
+    anchors.top: searchText.bottom
+    anchors.left: parent.left
+    anchors.right: spellListScrollBar.left
+    height: 395
+    margin-top: 5
+    background-color: alpha
+    border-width-top: 1
+    border-color-top: black
+    border-width-left: 1
+    border-color-left: black
+    border-width-bottom: 1
+    border-color-bottom: #747474
+    border-width-right: 1
+    border-color-right: #747474
+    padding: 1
+    layout:
+      type: verticalBox
+    vertical-scrollbar: spellListScrollBar
+    focusable: true
+
+  VerticalQtScrollBar
+    id: spellListScrollBar
+    anchors.top: searchText.bottom
+    anchors.right: parent.right
+    margin-top: 5
+    height: 395
+    step: 50
+    pixels-scroll: true
+
+  Panel
+    id: filterPanel
+    anchors.top: spellList.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    height: 20
+    margin-top: 5
+    border-width-top: 1
+    border-color-top: black
+    border-width-left: 1
+    border-color-left: black
+    border-width-bottom: 1
+    border-color-bottom: #747474
+    border-width-right: 1
+    border-color-right: #747474
+
+    CheckBox
+      id: filterLearntSpells
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      margin-left: 5
+      !text: tr('Only show learnt spells')
+      color: #c0c0c0
+
+  Label
+    id: paramLabel
+    anchors.top: filterPanel.bottom
+    anchors.left: parent.left
+    margin-top: 5
+    !text: tr('Parameter:')
+    text-offset: 0 2
+
+  TextEdit
+    id: paramText
+    anchors.top: paramLabel.top
+    anchors.left: paramLabel.right
+    anchors.right: parent.right
+    height: 20
+    margin-left: 10
+
+  HorizontalSeparator
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: spellFooter.top
+    margin-bottom: 5
+
+  Panel
+    id: spellFooter
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    height: 22
+
+    Button
+      id: dev
+      anchors.left: parent.left
+      anchors.verticalCenter: parent.verticalCenter
+      !text: tr('show All')
+      visible: false
+
+    Button
+      id: buttonClose
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      !text: tr('Cancel')
+      margin-right: 5
+
+    Button
+      id: buttonApply
+      anchors.right: buttonClose.left
+      anchors.verticalCenter: parent.verticalCenter
+      !text: tr('Apply')
+      margin-right: 5
+
+    Button
+      id: buttonOk
+      anchors.right: buttonApply.left
+      anchors.verticalCenter: parent.verticalCenter
+      !text: tr('Ok')
+      margin-right: 5
+
+ActionBarPassiveWindow < MainWindow
+  id: assignPassiveWindow
+  size: 273 263
+  @onEscape: self:destroy()
+
+  UIWidget
+    id: image
+    anchors.top: parent.top
+    anchors.left: parent.left
+    size: 30 30
+    image-source: /images/game/spells/passiveability-icons-32x32
+
+  Label
+    id: preview
+    anchors.top: parent.top
+    anchors.left: image.right
+    anchors.right: parent.right
+    height: 30
+    margin-left: 15
+    text-auto-resize: false
+    text-wrap: true
+    !text: tr('Gift of Life')
+
+  HorizontalSeparator
+    anchors.top: image.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 2
+
+  Panel
+    id: passiveList
+    anchors.top: prev.bottom
+    anchors.left: parent.left
+    anchors.right: passiveListScrollBar.left
+    height: 118
+    margin-top: 5
+    background-color: alpha
+    border-width-top: 1
+    border-color-top: black
+    border-width-left: 1
+    border-color-left: black
+    border-width-bottom: 1
+    border-color-bottom: #747474
+    border-width-right: 1
+    border-color-right: #747474
+    padding: 1
+    layout:
+      type: verticalBox
+    vertical-scrollbar: passiveListScrollBar
+    focusable: false
+
+  VerticalQtScrollBar
+    id: passiveListScrollBar
+    anchors.top: passiveList.top
+    anchors.bottom: passiveList.bottom
+    anchors.right: parent.right
+    step: 50
+    pixels-scroll: true
+
+  HorizontalSeparator
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: passiveFooter.top
+    margin-bottom: 5
+
+  Panel
+    id: passiveFooter
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    height: 22
+
+    Button
+      id: buttonClose
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      !text: tr('Cancel')
+      margin-right: 5
+
+    Button
+      id: buttonApply
+      anchors.right: buttonClose.left
+      anchors.verticalCenter: parent.verticalCenter
+      !text: tr('Apply')
+      margin-right: 5
+
+    Button
+      id: buttonOk
+      anchors.right: buttonApply.left
+      anchors.verticalCenter: parent.verticalCenter
+      !text: tr('Ok')
+      margin-right: 5
+
+MultiActionSlot < Panel
+  size: 34 34
+  focusable: true
+
+  Label
+    id: slotLabel
+    anchors.fill: parent
+    text-align: center
+    font: verdana-11px-rounded
+    color: #c0c0c066
+    phantom: true
+
+  Item
+    id: item
+    anchors.fill: parent
+    padding: 1
+    virtual: true
+    font: verdana-8px-rounded
+
+    $!on:
+      image-source: /images/game/actionbar/actionbarslot
+      image-color: #dfdfdf
+      image-clip: 0 0 34 34
+      image-border: 0
+
+    $on:
+      image-source: /images/ui/button
+      image-color: #dfdfdf
+      image-clip: 0 0 22 23
+      image-border: 3
+
+    Label
+      id: text
+      anchors.fill: parent
+      text-wrap: true
+      text-align: center
+      margin: 1
+      font: small-9px
+      phantom: true
+
+MultiActionArrow < UIWidget
+  size: 9 6
+  image-source: /images/icons/icon-arrow-greater-vertical
+  phantom: true
+
+ActionBarMultiActionWindow < Panel
+  id: multiActionPanel
+  size: 70 118
+  image-source: /images/ui/2pixel_up_frame_borderimage
+  image-border: 2
+  focusable: true
+  phantom: false
+
+  Label
+    id: label3
+    anchors.top: parent.top
+    anchors.left: parent.left
+    size: 20 34
+    margin-top: 6
+    margin-left: 6
+    text-align: center
+    font: verdana-11px-rounded
+    color: #c0c0c0aa
+    !text: 'III'
+
+  MultiActionSlot
+    id: slot3
+    anchors.top: parent.top
+    anchors.left: label3.right
+    margin-top: 6
+    margin-left: 6
+
+  MultiActionArrow
+    id: arrow2
+    anchors.top: parent.top
+    anchors.left: parent.left
+    margin-top: 37
+    margin-left: 12
+
+  Label
+    id: label2
+    anchors.top: parent.top
+    anchors.left: parent.left
+    size: 20 34
+    margin-top: 41
+    margin-left: 6
+    text-align: center
+    font: verdana-11px-rounded
+    color: #c0c0c0aa
+    !text: 'II'
+
+  MultiActionSlot
+    id: slot2
+    anchors.top: parent.top
+    anchors.left: label2.right
+    margin-top: 42
+    margin-left: 6
+
+  MultiActionArrow
+    id: arrow1
+    anchors.top: parent.top
+    anchors.left: parent.left
+    margin-top: 76
+    margin-left: 12
+
+  Label
+    id: label1
+    anchors.top: parent.top
+    anchors.left: parent.left
+    size: 20 34
+    margin-top: 78
+    margin-left: 6
+    text-align: center
+    font: verdana-11px-rounded
+    color: #c0c0c0aa
+    !text: 'I'
+
+  MultiActionSlot
+    id: slot1
+    anchors.top: parent.top
+    anchors.left: label1.right
+    margin-top: 78
+    margin-left: 6

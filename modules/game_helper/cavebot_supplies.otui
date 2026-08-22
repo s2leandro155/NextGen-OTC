@@ -1,0 +1,123 @@
+CaveSupplyRow < Panel
+  size: 205 48
+  Label
+    id: title
+    anchors.left: parent.left
+    anchors.top: parent.top
+    text: Supply
+    font: $var-cip-font
+  UIItem
+    id: item
+    size: 36 36
+    anchors.left: parent.left
+    anchors.bottom: parent.bottom
+    image-source: /images/ui/item
+    draggable: true
+  TextEdit
+    id: minimum
+    size: 55 20
+    anchors.left: item.right
+    anchors.verticalCenter: item.verticalCenter
+    margin-left: 10
+    text: 0
+    text-align: center
+  TextEdit
+    id: buy
+    size: 55 20
+    anchors.left: minimum.right
+    anchors.verticalCenter: minimum.verticalCenter
+    margin-left: 13
+    text: 1
+    text-align: center
+
+NewHeadlessWindow
+  id: cavebotSuppliesWindow
+  size: 500 400
+  anchors.centerIn: parent
+  @onEscape: modules.game_helper.cavebotCloseSupplies()
+  Label
+    anchors.top: parent.top
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-top: 8
+    text: Cavebot Supplies
+    font: Verdana Bold-11px
+  Label
+    anchors.top: parent.top
+    anchors.left: parent.left
+    margin: 45 0 0 94
+    text: "Min:          Buy:"
+  Label
+    anchors.top: parent.top
+    anchors.left: parent.left
+    margin: 45 0 0 334
+    text: "Min:          Buy:"
+  Panel
+    id: supplyGrid
+    anchors.fill: parent
+    margin: 68 28 45 28
+    CaveSupplyRow
+      id: supply1
+      anchors.left: parent.left
+      anchors.top: parent.top
+      title.text: "Supply #1:"
+    CaveSupplyRow
+      id: supply2
+      anchors.left: parent.left
+      anchors.top: supply1.bottom
+      margin-top: 8
+      title.text: "Supply #2:"
+    CaveSupplyRow
+      id: supply3
+      anchors.left: parent.left
+      anchors.top: supply2.bottom
+      margin-top: 8
+      title.text: "Supply #3:"
+    CaveSupplyRow
+      id: supply4
+      anchors.left: parent.left
+      anchors.top: supply3.bottom
+      margin-top: 8
+      title.text: "Supply #4:"
+    CaveSupplyRow
+      id: supply5
+      anchors.left: parent.left
+      anchors.top: supply4.bottom
+      margin-top: 8
+      title.text: "Supply #5:"
+    CaveSupplyRow
+      id: supply6
+      anchors.right: parent.right
+      anchors.top: parent.top
+      title.text: "Supply #6:"
+    CaveSupplyRow
+      id: supply7
+      anchors.right: parent.right
+      anchors.top: supply6.bottom
+      margin-top: 8
+      title.text: "Supply #7:"
+    CaveSupplyRow
+      id: supply8
+      anchors.right: parent.right
+      anchors.top: supply7.bottom
+      margin-top: 8
+      title.text: "Supply #8:"
+    CaveSupplyRow
+      id: supply9
+      anchors.right: parent.right
+      anchors.top: supply8.bottom
+      margin-top: 8
+      title.text: "Supply #9:"
+    CaveSupplyRow
+      id: supply10
+      anchors.right: parent.right
+      anchors.top: supply9.bottom
+      margin-top: 8
+      title.text: "Supply #10:"
+  Button
+    height: 22
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    margin: 0 40 12 240
+    text: Close
+    @onClick: modules.game_helper.cavebotCloseSupplies()

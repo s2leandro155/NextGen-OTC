@@ -1,0 +1,493 @@
+CaveSettingEdit < TextEdit
+  size: 54 20
+  text-align: center
+
+CaveSettingCheck < OptionCheckBox
+  size: 14 14
+
+CaveSettingLabel < Label
+  font: $var-cip-font
+  color: #c0c0c0
+  text-auto-resize: true
+
+NewHeadlessWindow
+  id: cavebotSettingsWindow
+  size: 620 440
+  anchors.centerIn: parent
+  @onEscape: modules.game_helper.cavebotCloseSettings()
+
+  Label
+    anchors.top: parent.top
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-top: 7
+    text: Cavebot Settings
+    font: Verdana Bold-11px
+
+  Panel
+    id: tabButtons
+    height: 22
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin: 30 18 0 18
+    Button
+      width: 116
+      anchors.left: parent.left
+      anchors.top: parent.top
+      text: Movement
+      @onClick: modules.game_helper.cavebotSettingsTab('movement')
+    Button
+      width: 116
+      anchors.left: prev.right
+      anchors.top: parent.top
+      margin-left: 3
+      text: Combat
+      @onClick: modules.game_helper.cavebotSettingsTab('combat')
+    Button
+      width: 116
+      anchors.left: prev.right
+      anchors.top: parent.top
+      margin-left: 3
+      text: Check Supply
+      @onClick: modules.game_helper.cavebotSettingsTab('supply')
+    Button
+      width: 116
+      anchors.left: prev.right
+      anchors.top: parent.top
+      margin-left: 3
+      text: Presets
+      @onClick: modules.game_helper.cavebotSettingsTab('presets')
+
+  Panel
+    id: movementPanel
+    anchors.top: tabButtons.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: actionButtons.top
+    margin: 12 24 8 24
+    CaveSettingLabel
+      anchors.left: parent.left
+      anchors.top: parent.top
+      text: Walker Settings (applies to this cavebot)
+      font: Verdana Bold-11px
+    HorizontalSeparator
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.top: parent.top
+      margin-top: 19
+    CaveSettingLabel
+      anchors.left: parent.left
+      anchors.top: parent.top
+      margin-top: 32
+      text: Node Dist (1-3):
+    CaveSettingEdit
+      id: movementNodeDistance
+      anchors.left: parent.left
+      anchors.top: parent.top
+      margin-left: 170
+      margin-top: 28
+      text: 2
+    CaveSettingLabel
+      anchors.left: parent.left
+      anchors.top: parent.top
+      margin-top: 62
+      text: Walk Delay (10-5000ms):
+    CaveSettingEdit
+      id: movementWalkDelay
+      anchors.left: parent.left
+      anchors.top: parent.top
+      margin-left: 170
+      margin-top: 58
+      text: 20
+    CaveSettingLabel
+      anchors.left: parent.left
+      anchors.top: parent.top
+      margin-left: 245
+      margin-top: 32
+      text: Stop Kill Dist (1-3):
+    CaveSettingEdit
+      id: movementStopKillDistance
+      anchors.left: parent.left
+      anchors.top: parent.top
+      margin-left: 420
+      margin-top: 28
+      text: 2
+    CaveSettingCheck
+      id: movementWalkCheck
+      anchors.left: parent.left
+      anchors.top: parent.top
+      margin-top: 92
+      checked: true
+    CaveSettingLabel
+      anchors.left: parent.left
+      anchors.top: parent.top
+      margin-left: 20
+      margin-top: 91
+      text: Walk
+    CaveSettingCheck
+      id: movementClickCheck
+      anchors.left: parent.left
+      anchors.top: parent.top
+      margin-left: 70
+      margin-top: 92
+    CaveSettingLabel
+      anchors.left: parent.left
+      anchors.top: parent.top
+      margin-left: 90
+      margin-top: 91
+      text: Click
+    CaveSettingCheck
+      id: movementRecoveryCheck
+      anchors.left: parent.left
+      anchors.top: parent.top
+      margin-left: 245
+      margin-top: 92
+      checked: true
+    CaveSettingLabel
+      anchors.left: parent.left
+      anchors.top: parent.top
+      margin-left: 265
+      margin-top: 91
+      text: Z-Recovery
+    CaveSettingLabel
+      anchors.left: parent.left
+      anchors.top: parent.top
+      margin-top: 124
+      text: Creatures to stop (1-99):
+    CaveSettingEdit
+      id: movementCreaturesToStop
+      anchors.left: parent.left
+      anchors.top: parent.top
+      margin-left: 170
+      margin-top: 120
+      text: 8
+    CaveSettingLabel
+      anchors.left: parent.left
+      anchors.top: parent.top
+      margin-left: 245
+      margin-top: 124
+      text: Creatures to walk (0-99):
+    CaveSettingEdit
+      id: movementCreaturesToWalk
+      anchors.left: parent.left
+      anchors.top: parent.top
+      margin-left: 420
+      margin-top: 120
+      text: 2
+    CaveSettingLabel
+      anchors.left: parent.left
+      anchors.top: parent.top
+      margin-top: 158
+      text: Ignored Creatures (separated by comma):
+    TextEdit
+      id: movementIgnoredCreatures
+      height: 56
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.top: parent.top
+      margin-top: 178
+      text: Ex. Demon, Rat, Hunter
+    CaveSettingLabel
+      anchors.left: parent.left
+      anchors.top: parent.top
+      margin-top: 248
+      text: Goto label on death:
+    QtComboBox
+      id: movementDeathLabel
+      width: 220
+      height: 20
+      anchors.left: parent.left
+      anchors.top: parent.top
+      margin-left: 170
+      margin-top: 244
+      text: (none)
+
+  Panel
+    id: combatPanel
+    anchors.fill: movementPanel
+    visible: false
+    CaveSettingLabel
+      anchors.left: parent.left
+      anchors.top: parent.top
+      text: Do not walk if
+    CaveSettingEdit
+      anchors.left: parent.left
+      anchors.top: prev.top
+      margin-left: 85
+      text: 0
+    CaveSettingLabel
+      anchors.left: prev.right
+      anchors.verticalCenter: prev.verticalCenter
+      margin-left: 6
+      text: mobs HP below
+    CaveSettingEdit
+      anchors.left: prev.right
+      anchors.verticalCenter: prev.verticalCenter
+      margin-left: 6
+      text: 30
+    CaveSettingLabel
+      anchors.left: prev.right
+      anchors.verticalCenter: prev.verticalCenter
+      margin-left: 6
+      text: "%"
+    Panel
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.top: prev.bottom
+      height: 60
+      margin-top: 12
+      image-source: /images/ui/2pixel_up_frame_borderimage
+      image-border: 5
+      CaveSettingLabel
+        anchors.left: parent.left
+        anchors.top: parent.top
+        margin-left: 10
+        margin-top: -7
+        text: Stop to Kill
+      CaveSettingLabel
+        anchors.left: parent.left
+        anchors.verticalCenter: parent.verticalCenter
+        margin-left: 10
+        text: Stop to Kill Timeout (10-120s):
+      CaveSettingEdit
+        anchors.left: parent.left
+        anchors.verticalCenter: parent.verticalCenter
+        margin-left: 230
+        text: 60
+    Panel
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.top: prev.bottom
+      height: 100
+      margin-top: 12
+      image-source: /images/ui/2pixel_up_frame_borderimage
+      image-border: 5
+      CaveSettingLabel
+        anchors.left: parent.left
+        anchors.top: parent.top
+        margin-left: 10
+        margin-top: -7
+        text: Lure Mode
+      CaveSettingCheck
+        id: lureEnableCheck
+        anchors.left: parent.left
+        anchors.top: parent.top
+        margin: 12 10
+        checked: true
+      CaveSettingLabel
+        anchors.left: parent.left
+        anchors.top: parent.top
+        margin-left: 30
+        margin-top: 11
+        text: Enable Lure Mode
+      CaveSettingCheck
+        id: lureDebugCheck
+        anchors.left: parent.left
+        anchors.top: parent.top
+        margin-left: 430
+        margin-top: 12
+      CaveSettingLabel
+        anchors.left: parent.left
+        anchors.top: parent.top
+        margin-left: 450
+        margin-top: 11
+        text: Lure Debug
+      CaveSettingLabel
+        anchors.left: parent.left
+        anchors.top: prev.bottom
+        margin: 12 10
+        text: Check X Area (1-6):
+      CaveSettingEdit
+        anchors.left: parent.left
+        anchors.top: prev.top
+        margin-left: 150
+        text: 6
+      CaveSettingLabel
+        anchors.left: parent.left
+        anchors.top: prev.top
+        margin-left: 220
+        text: Check Y (1-4):
+      CaveSettingEdit
+        anchors.left: parent.left
+        anchors.top: prev.top
+        margin-left: 310
+        text: 4
+      CaveSettingLabel
+        anchors.left: parent.left
+        anchors.top: prev.bottom
+        margin: 10 10
+        text: Lure Timeout (500-5000ms):
+      CaveSettingEdit
+        anchors.left: parent.left
+        anchors.top: prev.top
+        margin-left: 200
+        text: 1500
+    Panel
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.top: prev.bottom
+      height: 70
+      margin-top: 12
+      image-source: /images/ui/2pixel_up_frame_borderimage
+      image-border: 5
+      CaveSettingLabel
+        anchors.left: parent.left
+        anchors.top: parent.top
+        margin-left: 10
+        margin-top: -7
+        text: Avoid Mode
+      CaveSettingCheck
+        id: avoidEnableCheck
+        anchors.left: parent.left
+        anchors.top: parent.top
+        margin: 12 10
+        checked: true
+      CaveSettingLabel
+        anchors.left: parent.left
+        anchors.top: parent.top
+        margin-left: 30
+        margin-top: 11
+        text: Enable Avoid Trap
+      CaveSettingLabel
+        anchors.left: parent.left
+        anchors.top: prev.bottom
+        margin: 14 10
+        text: Trap Distance (1-3):
+      CaveSettingEdit
+        anchors.left: parent.left
+        anchors.top: prev.top
+        margin-left: 135
+        text: 1
+      CaveSettingLabel
+        anchors.left: parent.left
+        anchors.top: prev.top
+        margin-left: 205
+        text: Creatures to Avoid (1-7):
+      CaveSettingEdit
+        anchors.left: parent.left
+        anchors.top: prev.top
+        margin-left: 360
+        text: 7
+    CaveSettingCheck
+      id: debugPathCheck
+      anchors.left: parent.left
+      anchors.top: prev.bottom
+      margin-top: 12
+    CaveSettingLabel
+      anchors.left: parent.left
+      anchors.top: debugPathCheck.top
+      margin-left: 20
+      text: Debug Path
+    Button
+      size: 120 22
+      anchors.right: parent.right
+      anchors.verticalCenter: prev.verticalCenter
+      text: Reset Debug Pos
+
+  Panel
+    id: supplyPanel
+    anchors.fill: movementPanel
+    visible: false
+    Button
+      size: 150 22
+      anchors.left: parent.left
+      anchors.top: parent.top
+      text: Configure Supplies
+      @onClick: modules.game_helper.cavebotOpenSupplies()
+    HorizontalSeparator
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.top: prev.bottom
+      margin-top: 12
+    CaveSettingLabel
+      anchors.left: parent.left
+      anchors.top: prev.bottom
+      margin-top: 15
+      text: Cavebot Conditions
+      font: Verdana Bold-11px
+    CaveSettingLabel
+      anchors.left: parent.left
+      anchors.top: prev.bottom
+      margin-top: 14
+      text: Stamina to leave (0-42h):
+    CaveSettingEdit
+      anchors.left: parent.left
+      anchors.top: prev.top
+      margin-left: 175
+      text: 39
+    CaveSettingLabel
+      anchors.left: parent.left
+      anchors.top: prev.bottom
+      margin-top: 14
+      text: Cap to leave (0-4000):
+    CaveSettingEdit
+      anchors.left: parent.left
+      anchors.top: prev.top
+      margin-left: 175
+      text: 500
+    CaveSettingLabel
+      anchors.left: parent.left
+      anchors.top: prev.bottom
+      margin-top: 14
+      text: Stamina to return (1-42h): 42
+    CaveSettingLabel
+      anchors.left: parent.left
+      anchors.top: prev.bottom
+      margin-top: 14
+      text: Deaths to disable (0-100): 0
+
+  Panel
+    id: presetsPanel
+    anchors.fill: movementPanel
+    visible: false
+    CaveSettingLabel
+      anchors.left: parent.left
+      anchors.top: parent.top
+      text: Force Presets (applies to this cavebot)
+      font: Verdana Bold-11px
+    CaveSettingCheck
+      anchors.left: parent.left
+      anchors.top: prev.bottom
+      margin-top: 18
+    CaveSettingLabel
+      anchors.left: prev.right
+      anchors.verticalCenter: prev.verticalCenter
+      margin-left: 5
+      text: Force Targeting        (do nothing)
+    CaveSettingCheck
+      anchors.left: parent.left
+      anchors.top: prev.bottom
+      margin-top: 20
+    CaveSettingLabel
+      anchors.left: prev.right
+      anchors.verticalCenter: prev.verticalCenter
+      margin-left: 5
+      text: Force Magic Shooter   (do nothing)
+
+  Panel
+    id: actionButtons
+    height: 26
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    margin: 0 18 10 18
+    Button
+      width: 80
+      anchors.right: parent.right
+      anchors.top: parent.top
+      text: Cancel
+      @onClick: modules.game_helper.cavebotCloseSettings()
+    Button
+      width: 80
+      anchors.right: prev.left
+      anchors.top: parent.top
+      margin-right: 5
+      text: Apply
+      @onClick: modules.game_helper.cavebotApplySettings(false)
+    Button
+      width: 80
+      anchors.right: prev.left
+      anchors.top: parent.top
+      margin-right: 5
+      text: Ok
+      @onClick: modules.game_helper.cavebotApplySettings(true)

@@ -49,6 +49,10 @@ PhantomMiniWindow
       margin-left: 8
       size: 108 20
       phantom: true
+      layout:
+        type: verticalBox
+        spacing: 0
+        fit-children: true
 
     UIWidget
       id: storeHighlight

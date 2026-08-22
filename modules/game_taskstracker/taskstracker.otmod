@@ -1,0 +1,9 @@
+Module
+  name: game_taskstracker
+  description: Task System Tracker window
+  author: Marcosvf132
+  website: https://deusot.com/
+  sandboxed: true
+  scripts: [ taskstracker ]
+  @onLoad: init()
+  @onUnload: terminate()

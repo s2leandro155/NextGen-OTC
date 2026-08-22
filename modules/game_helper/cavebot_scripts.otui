@@ -1,0 +1,81 @@
+NewHeadlessWindow
+  id: cavebotScriptsWindow
+  size: 155 292
+  anchors.centerIn: parent
+  @onEscape: modules.game_helper.cavebotCloseScriptsWindow()
+
+  HelperPopupSection
+    id: scriptsSection
+    !text: tr('Scripts')
+    anchors.fill: parent
+    margin: 8
+
+    TextList
+      id: cavebotScriptList
+      anchors.top: parent.top
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.bottom: cavebotScriptName.top
+      margin-top: 8
+      margin-left: 7
+      margin-right: 19
+      margin-bottom: 7
+      background-color: #363636
+      focusable: true
+      vertical-scrollbar: cavebotScriptScroll
+
+    VerticalScrollBar
+      id: cavebotScriptScroll
+      anchors.top: cavebotScriptList.top
+      anchors.right: parent.right
+      anchors.bottom: cavebotScriptList.bottom
+      margin-right: 7
+      width: 12
+      step: 19
+      pixels-scroll: true
+
+    TextEdit
+      id: cavebotScriptName
+      height: 20
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.bottom: cavebotSaveScriptButton.top
+      margin-left: 7
+      margin-right: 7
+      margin-bottom: 4
+      text: ""
+      !placeholder: tr('Route name')
+
+    Button
+      id: cavebotSaveScriptButton
+      height: 20
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.bottom: cavebotLoadScriptButton.top
+      margin-left: 7
+      margin-right: 7
+      margin-bottom: 4
+      text: Save
+      @onClick: modules.game_helper.cavebotSaveScript()
+
+    Button
+      id: cavebotLoadScriptButton
+      width: 61
+      height: 20
+      anchors.left: parent.left
+      anchors.bottom: parent.bottom
+      margin-left: 7
+      margin-bottom: 7
+      text: Load
+      @onClick: modules.game_helper.cavebotLoadScript()
+
+    Button
+      id: cavebotDeleteScriptButton
+      width: 61
+      height: 20
+      anchors.right: parent.right
+      anchors.bottom: parent.bottom
+      margin-right: 7
+      margin-bottom: 7
+      text: Delete
+      @onClick: modules.game_helper.cavebotDeleteScript()
