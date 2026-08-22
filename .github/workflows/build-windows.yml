@@ -105,10 +105,41 @@ jobs:
         uses: lukka/get-cmake@v3.31.6
 
       - name: Configure and Build
-        uses: lukka/run-cmake@main
+        id: compile
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          $log = "$env:GITHUB_WORKSPACE\windows-build.log"
+
+          # vcpkg downloads occasionally fail transiently on GitHub runners.
+          # Retry configuration once before treating it as a real build failure.
+          cmake --preset windows-release *>&1 | Tee-Object -FilePath $log
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "First configure attempt failed; retrying in 15 seconds..."
+            Start-Sleep -Seconds 15
+            cmake --preset windows-release *>&1 | Tee-Object -FilePath $log -Append
+          }
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          cmake --build --preset windows-release *>&1 | Tee-Object -FilePath $log -Append
+          exit $LASTEXITCODE
+
+      - name: Upload build diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
         with:
-          configurePreset: windows-release
-          buildPreset: windows-release
+          name: CrystalOTC-windows-build-log
+          path: |
+            ${{ github.workspace }}/windows-build.log
+            ${{ github.workspace }}/vcpkg/buildtrees/**/*.log
+          if-no-files-found: ignore
+
+      - name: Stop after build failure
+        if: ${{ steps.compile.outcome == 'failure' }}
+        shell: pwsh
+        run: |
+          Write-Error "Windows build failed. Download CrystalOTC-windows-build-log for details."
+          exit 1
 
       - name: Prepare artifact folder
         shell: pwsh
