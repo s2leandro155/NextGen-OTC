@@ -138,6 +138,17 @@ jobs:
         if: ${{ steps.compile.outcome == 'failure' }}
         shell: pwsh
         run: |
+          $log = "$env:GITHUB_WORKSPACE\windows-build.log"
+          if (Test-Path $log) {
+            $lines = @(Get-Content $log -Tail 180)
+            for ($offset = 0; $offset -lt $lines.Count; $offset += 30) {
+              $end = [Math]::Min($offset + 29, $lines.Count - 1)
+              $text = ($lines[$offset..$end] -join "`n")
+              $text = $text.Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
+              $part = [int]($offset / 30) + 1
+              Write-Output "::error title=Windows build log part $part::$text"
+            }
+          }
           Write-Error "Windows build failed. Download CrystalOTC-windows-build-log for details."
           exit 1
 
