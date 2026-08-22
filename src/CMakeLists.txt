@@ -593,11 +593,11 @@ target_compile_definitions(otclient_core PRIVATE ENABLE_DISCORD_RPC=${OTCLIENT_E
 # *****************************************************************************
 if(MSVC)
 
-  # Set variables to have Windows Vista Value so httplib will build 'inet_pton'
+  # cpp-httplib versions from the current vcpkg baseline require Windows 10+.
   target_compile_definitions(otclient_core
           PUBLIC
-          NTDDI_VERSION=0x06000000
-          _WIN32_WINNT=0x0600
+          NTDDI_VERSION=0x0A000000
+          _WIN32_WINNT=0x0A00
   )
 
   target_compile_definitions(otclient_core PRIVATE CRASH_HANDLER)
