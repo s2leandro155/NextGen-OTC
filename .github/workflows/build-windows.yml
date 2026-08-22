@@ -108,52 +108,20 @@ jobs:
         uses: lukka/get-cmake@v3.31.6
 
       - name: Configure and Build
-        id: compile
-        shell: pwsh
-        continue-on-error: true
-        run: |
-          $log = "$env:GITHUB_WORKSPACE\windows-build.log"
-
-          # vcpkg downloads occasionally fail transiently on GitHub runners.
-          # Retry configuration once before treating it as a real build failure.
-          cmake --preset windows-release *>&1 | Tee-Object -FilePath $log
-          if ($LASTEXITCODE -ne 0) {
-            Write-Host "First configure attempt failed; retrying in 15 seconds..."
-            Start-Sleep -Seconds 15
-            cmake --preset windows-release *>&1 | Tee-Object -FilePath $log -Append
-          }
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-          cmake --build --preset windows-release *>&1 | Tee-Object -FilePath $log -Append
-          exit $LASTEXITCODE
+        uses: lukka/run-cmake@main
+        with:
+          configurePreset: windows-release
+          buildPreset: windows-release
 
       - name: Upload build diagnostics
-        if: ${{ always() }}
+        if: ${{ failure() }}
         uses: actions/upload-artifact@v4
         with:
           name: CrystalOTC-windows-build-log
           path: |
-            ${{ github.workspace }}/windows-build.log
+            ${{ github.workspace }}/build/windows-release/vcpkg-manifest-install.log
             ${{ github.workspace }}/vcpkg/buildtrees/**/*.log
           if-no-files-found: ignore
-
-      - name: Stop after build failure
-        if: ${{ steps.compile.outcome == 'failure' }}
-        shell: pwsh
-        run: |
-          $log = "$env:GITHUB_WORKSPACE\windows-build.log"
-          if (Test-Path $log) {
-            $lines = @(Get-Content $log -Tail 180)
-            for ($offset = 0; $offset -lt $lines.Count; $offset += 30) {
-              $end = [Math]::Min($offset + 29, $lines.Count - 1)
-              $text = ($lines[$offset..$end] -join "`n")
-              $text = $text.Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
-              $part = [int]($offset / 30) + 1
-              Write-Output "::error title=Windows build log part $part::$text"
-            }
-          }
-          Write-Error "Windows build failed. Download CrystalOTC-windows-build-log for details."
-          exit 1
 
       - name: Prepare artifact folder
         shell: pwsh
