@@ -677,7 +677,10 @@ if(MSVC)
           LibLZMA::LibLZMA
           winmm.lib
           pugixml::pugixml
-          fmt::fmt-header-only
+          # Link the compiled fmt target on Windows. httplib also brings the
+          # compiled fmt library, so fmt-header-only produces duplicate fmt
+          # symbols at the final MSVC link step (LNK2005/LNK1169).
+          fmt::fmt
           utf8cpp::utf8cpp
           Freetype::Freetype
   )

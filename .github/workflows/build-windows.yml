@@ -26,9 +26,9 @@ permissions:
 env:
   CMAKE_BUILD_PARALLEL_LEVEL: 2
   MAKEFLAGS: "-j 2"
-  # The repository cache below already preserves vcpkg artifacts. Disabling
-  # vcpkg's x-gha binary provider avoids missing runtime-token failures.
-  VCPKG_BINARY_SOURCES: "clear"
+  # Keep compiled vcpkg packages in a normal filesystem cache. This avoids the
+  # unavailable x-gha runtime token and lets failed runs reuse dependencies.
+  VCPKG_BINARY_SOURCES: "clear;files,${{ github.workspace }}/.vcpkg-binary-cache,readwrite"
 
 jobs:
   build:
@@ -80,11 +80,14 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            ${{ github.workspace }}/vcpkg/installed
+            ${{ github.workspace }}/.vcpkg-binary-cache
+            ${{ github.workspace }}/build/windows-release/vcpkg_installed
             ${{ github.workspace }}/vcpkg/buildtrees
             ${{ github.workspace }}/vcpkg/downloads
-          key: vcpkg-windows-release-${{ steps.hash.outputs.hash }}
+            ${{ github.workspace }}/vcpkg/packages
+          key: vcpkg-windows-release-v2-${{ steps.hash.outputs.hash }}
           restore-keys: |
+            vcpkg-windows-release-v2-
             vcpkg-windows-release-
 
       - name: Compiler cache (sccache)
@@ -109,6 +112,10 @@ jobs:
 
       - name: Set up MSVC environment
         uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Prepare persistent vcpkg binary cache
+        shell: pwsh
+        run: New-Item -ItemType Directory -Force -Path "$env:GITHUB_WORKSPACE\.vcpkg-binary-cache" | Out-Null
 
       - name: Configure and Build
         id: compile
