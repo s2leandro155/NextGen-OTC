@@ -26,6 +26,9 @@ permissions:
 env:
   CMAKE_BUILD_PARALLEL_LEVEL: 2
   MAKEFLAGS: "-j 2"
+  # The repository cache below already preserves vcpkg artifacts. Disabling
+  # vcpkg's x-gha binary provider avoids missing runtime-token failures.
+  VCPKG_BINARY_SOURCES: "clear"
 
 jobs:
   build:
