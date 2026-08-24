@@ -3107,13 +3107,13 @@ ShooterPanel < Panel
 
       Panel
         id: posturePanel
-        size: 76 30
+        size: 110 64
         anchors.top: postureLabel.bottom
         anchors.horizontalCenter: postureLabel.horizontalCenter
         margin-top: 6
         layout:
-          type: horizontalBox
-          spacing: 8
+          type: verticalBox
+          spacing: 4
 
       Panel
         id: combatStancePanel

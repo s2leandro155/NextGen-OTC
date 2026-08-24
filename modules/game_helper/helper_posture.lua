@@ -137,6 +137,13 @@ local function resolvePlayerVocation(player)
 
 	local rawVocation = tonumber(safeCall(player, "getVocation")) or 0
 
+	-- This server already sends the Helper vocation ids directly. In
+	-- particular, raw id 5 is Sorcerer here (the official translator would
+	-- incorrectly turn it into Monk).
+	if rawVocation >= 5 and rawVocation <= 10 then
+		return rawVocation, rawVocation
+	end
+
 	if type(translateVocation) == "function" then
 		local ok, vocation = pcall(translateVocation, rawVocation)
 
@@ -509,7 +516,10 @@ function HelperPosture.castPending(player, cooldownReady)
 	end
 
 	for _, groupKey in ipairs(STANCE_SELECTION_ORDER) do
-		local words = castRequests[groupKey]
+		-- A selected posture is persistent: cast it again whenever its own
+		-- exhaustion expires. castRequests only makes a newly clicked selection
+		-- eligible immediately; clearing it must not disable future renewals.
+		local words = castRequests[groupKey] or selection[groupKey]
 
 		if words and tostring(words) ~= "" then
 			local spell = findStance(groupKey, words, player)
@@ -649,15 +659,18 @@ function HelperPosture.refreshUI()
 	selection = normalizeSelection(selection)
 
 	for groupIndex, group in ipairs(groups) do
-		if groupIndex > 1 then
-			local spacer = g_ui.createWidget("UIWidget", panel)
-
-			spacer:setPhantom(true)
-			spacer:setWidth(8)
-			spacer:setHeight(ICON_SIZE)
-
-			postureWidgets[#postureWidgets + 1] = spacer
-		end
+		-- Keep each posture family on its own line. Sorcerer therefore shows
+		-- the three elemental stances on top and the two combat auras below.
+		local groupRow = g_ui.createWidget("Panel", panel)
+		groupRow:mergeStyle({
+			width = 110,
+			height = ICON_SIZE,
+			layout = {
+				type = "horizontalBox",
+				spacing = 8
+			}
+		})
+		postureWidgets[#postureWidgets + 1] = groupRow
 
 		local selectedWords = normalizeKey(selection[group.key] or "")
 		local groupKey = group.key
@@ -666,7 +679,7 @@ function HelperPosture.refreshUI()
 			local active = selectedWords ~= "" and normalizeKey(spell.words) == selectedWords
 			local words = tostring(spell.words or "")
 			local ok, err = pcall(function()
-				local btn = g_ui.createWidget("HelperPostureButton", panel)
+				local btn = g_ui.createWidget("HelperPostureButton", groupRow)
 
 				btn:setPhantom(false)
 				btn:setFocusable(false)
@@ -699,7 +712,9 @@ function HelperPosture.refreshUI()
 					return true
 				end
 
-				postureWidgets[#postureWidgets + 1] = btn
+				-- The row owns and destroys its buttons. Keeping the child here too
+				-- made refreshUI destroy the same widget twice after a click, which
+				-- broke the aura selection/highlight.
 			end)
 
 			if not ok and g_logger and g_logger.info then

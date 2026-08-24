@@ -79,8 +79,7 @@ function var_0_0.shooterLayout(arg_2_0)
 		"countMinCreature0",
 		"cycleRuneIntervalLabel",
 		"cycleRuneInterval",
-		"cycleRuneCheck",
-		"combatStancePanel"
+		"cycleRuneCheck"
 	}
 
 	for iter_2_4, iter_2_5 in ipairs(var_2_4) do
@@ -89,6 +88,14 @@ function var_0_0.shooterLayout(arg_2_0)
 		if var_2_5 then
 			var_2_5:setVisible(true)
 		end
+	end
+
+	-- The generic posture panel now owns Blood Rage/Protector. Keeping the
+	-- legacy Knight combat-stance editor visible overlays its title, icons,
+	-- recast and mana controls on top of the new stance buttons.
+	local legacyStancePanel = runePanel:recursiveGetChildById("combatStancePanel")
+	if legacyStancePanel then
+		legacyStancePanel:setVisible(false)
 	end
 
 	enableButtons:addAnchor(AnchorTop, "runePanel", AnchorBottom)

@@ -385,7 +385,10 @@ local function var_0_42()
 	return var_3_0 < var_0_41(var_0_25.id) or var_3_0 < var_0_12
 end
 
-local var_0_43 = 400
+-- Minimum local lock for each Shooter spell. The server cooldown packet can
+-- arrive late (or briefly report a shorter value) on a high-latency link, so
+-- 400 ms allowed the same words to be sent repeatedly before state settled.
+local var_0_43 = 1500
 local var_0_44 = 2000
 local var_0_45
 local var_0_46 = 0
@@ -1138,7 +1141,11 @@ local var_0_96 = {
 	3035
 }
 local var_0_97 = {
-	258
+	258, -- Divine Grenade (RP)
+	302, -- Divine Barrage (RP)
+	303, -- Ethereal Barrage (MS)
+	310, -- Death Echo (MS)
+	301  -- Thousand Fist Blows (Monk)
 }
 local var_0_98 = {
 	[275] = true,
@@ -1221,6 +1228,12 @@ function getPlayerVocation()
 	end
 
 	local rawVocation = tonumber(var_37_0:getVocation()) or 0
+	-- Crystal sends its Helper vocation ids directly: 5 Sorcerer, 6 Druid,
+	-- 7 Paladin, 8 Knight and 9/10 Monk. Do not pass id 5 through the
+	-- official-client translator, where 5 means Monk.
+	if rawVocation >= 5 and rawVocation <= 10 then
+		return rawVocation
+	end
 	local translated = translateVocation(rawVocation)
 
 	-- Crystal's server already sends the promoted vocation in the Helper
@@ -1934,7 +1947,8 @@ function offline()
 end
 
 function onSpellCooldown(arg_58_0, arg_58_1)
-	var_0_40[arg_58_0] = g_clock.millis() + arg_58_1
+	-- Never let a delayed/shorter cooldown packet undo a local anti-spam lock.
+	var_0_40[arg_58_0] = math.max(var_0_40[arg_58_0] or 0, g_clock.millis() + arg_58_1)
 
 	if var_0_45 and var_0_45.id == arg_58_0 then
 		var_0_45 = nil
@@ -4604,21 +4618,22 @@ function assignSpell(arg_179_0, arg_179_1, arg_179_2, arg_179_3, arg_179_4)
 				local var_187_8 = shooterPanel:recursiveGetChildById("selfCast" .. var_187_4)
 
 				if table.contains(var_0_97, var_187_5.id) and not var_187_8 then
-					var_187_8 = g_ui.createWidget("CheckBox", var_187_6:getParent())
+					var_187_8 = g_ui.createWidget("Button", arg_179_0)
 
 					var_187_8:mergeStyle({
-						["margin-top"] = 6,
 						width = 12,
-						["margin-left"] = 5,
-						["anchors.top"] = "countMinCreature" .. var_187_4 .. ".top",
-						["anchors.left"] = "countMinCreature" .. var_187_4 .. ".right"
+						height = 12,
+						font = "Verdana Bold-9px-small",
+						["anchors.right"] = "parent.right",
+						["anchors.bottom"] = "parent.bottom"
 					})
 					var_187_8:setId("selfCast" .. var_187_4)
 					var_187_8:setTooltip("Cast on yourself")
 					var_187_8:setVisible(true)
+					updateSelfCastModeWidget(var_187_8)
 
-					function var_187_8.onCheckChange()
-						toggleSelfCast(var_187_4, var_187_8:isChecked())
+					function var_187_8.onClick()
+						toggleSelfCast(var_187_4, not var_179_7.spells[var_187_4 + 1].selfCast)
 					end
 				end
 
@@ -6390,7 +6405,37 @@ function updateMagicShooterCreatures(arg_295_0, arg_295_1, arg_295_2)
 end
 
 function toggleSelfCast(arg_296_0, arg_296_1)
-	getShooterProfile().spells[arg_296_0 + 1].selfCast = arg_296_1
+	local var_296_1 = getShooterProfile().spells[arg_296_0 + 1]
+	var_296_1.selfCast = arg_296_1
+	var_296_1.castMode = arg_296_1 and "Y" or "T"
+
+	-- Use the native 15.30 spell-aim setting too. Enabled means that the
+	-- server resolves the spell directly against the attacked creature.
+	if var_296_1.id and g_game.sendSelectSpellAim then
+		pcall(function()
+			g_game.sendSelectSpellAim({ var_296_1.id }, not arg_296_1)
+		end)
+	end
+
+	local var_296_0 = shooterPanel and shooterPanel:recursiveGetChildById("selfCast" .. arg_296_0)
+
+	updateSelfCastModeWidget(var_296_0)
+end
+
+-- Crosshair spells can be aimed at the current target or at the player. Keep
+-- that choice visible beside the checkbox: T = target, Y = yourself.
+function updateSelfCastModeWidget(arg_296_0)
+	if not arg_296_0 then
+		return
+	end
+
+	local var_296_1 = tonumber(arg_296_0:getId():match("%d+"))
+	local var_296_2 = var_296_1 and getShooterProfile().spells[var_296_1 + 1]
+	local var_296_0 = var_296_2 and var_296_2.selfCast == true
+
+	arg_296_0:setText(var_296_0 and "Y" or "T")
+	arg_296_0:setColor(var_296_0 and "#66ff66" or "#ffd966")
+	arg_296_0:setTooltip(var_296_0 and "Y = Yourself (cast on yourself)" or "T = Target (cast on current target)")
 end
 
 function toggleForceCast(arg_297_0, arg_297_1)
@@ -7090,8 +7135,10 @@ function checkMagicShooter()
 
 			if iter_329_11.type == "spell" then
 				local var_329_20 = false
+				local var_329_34 = nil
 				local var_329_21 = iter_329_11.spell
 				local var_329_22 = iter_329_11.config
+				var_329_22.castMode = var_329_22.castMode or (var_329_22.selfCast and "Y" or "T")
 				local var_329_23 = 0
 				local var_329_24 = var_329_21.range and var_329_21.range > 0 or table.contains(var_0_97, var_329_21.id)
 
@@ -7103,11 +7150,11 @@ function checkMagicShooter()
 					if var_0_72 then
 						print(string.format("[ShootDbg] %s: skip mana(%d<%d)", tostring(var_329_21.words), var_0_0:getMana(), var_329_21.mana))
 					end
-				elseif var_329_24 and not var_329_18 and not var_329_22.selfCast then
+				elseif var_329_24 and not var_329_18 and var_329_22.castMode == "T" then
 					if var_0_72 then
 						print(string.format("[ShootDbg] %s: skip no-target(targetable)", tostring(var_329_21.words)))
 					end
-				elseif var_329_2 and var_329_24 and not var_329_22.selfCast then
+				elseif var_329_2 and var_329_24 and var_329_22.castMode == "T" then
 					if var_0_72 then
 						print(string.format("[ShootDbg] %s: skip targeted(following)", tostring(var_329_21.words)))
 					end
@@ -7141,7 +7188,8 @@ function checkMagicShooter()
 							print(string.format("[ShootDbg] %s: skip mana%%(%.0f<%d)", tostring(var_329_21.words), var_329_13, var_329_22.percent))
 						end
 					else
-						if table.contains(var_0_97, var_329_21.id) and var_329_22.selfCast then
+						if table.contains(var_0_97, var_329_21.id) and var_329_22.castMode == "Y" then
+							var_329_34 = var_329_3
 							local var_329_26 = modules.game_interface.getMapPanel()
 							local var_329_27 = var_329_26 and var_329_26:getSpectators() or {}
 
@@ -7158,7 +7206,8 @@ function checkMagicShooter()
 							if var_329_23 >= var_329_22.creatures then
 								var_329_20 = true
 							end
-						elseif var_329_24 and not var_329_22.selfCast then
+						elseif var_329_24 and var_329_22.castMode == "T" then
+							var_329_34 = var_329_19
 							if not var_329_19 or var_329_19.z ~= var_329_3.z or not var_329_18:canBeSeen() then
 								goto label_329_0
 							end
@@ -7198,16 +7247,26 @@ function checkMagicShooter()
 						end
 
 						if var_329_23 >= var_329_22.creatures then
-							if not table.contains(var_0_97, var_329_21.id) and not var_329_22.forceCast and var_329_24 and var_329_6 > 1 then
-								if var_0_72 then
-									print(string.format("[ShootDbg] %s: skip crowd(forceCast off, around=%d)", tostring(var_329_21.words), var_329_6))
-								end
-							elseif isSpellOnCooldown(var_329_21) then
+							-- A configured target spell must not be disabled merely because
+							-- more than one monster is nearby. That old safety rule made the
+							-- Shooter stop completely in normal hunts; the configured creature
+							-- count, target, range and cooldown already guard the cast.
+							if isSpellOnCooldown(var_329_21) then
 								if var_0_72 then
 									print(string.format("[ShootDbg] %s: skip cooldown", tostring(var_329_21.words)))
 								end
 							else
-								if var_329_20 and var_329_18 then
+								if var_329_34 and g_game.talkSpell then
+									-- Reliable helper aim channel. Some 15.30 protocol combinations
+									-- discard the optional position tail of a say packet. Stage the
+									-- same tile through an OTC extended opcode immediately before
+									-- speaking; the server consumes it for this one spell only.
+									local var_329_35 = g_game.getProtocolGame and g_game.getProtocolGame()
+									if var_329_35 and var_329_35.sendExtendedOpcode then
+										var_329_35:sendExtendedOpcode(249, string.format("%d,%d,%d", var_329_34.x, var_329_34.y, var_329_34.z))
+									end
+									g_game.talkSpell(var_329_21.words, var_329_22.castMode == "T" and 3 or 2, var_329_34)
+								elseif var_329_20 and var_329_18 then
 									g_game.cancelAttack()
 									g_game.talk(var_329_21.words)
 									scheduleEvent(function()
@@ -8052,27 +8111,40 @@ function loadShooterProfileByName(arg_342_0)
 					var_342_6:setTooltip("Spell: " .. Spells.getSpellNameByWords(var_342_11.words) .. "\nWords: " .. var_342_11.words)
 
 					if table.contains(var_0_97, var_342_11.id) and not var_342_10 then
-						var_342_10 = g_ui.createWidget("CheckBox", var_342_7:getParent())
+						var_342_10 = g_ui.createWidget("Button", var_342_6)
 
 						if var_342_10 then
 							local var_342_14 = {
-								["margin-top"] = 6,
 								width = 12,
-								["margin-left"] = 5,
-								["anchors.top"] = "countMinCreature" .. iter_342_6 - 1 .. ".top",
-								["anchors.left"] = "countMinCreature" .. iter_342_6 - 1 .. ".right"
+								height = 12,
+								font = "Verdana Bold-9px-small",
+								["anchors.right"] = "parent.right",
+								["anchors.bottom"] = "parent.bottom"
 							}
 
 							var_342_10:mergeStyle(var_342_14)
 							var_342_10:setId("selfCast" .. iter_342_6 - 1)
 							var_342_10:setTooltip("Cast on yourself")
 							var_342_10:setVisible(true)
-							var_342_10:setChecked(iter_342_7.selfCast)
+							updateSelfCastModeWidget(var_342_10)
 
-							function var_342_10.onCheckChange()
-								toggleSelfCast(var_342_10:getId():match("%d+"), var_342_10:isChecked())
+							function var_342_10.onClick()
+								local var_342_15 = tonumber(var_342_10:getId():match("%d+"))
+								toggleSelfCast(var_342_15, not getShooterProfile().spells[var_342_15 + 1].selfCast)
 							end
 						end
+
+						if var_342_10 then
+							updateSelfCastModeWidget(var_342_10)
+						end
+					end
+
+					-- Refresh controls that already existed before loading this preset.
+					if table.contains(var_0_97, var_342_11.id) and var_342_10 then
+						updateSelfCastModeWidget(var_342_10)
+					elseif var_342_10 then
+						var_342_10:destroy()
+						var_342_10 = nil
 					end
 
 					if var_342_7 and not var_342_11.area and not table.contains(var_0_97, var_342_11.id) then
@@ -9614,23 +9686,25 @@ function onSetupDropSpell(arg_379_0, arg_379_1, arg_379_2, arg_379_3)
 			local var_379_12 = shooterPanel:recursiveGetChildById("selfCast" .. var_379_9)
 
 			if table.contains(var_0_97, var_379_6.id) and not var_379_12 then
-				var_379_12 = g_ui.createWidget("CheckBox", var_379_10:getParent())
+				var_379_12 = g_ui.createWidget("Button", arg_379_0)
 
 				local var_379_13 = {
-					["margin-top"] = 6,
 					width = 12,
-					["margin-left"] = 5,
-					["anchors.top"] = "countMinCreature" .. var_379_9 .. ".top",
-					["anchors.left"] = "countMinCreature" .. var_379_9 .. ".right"
+					height = 12,
+					font = "Verdana Bold-9px-small",
+					["anchors.right"] = "parent.right",
+					["anchors.bottom"] = "parent.bottom"
 				}
 
 				var_379_12:mergeStyle(var_379_13)
 				var_379_12:setId("selfCast" .. var_379_9)
 				var_379_12:setTooltip("Cast on yourself")
 				var_379_12:setVisible(true)
+				updateSelfCastModeWidget(var_379_12)
 
-				function var_379_12.onCheckChange()
-					toggleSelfCast(var_379_12:getId():match("%d+"), var_379_12:isChecked())
+				function var_379_12.onClick()
+					local var_379_14 = tonumber(var_379_12:getId():match("%d+"))
+					toggleSelfCast(var_379_14, not getShooterProfile().spells[var_379_14 + 1].selfCast)
 				end
 			end
 
