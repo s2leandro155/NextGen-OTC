@@ -36,8 +36,11 @@ namespace stdext
     inline void writeULE64(uint8_t* addr, const uint64_t value) { writeULE32(addr + 4, value >> 32); writeULE32(addr, static_cast<uint32_t>(value)); }
 
     inline int16_t readSLE16(const uint8_t* addr) { return static_cast<int16_t>(addr[1]) << 8 | addr[0]; }
-    inline int32_t readSLE32(const uint8_t* addr) { return static_cast<int32_t>(readSLE16(addr + 2)) << 16 | readSLE16(addr); }
-    inline int64_t readSLE64(const uint8_t* addr) { return static_cast<int64_t>(readSLE32(addr + 4)) << 32 | readSLE32(addr); }
+    // Only the most-significant half carries the sign. Reading the lower half
+    // as signed sign-extends bit 15/31 into the complete value. For example,
+    // the valid positive int64 value 0x00000000FFFFA610 was decoded as -23024.
+    inline int32_t readSLE32(const uint8_t* addr) { return static_cast<int32_t>(readSLE16(addr + 2)) * 0x10000 + readULE16(addr); }
+    inline int64_t readSLE64(const uint8_t* addr) { return static_cast<int64_t>(readSLE32(addr + 4)) * 0x100000000LL + readULE32(addr); }
 
     inline void writeSLE16(uint8_t* addr, const int16_t value) { addr[1] = value >> 8; addr[0] = static_cast<int8_t>(value); }
     inline void writeSLE32(uint8_t* addr, const int32_t value) { writeSLE16(addr + 2, value >> 16); writeSLE16(addr, static_cast<int16_t>(value)); }
