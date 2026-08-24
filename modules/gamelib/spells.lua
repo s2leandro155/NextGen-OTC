@@ -6581,6 +6581,17 @@ function Spells.getRuneUsageSpell(itemId)
 
 	local groupCd = runeData.groupExhaustion or runeData.exhaustion
 	local conjureSpell = Spells.getSpellDataById(runeData.id)
+	local attackRuneAreas = {
+		[3161] = SpellAreas.AREA_CIRCLE3X3, -- avalanche
+		[3175] = SpellAreas.AREA_CIRCLE3X3, -- stone shower
+		[3191] = SpellAreas.AREA_CIRCLE3X3, -- great fireball
+		[3202] = SpellAreas.AREA_CIRCLE3X3, -- thunderstorm
+		[3192] = SpellAreas.AREA_CIRCLE1X1,
+		[3149] = SpellAreas.AREA_CIRCLE1X1,
+		[3173] = SpellAreas.AREA_CIRCLE1X1,
+		[3200] = SpellAreas.AREA_CIRCLE1X1,
+		[21351] = SpellAreas.AREA_CIRCLE1X1
+	}
 
 	return {
 		type = "Rune",
@@ -6591,7 +6602,10 @@ function Spells.getRuneUsageSpell(itemId)
 		group = {
 			[runeData.group] = groupCd
 		},
+		runeGroup = runeData.group,
 		exhaustion = runeData.exhaustion,
+		area = attackRuneAreas[itemId],
+		range = 7,
 		_conjureVocations = conjureSpell and conjureSpell.vocations or nil
 	}
 end

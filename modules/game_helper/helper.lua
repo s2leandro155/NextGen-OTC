@@ -14,6 +14,8 @@ local var_0_12 = 0
 local var_0_13 = 0
 local var_0_14 = 0
 local var_0_15 = 180
+local shooterPriorityCursor = 1
+local shooterPrioritySignature = ""
 local var_0_16 = {
 	B = 2,
 	H = 8,
@@ -4405,6 +4407,20 @@ function getAllSpellSlots()
 	}
 end
 
+function getConfiguredSpellSlots()
+	local slots = {}
+
+	for _, slot in ipairs(getAreaSpellSlots()) do
+		table.insert(slots, slot)
+	end
+
+	for _, slot in ipairs(getSingleSpellSlots()) do
+		table.insert(slots, slot)
+	end
+
+	return slots
+end
+
 function isAoeSpellSlot(arg_174_0)
 	arg_174_0 = tonumber(arg_174_0)
 
@@ -4414,7 +4430,7 @@ end
 function getSpellSlotRank(arg_175_0, arg_175_1)
 	arg_175_0 = tonumber(arg_175_0)
 
-	local var_175_0 = isAoeSpellSlot(arg_175_0) and getAreaSpellSlots() or getSingleSpellSlots()
+	local var_175_0 = getConfiguredSpellSlots()
 	local var_175_1 = {}
 
 	for iter_175_0, iter_175_1 in ipairs(var_175_0) do
@@ -4429,7 +4445,18 @@ function getSpellSlotRank(arg_175_0, arg_175_1)
 	end
 
 	table.sort(var_175_1, function(arg_176_0, arg_176_1)
-		return arg_176_0.prio < arg_176_1.prio
+		if arg_176_0.prio ~= arg_176_1.prio then
+			return arg_176_0.prio < arg_176_1.prio
+		end
+
+		local leftArea = isAoeSpellSlot(arg_176_0.idx)
+		local rightArea = isAoeSpellSlot(arg_176_1.idx)
+
+		if leftArea ~= rightArea then
+			return leftArea
+		end
+
+		return arg_176_0.idx < arg_176_1.idx
 	end)
 
 	for iter_175_2, iter_175_3 in ipairs(var_175_1) do
@@ -4797,7 +4824,7 @@ function onAssignRune(arg_196_0, arg_196_1, arg_196_2, arg_196_3)
 
 	local var_196_6 = Spells.getRuneSpellByItem(var_196_2)
 
-	if var_196_6 and var_196_6.group == 1 then
+	if var_196_6 and (var_196_6.runeGroup == 1 or var_196_6.group == 1) then
 		if var_196_6.vocations and not table.contains(var_196_6.vocations, getPlayerVocation()) then
 			modules.game_textmessage.displayFailureMessage(tr("Your vocation can not use this rune."))
 
@@ -4823,6 +4850,7 @@ function onAssignRune(arg_196_0, arg_196_1, arg_196_2, arg_196_3)
 end
 
 function updateRuneButton(arg_197_0, arg_197_1, arg_197_2)
+	invalidateHelperCache()
 	arg_197_0:setImageSource("/images/ui/item")
 
 	if not arg_197_0:getChildById("runeItem") then
@@ -6378,8 +6406,15 @@ function rebuildSpellPriorityOptions()
 		end
 	end
 
-	var_292_0(getAreaSpellSlots())
-	var_292_0(getSingleSpellSlots())
+	var_292_0(getConfiguredSpellSlots())
+end
+
+function normalizeMagicShooterPriorities(profile)
+	local _, ordered = getSpellSlotRank(-1, profile)
+
+	for rank, entry in ipairs(ordered) do
+		profile.spells[entry.idx + 1].priority = rank
+	end
 end
 
 function updateMagicShooterPriority(arg_294_0, arg_294_1)
@@ -6873,26 +6908,32 @@ end
 
 local function var_0_158(arg_321_0)
 	if arg_321_0.type == "rune" then
-		return 2
-	end
-
-	if arg_321_0.slotIndex ~= nil and isAoeSpellSlot(arg_321_0.slotIndex) then
+		-- A rune with the same configured priority as a spell must get the
+		-- first chance. Otherwise alternating ready spells can permanently
+		-- starve the rune at the end of the list.
 		return 0
 	end
 
-	return 1
+	if arg_321_0.slotIndex ~= nil and isAoeSpellSlot(arg_321_0.slotIndex) then
+		return 1
+	end
+
+	return 2
 end
 
 local function var_0_159(arg_322_0)
 	table.sort(arg_322_0, function(arg_323_0, arg_323_1)
 		local var_323_0 = var_0_158(arg_323_0)
 		local var_323_1 = var_0_158(arg_323_1)
+		local var_323_2 = tonumber(arg_323_0.config.priority) or 999
+		local var_323_3 = tonumber(arg_323_1.config.priority) or 999
 
-		if var_323_0 ~= var_323_1 then
-			return var_323_0 < var_323_1
+		-- Respect the priority selected in the UI across spells and runes.
+		if var_323_2 ~= var_323_3 then
+			return var_323_2 < var_323_3
 		end
 
-		return (arg_323_0.config.priority or 999) < (arg_323_1.config.priority or 999)
+		return var_323_0 < var_323_1
 	end)
 
 	local var_322_0 = g_game.getLocalPlayer()
@@ -7141,6 +7182,23 @@ function checkMagicShooter()
 		end
 	end
 
+	local signatureParts = {}
+
+	for _, action in ipairs(var_329_10) do
+		table.insert(signatureParts, string.format("%s:%s:%s", tostring(action.type), tostring(action.config and action.config.id or 0), tostring(action.config and action.config.priority or 999)))
+	end
+
+	local currentPrioritySignature = table.concat(signatureParts, "|")
+
+	if currentPrioritySignature ~= shooterPrioritySignature then
+		shooterPrioritySignature = currentPrioritySignature
+		shooterPriorityCursor = 1
+	end
+
+	if shooterPriorityCursor > #var_329_10 then
+		shooterPriorityCursor = 1
+	end
+
 	local var_329_13 = var_0_0:getMana() / var_0_0:getMaxMana() * 100
 	local var_329_14 = var_0_0:getHarmony()
 
@@ -7168,7 +7226,9 @@ function checkMagicShooter()
 		end
 	end
 
-	for iter_329_10, iter_329_11 in ipairs(var_329_10) do
+	for shooterPriorityOffset = 0, #var_329_10 - 1 do
+		local iter_329_10 = (shooterPriorityCursor + shooterPriorityOffset - 1) % #var_329_10 + 1
+		local iter_329_11 = var_329_10[iter_329_10]
 		if var_0_11 then
 			-- block empty
 		else
@@ -7350,6 +7410,7 @@ function checkMagicShooter()
 									time = g_clock.millis()
 								}
 
+								shooterPriorityCursor = iter_329_10 % #var_329_10 + 1
 								return
 							end
 						end
@@ -7384,6 +7445,7 @@ function checkMagicShooter()
 							var_0_13 = g_clock.millis()
 						end
 
+						shooterPriorityCursor = iter_329_10 % #var_329_10 + 1
 						return
 					end
 				end
@@ -8073,6 +8135,8 @@ function loadShooterProfileByName(arg_342_0)
 		return
 	end
 
+	normalizeMagicShooterPriorities(var_342_0)
+
 	local var_342_1 = var_0_6:recursiveGetChildById("currentPresetName")
 
 	if var_342_1 then
@@ -8097,12 +8161,8 @@ function loadShooterProfileByName(arg_342_0)
 
 	rebuildSpellPriorityOptions()
 
-	for iter_342_2, iter_342_3 in ipairs(getAreaSpellSlots()) do
+	for iter_342_2, iter_342_3 in ipairs(getConfiguredSpellSlots()) do
 		var_0_147(iter_342_3, var_342_0)
-	end
-
-	for iter_342_4, iter_342_5 in ipairs(getSingleSpellSlots()) do
-		var_0_147(iter_342_5, var_342_0)
 	end
 
 	local var_342_3 = getPlayerVocation() ~= 0
@@ -8236,6 +8296,10 @@ function loadShooterProfileByName(arg_342_0)
 	end
 
 	for iter_342_8, iter_342_9 in pairs(var_342_0.runes) do
+		iter_342_9.id = tonumber(iter_342_9.id) or 0
+		iter_342_9.creatures = tonumber(iter_342_9.creatures) or 1
+		iter_342_9.priority = tonumber(iter_342_9.priority) or 999
+
 		if iter_342_9.id > 0 then
 			local var_342_15 = Spells.getRuneSpellByItem(iter_342_9.id)
 
@@ -8245,6 +8309,8 @@ function loadShooterProfileByName(arg_342_0)
 				if isAoeRuneSlot(iter_342_8 - 1) and not var_342_16 or not isAoeRuneSlot(iter_342_8 - 1) and var_342_16 then
 					iter_342_9.id = 0
 				end
+			else
+				iter_342_9.id = 0
 			end
 		end
 
