@@ -7179,6 +7179,7 @@ function checkMagicShooter()
 			if iter_329_11.type == "spell" then
 				local var_329_20 = false
 				local var_329_34 = nil
+				local waveTurnDirection = nil
 				local var_329_21 = iter_329_11.spell
 				local var_329_22 = iter_329_11.config
 				var_329_22.castMode = var_329_22.castMode or (var_329_22.selfCast and "Y" or "T")
@@ -7273,7 +7274,7 @@ function checkMagicShooter()
 								var_329_29, var_329_23 = findBestWaveDirection(var_329_3, var_329_21.area, var_329_5, var_329_4)
 
 								if var_329_29 ~= var_329_4 and var_329_23 >= var_329_22.creatures then
-									g_game.turn(var_329_29)
+									waveTurnDirection = var_329_29
 								end
 							else
 								var_329_23 = var_0_151(var_329_3, var_329_29, var_329_21.area, var_329_5, false)
@@ -7302,6 +7303,12 @@ function checkMagicShooter()
 									print(string.format("[ShootDbg] %s: skip cooldown", tostring(var_329_21.words)))
 								end
 							else
+								-- Turn only after every cast condition (mana, creatures and
+								-- cooldown) has passed, immediately before speaking the wave.
+								if waveTurnDirection then
+									g_game.turn(waveTurnDirection)
+								end
+
 								if var_329_34 and g_game.talkSpell then
 									-- Reliable helper aim channel. Some 15.30 protocol combinations
 									-- discard the optional position tail of a say packet. Stage the
