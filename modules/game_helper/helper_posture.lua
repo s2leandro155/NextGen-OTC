@@ -705,14 +705,20 @@ function HelperPosture.refreshUI()
 					end
 
 					local wasActive = active
-					HelperPosture.setSelection(groupKey, wasActive and "" or words, true)
+					local changed = HelperPosture.setSelection(groupKey, wasActive and "" or words, true)
 
 					-- A posture icon is also a direct cast button. Previously the click
 					-- only queued the spell for checkMagicShooter(), so nothing happened
-					-- while "Enable Shooter Helper" was unchecked. Speaking the same
-					-- words when active toggles the server stance off.
-					if g_game and g_game.isOnline and g_game.isOnline() and words ~= "" then
+					-- while "Enable Shooter Helper" was unchecked. Consume the queued
+					-- request and reserve its cooldown here; otherwise the Shooter tick
+					-- speaks the same words a second time and toggles the aura back off.
+					if changed and g_game and g_game.isOnline and g_game.isOnline() and words ~= "" then
+						local castAt = nowMs()
+
 						g_game.talk(words)
+						castRequests[groupKey] = nil
+						nextCastAt = math.max(nextCastAt, castAt + GLOBAL_POSTURE_CAST_LOCK_MS)
+						reserveStanceCooldown(spell, castAt)
 					end
 					addEvent(function()
 						HelperPosture.refreshUI()
