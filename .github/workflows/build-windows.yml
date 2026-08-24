@@ -163,10 +163,21 @@ jobs:
           $artifactDir = "$env:GITHUB_WORKSPACE\artifacts"
           New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
 
-          $exePath = Get-ChildItem -Recurse -Path "$env:GITHUB_WORKSPACE\build" -Filter "otclient*.exe" | Select-Object -First 1
+          # The client target writes to the repository root when
+          # TOGGLE_BIN_FOLDER is disabled. A recursive search under build/
+          # can select otclient_*_tests.exe from vcpkg instead; that binary
+          # only runs GoogleTest and exits immediately.
+          $exeCandidates = @(
+            "$env:GITHUB_WORKSPACE\otclient.exe",
+            "$env:GITHUB_WORKSPACE\build\windows-release\bin\otclient.exe"
+          )
+          $exePath = $exeCandidates |
+            Where-Object { Test-Path -LiteralPath $_ } |
+            Select-Object -First 1 |
+            ForEach-Object { Get-Item -LiteralPath $_ }
 
           if (-not $exePath) {
-            Write-Error "otclient*.exe not found!"
+            Write-Error "Main otclient.exe not found in the expected output locations."
             exit 1
           }
 
