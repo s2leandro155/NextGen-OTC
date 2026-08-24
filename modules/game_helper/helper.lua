@@ -1934,6 +1934,17 @@ function offline()
 		print(string.format("[HelperDbg] offline(): hotkeyHelperStatus=%s helperEnabled=%s", tostring(var_0_10), tostring(helperConfig.helperEnabled)))
 	end
 
+	-- The legacy Helper window lives outside the game interface, so it is not
+	-- hidden automatically when returning to the character list.
+	if var_0_5 then
+		g_keyboard.unbindKeyPress("Tab", toggleNextWindow, var_0_5)
+		var_0_5:hide()
+	end
+
+	if gmVocSwitch then
+		gmVocSwitch:hide()
+	end
+
 	var_0_64()
 
 	local var_57_0 = presetsPanel:recursiveGetChildById("presets")
