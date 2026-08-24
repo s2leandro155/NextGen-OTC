@@ -8119,11 +8119,14 @@ function loadShooterProfileByName(arg_342_0)
 				local var_342_4 = Spells.getSpellDataById(iter_342_7.id)
 
 				if var_342_4 then
+					local belongsToCurrentVocation = type(var_342_4.vocations) == "table" and table.contains(var_342_4.vocations, getPlayerVocation())
 					local var_342_5 = isAreaSpellData(var_342_4)
 
-					if isAoeSpellSlot(iter_342_6 - 1) and not var_342_5 or not isAoeSpellSlot(iter_342_6 - 1) and var_342_5 then
+					if not belongsToCurrentVocation or isAoeSpellSlot(iter_342_6 - 1) and not var_342_5 or not isAoeSpellSlot(iter_342_6 - 1) and var_342_5 then
 						iter_342_7.id = 0
 					end
+				else
+					iter_342_7.id = 0
 				end
 			end
 
