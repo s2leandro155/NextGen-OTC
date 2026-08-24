@@ -1987,12 +1987,11 @@ function ensureAimCheckbox(arg_62_0, arg_62_1)
 		return
 	end
 
-	local var_62_0 = modules.game_cyclopedia and modules.game_cyclopedia.MagicalArchive
 	local var_62_1 = shooterPanel:recursiveGetChildById("countMinCreature" .. arg_62_0)
 	local var_62_2 = shooterPanel:recursiveGetChildById("aimTarget" .. arg_62_0)
-	local var_62_3 = arg_62_1 and arg_62_1.words
+	local var_62_3 = arg_62_1 and arg_62_1.directional == true
 
-	if (var_62_0 and var_62_3 and var_62_0.isDirectionalSpell(var_62_3) or false) and var_62_1 then
+	if var_62_3 and var_62_1 then
 		if not var_62_2 then
 			var_62_2 = g_ui.createWidget("CheckBox", var_62_1:getParent())
 
@@ -2005,15 +2004,19 @@ function ensureAimCheckbox(arg_62_0, arg_62_1)
 				["anchors.left"] = "countMinCreature" .. arg_62_0 .. ".right"
 			})
 			var_62_2:setId("aimTarget" .. arg_62_0)
-			var_62_2:setTooltip("Aim at Target\nAutomatically aims this wave at your current target.\nSyncs with the Magical Archive.")
+			var_62_2:setTooltip("Auto Turn\nTurns to the direction that hits the most creatures.\nNo target is required.")
 
 			function var_62_2.onCheckChange(arg_63_0, arg_63_1)
 				if arg_63_0.updating then
 					return
 				end
 
-				if var_62_0 and arg_63_0.spellId then
-					var_62_0.setAimEnabled(arg_63_0.spellId, arg_63_1)
+				local profile = getShooterProfile()
+				local entry = profile and profile.spells and profile.spells[arg_62_0 + 1]
+
+				if entry then
+					entry.autoTurn = arg_63_1 == true
+					saveSettings()
 				end
 			end
 		end
@@ -2021,7 +2024,10 @@ function ensureAimCheckbox(arg_62_0, arg_62_1)
 		var_62_2.spellId = arg_62_1.id
 		var_62_2.updating = true
 
-		var_62_2:setChecked(var_62_0 and var_62_0.isAimEnabled(arg_62_1.id) or false)
+		local profile = getShooterProfile()
+		local entry = profile and profile.spells and profile.spells[arg_62_0 + 1]
+
+		var_62_2:setChecked(entry and entry.autoTurn == true or false)
 
 		var_62_2.updating = false
 
@@ -6767,6 +6773,28 @@ local function var_0_152(arg_315_0, arg_315_1)
 	return var_315_1 >= 0 and Directions.South or Directions.North
 end
 
+local function findBestWaveDirection(playerPosition, area, creatures, currentDirection)
+	local directions = {
+		Directions.North,
+		Directions.East,
+		Directions.South,
+		Directions.West
+	}
+	local bestDirection = currentDirection
+	local bestHits = var_0_151(playerPosition, currentDirection, area, creatures, false)
+
+	for _, direction in ipairs(directions) do
+		local hits = var_0_151(playerPosition, direction, area, creatures, false)
+
+		if hits > bestHits then
+			bestDirection = direction
+			bestHits = hits
+		end
+	end
+
+	return bestDirection, bestHits
+end
+
 local function var_0_153(arg_316_0)
 	return arg_316_0.vocations and (table.contains(arg_316_0.vocations, 4) or table.contains(arg_316_0.vocations, 8))
 end
@@ -7232,14 +7260,17 @@ function checkMagicShooter()
 							end
 						elseif var_329_21.area then
 							local var_329_29 = var_329_4
-							local var_329_30 = modules.game_cyclopedia and modules.game_cyclopedia.MagicalArchive
-
-							if var_329_18 and var_329_19.z == var_329_3.z and var_329_30 and var_329_30.isDirectionalSpell(var_329_21.words) and var_329_30.isAimEnabled(var_329_21.id) then
-								var_329_29 = var_0_152(var_329_3, var_329_19) or var_329_4
-							end
+							local isDirectional = var_329_21.directional == true
+							local autoTurn = isDirectional and var_329_22.autoTurn == true
 
 							if var_0_155(var_329_21) then
 								var_329_23 = var_0_157(var_329_3, var_329_21.area, var_329_5)
+							elseif autoTurn then
+								var_329_29, var_329_23 = findBestWaveDirection(var_329_3, var_329_21.area, var_329_5, var_329_4)
+
+								if var_329_29 ~= var_329_4 and var_329_23 >= var_329_22.creatures then
+									g_game.turn(var_329_29)
+								end
 							else
 								var_329_23 = var_0_151(var_329_3, var_329_29, var_329_21.area, var_329_5, false)
 							end
