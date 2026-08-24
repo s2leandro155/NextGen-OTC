@@ -3108,7 +3108,10 @@ function onGameStart()
 end
 
 function onLogout()
+	stopScheduler()
+	stopCombatScheduler()
 	saveActiveHelperCharacter()
+	onHelperClose()
 end
 
 function onGameEnd()
