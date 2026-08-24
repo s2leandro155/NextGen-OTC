@@ -1988,36 +1988,33 @@ function ensureAimCheckbox(arg_62_0, arg_62_1)
 	end
 
 	local var_62_1 = shooterPanel:recursiveGetChildById("countMinCreature" .. arg_62_0)
-	local var_62_2 = shooterPanel:recursiveGetChildById("aimTarget" .. arg_62_0)
+	local oldAimCheck = shooterPanel:recursiveGetChildById("aimTarget" .. arg_62_0)
+	local var_62_2 = shooterPanel:recursiveGetChildById("conditionSetting" .. arg_62_0)
 	local var_62_3 = arg_62_1 and arg_62_1.directional == true
 
-	if var_62_3 and var_62_1 then
-		if not var_62_2 then
-			var_62_2 = g_ui.createWidget("CheckBox", var_62_1:getParent())
+	if oldAimCheck then
+		oldAimCheck:destroy()
+	end
 
-			var_62_2:mergeStyle({
-				["margin-top"] = 6,
-				["margin-left"] = 5,
-				width = 12,
-				height = 12,
-				["anchors.top"] = "countMinCreature" .. arg_62_0 .. ".top",
-				["anchors.left"] = "countMinCreature" .. arg_62_0 .. ".right"
-			})
-			var_62_2:setId("aimTarget" .. arg_62_0)
-			var_62_2:setTooltip("Auto Turn\nTurns to the direction that hits the most creatures.\nNo target is required.")
+	if var_62_3 and var_62_1 and var_62_2 then
+		var_62_2:setWidth(78)
+		var_62_2:setHeight(18)
+		var_62_2:setMarginLeft(5)
+		var_62_2:setMarginTop(3)
+		var_62_2:setText("Auto-turn")
+		var_62_2:setTooltip("Auto Turn\nTurns to the direction that hits the most creatures.\nNo target is required.")
 
-			function var_62_2.onCheckChange(arg_63_0, arg_63_1)
-				if arg_63_0.updating then
-					return
-				end
+		function var_62_2.onCheckChange(arg_63_0, arg_63_1)
+			if arg_63_0.updating then
+				return
+			end
 
-				local profile = getShooterProfile()
-				local entry = profile and profile.spells and profile.spells[arg_62_0 + 1]
+			local profile = getShooterProfile()
+			local entry = profile and profile.spells and profile.spells[arg_62_0 + 1]
 
-				if entry then
-					entry.autoTurn = arg_63_1 == true
-					saveSettings()
-				end
+			if entry then
+				entry.autoTurn = arg_63_1 == true
+				saveSettings()
 			end
 		end
 
@@ -2033,7 +2030,14 @@ function ensureAimCheckbox(arg_62_0, arg_62_1)
 
 		var_62_2:setVisible(true)
 	elseif var_62_2 then
-		var_62_2:destroy()
+		var_62_2.updating = true
+		var_62_2:setChecked(false)
+		var_62_2.updating = false
+		var_62_2:setText("")
+		var_62_2:setWidth(12)
+		var_62_2:setHeight(12)
+		var_62_2:setMarginTop(7)
+		var_62_2:setVisible(false)
 	end
 end
 
