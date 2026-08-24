@@ -4647,7 +4647,7 @@ function assignSpell(arg_179_0, arg_179_1, arg_179_2, arg_179_3, arg_179_4)
 					var_187_8:mergeStyle({
 						width = 12,
 						height = 12,
-						font = "Verdana Bold-9px-small",
+						font = "Verdana Bold-11px",
 						["anchors.right"] = "parent.right",
 						["anchors.bottom"] = "parent.bottom"
 					})
@@ -8176,7 +8176,7 @@ function loadShooterProfileByName(arg_342_0)
 							local var_342_14 = {
 								width = 12,
 								height = 12,
-								font = "Verdana Bold-9px-small",
+								font = "Verdana Bold-11px",
 								["anchors.right"] = "parent.right",
 								["anchors.bottom"] = "parent.bottom"
 							}
@@ -9750,7 +9750,7 @@ function onSetupDropSpell(arg_379_0, arg_379_1, arg_379_2, arg_379_3)
 				local var_379_13 = {
 					width = 12,
 					height = 12,
-					font = "Verdana Bold-9px-small",
+					font = "Verdana Bold-11px",
 					["anchors.right"] = "parent.right",
 					["anchors.bottom"] = "parent.bottom"
 				}
