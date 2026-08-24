@@ -704,7 +704,16 @@ function HelperPosture.refreshUI()
 						return false
 					end
 
-					HelperPosture.setSelection(groupKey, active and "" or words, true)
+					local wasActive = active
+					HelperPosture.setSelection(groupKey, wasActive and "" or words, true)
+
+					-- A posture icon is also a direct cast button. Previously the click
+					-- only queued the spell for checkMagicShooter(), so nothing happened
+					-- while "Enable Shooter Helper" was unchecked. Speaking the same
+					-- words when active toggles the server stance off.
+					if g_game and g_game.isOnline and g_game.isOnline() and words ~= "" then
+						g_game.talk(words)
+					end
 					addEvent(function()
 						HelperPosture.refreshUI()
 					end)
