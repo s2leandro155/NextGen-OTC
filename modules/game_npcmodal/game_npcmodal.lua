@@ -586,8 +586,10 @@ local function onNpcModalInventoryChange(player, slot, item, oldItem)
 		return
 	end
 
-	refreshNpcTradeItemList()
-	revalidateNpcTradeQuantity()
+	-- Do not rebuild the complete NPC offer list for every inventory mutation.
+	-- Ammo/charges and equipment changes can fire this callback on every hit;
+	-- after the first sale that made the whole game stutter. The server's
+	-- onPlayerGoods packet refreshes playerItems and the list authoritatively.
 	refreshSellAllButtonVisibility()
 
 	if not isNpcTradeGoldCurrency() and npcTradeCurrencyId ~= 0 then
@@ -639,8 +641,6 @@ local function npcModalOnSellAllGameStart()
 
 	refreshSellAllButtonVisibility()
 	loadSellAllIgnoreList()
-	bindNpcModalPlayerInventoryListener()
-	addEvent(bindNpcModalPlayerInventoryListener)
 end
 
 local function updateNpcTradePriceLabel(price)

@@ -2737,7 +2737,9 @@ void ProtocolGame::parsePlayerSkills(const InputMessagePtr& msg) const
 
         if (g_game.getClientVersion() >= 1281) {
             msg->getU16(); // base + loyalty bonus(?)
-            levelPercent = msg->getU16() / 100;
+            // Keep the 15.30 precision (0..10000). The skills UI converts it
+            // to 0..100 and uses the raw value to show exact progress.
+            levelPercent = msg->getU16();
         } else {
             levelPercent = msg->getU8();
         }
@@ -5152,8 +5154,12 @@ void ProtocolGame::parseTaskHuntingData(const InputMessagePtr& msg)
 
 void ProtocolGame::parseExperienceTracker(const InputMessagePtr& msg)
 {
-    msg->get64(); // raw exp
-    msg->get64(); // final exp
+    const int64_t rawExp = msg->get64();
+    const int64_t finalExp = msg->get64();
+
+    // Feed the 15.30 experience packet to Hunt/XP Analysers. Previously the
+    // parser consumed both values silently, so XP gain and XP/h stayed zero.
+    g_lua.callGlobalField("g_game", "onUpdateExperience", rawExp, finalExp);
 }
 
 void ProtocolGame::parseLootContainers(const InputMessagePtr& msg)

@@ -3862,6 +3862,8 @@ function WheelOfDestiny.saveWheelPresets()
 end
 
 function WheelOfDestiny.configureEquippedGems()
+	local firstEquippedDomain
+
 	for i = 0, 3 do
 		local data = GemAtelier.getEquipedGem(i)
 		local background = wheelPanel:recursiveGetChildById("socketBackground" .. i)
@@ -3893,6 +3895,7 @@ function WheelOfDestiny.configureEquippedGems()
 		gemIcon:setVisible(data ~= nil)
 
 		if data then
+			firstEquippedDomain = firstEquippedDomain or i
 			local typeOffset = data.gemType * 32
 			local domainOffet = data.gemDomain * 96
 			local vocationOffset = (WheelOfDestiny.vocationId - 1) * 384
@@ -3910,6 +3913,21 @@ function WheelOfDestiny.configureEquippedGems()
 			socket:setImageClip("0 0 34 34")
 		end
 	end
+
+	-- The wheel used to open with no vessel selected, leaving the Selection
+	-- panel blank even when gems were equipped. Keep the current selection
+	-- when possible; otherwise display the first equipped gem automatically.
+	local selectedDomain
+	if WheelOfDestiny.lastSelectedGemVessel then
+		selectedDomain = tonumber(WheelOfDestiny.lastSelectedGemVessel:getId():match("selectVessel(%d+)"))
+	end
+
+	if selectedDomain == nil or (firstEquippedDomain ~= nil and not GemAtelier.getEquipedGem(selectedDomain)) then
+		selectedDomain = firstEquippedDomain
+	end
+	if selectedDomain ~= nil then
+		WheelOfDestiny.onGemVesselClick(selectedDomain)
+	end
 end
 
 function WheelOfDestiny.onGemVesselClick(domain)
@@ -3921,6 +3939,9 @@ function WheelOfDestiny.onGemVesselClick(domain)
 	wheelPanel.borderSelectedWheel:setVisible(false)
 
 	local widget = wheelPanel:recursiveGetChildById("selectVessel" .. domain)
+	if not widget then
+		return
+	end
 
 	WheelOfDestiny.lastSelectedGemVessel = widget
 
