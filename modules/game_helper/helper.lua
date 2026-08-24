@@ -1990,7 +1990,10 @@ function ensureAimCheckbox(arg_62_0, arg_62_1)
 	local var_62_1 = shooterPanel:recursiveGetChildById("countMinCreature" .. arg_62_0)
 	local oldAimCheck = shooterPanel:recursiveGetChildById("aimTarget" .. arg_62_0)
 	local var_62_2 = shooterPanel:recursiveGetChildById("conditionSetting" .. arg_62_0)
-	local var_62_3 = arg_62_1 and arg_62_1.directional == true
+	-- Auto-turn only belongs to directional area spells (waves/beams). A
+	-- directional flag by itself is not enough: targeted and non-area spells
+	-- must never expose this option.
+	local var_62_3 = arg_62_1 and arg_62_1.directional == true and type(arg_62_1.area) == "table"
 
 	if oldAimCheck then
 		oldAimCheck:destroy()
