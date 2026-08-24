@@ -14,6 +14,16 @@ TaskStoreProduct < UIWidget
     size: 64 64
     virtual: true
 
+  UICreature
+    id: outfit
+    anchors.left: parent.left
+    anchors.verticalCenter: parent.verticalCenter
+    margin-left: 12
+    size: 64 64
+    idle-animate: true
+    outfit-center: true
+    visible: false
+
   Label
     id: name
     anchors.left: item.right
@@ -76,6 +86,26 @@ MainWindow
       color: #ffffff
       font: verdana-11px-rounded
 
+  Button
+    id: itemsTab
+    anchors.top: header.bottom
+    anchors.left: parent.left
+    margin-top: 8
+    margin-left: 18
+    size: 115 24
+    text: Items
+    @onClick: modules.game_tasks.setTaskStoreCategory('items')
+
+  Button
+    id: outfitsTab
+    anchors.top: header.bottom
+    anchors.left: itemsTab.right
+    margin-top: 8
+    margin-left: 4
+    size: 115 24
+    text: Outfits
+    @onClick: modules.game_tasks.setTaskStoreCategory('outfits')
+
   FlatPanel
     id: balance
     anchors.left: parent.left
@@ -96,10 +126,10 @@ MainWindow
 
   VerticalScrollBar
     id: scroll
-    anchors.top: header.bottom
+    anchors.top: itemsTab.bottom
     anchors.right: parent.right
     anchors.bottom: close.top
-    margin-top: 10
+    margin-top: 8
     margin-right: 8
     margin-bottom: 10
     step: 58

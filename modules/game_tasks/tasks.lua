@@ -12,6 +12,9 @@ local var_0_8
 local var_0_9 = 143
 local taskStoreWindow
 local taskCoinBalance = 0
+local taskStoreCategory = "items"
+local taskStoreProducts = {}
+local taskStoreOutfits = {}
 local defaultTaskStoreProducts = {
 	{ id = 1, item = 61718, count = 1, price = 25, name = "Mystic Bag" },
 	{ id = 2, item = 61608, count = 1, price = 15, name = "Tigrinho Roulette Coin" },
@@ -388,14 +391,14 @@ function onExtendedOpcode(arg_16_0, arg_16_1, arg_16_2)
 
 		showExerciseWindow()
 	elseif arg_16_2.type == "task_store" then
-		showTaskStoreProducts(arg_16_2.products or {}, arg_16_2.taskPoints or 0)
+		showTaskStoreProducts(arg_16_2.products or {}, arg_16_2.taskPoints or 0, arg_16_2.outfits or {})
 	end
 end
 
 function showTaskStore()
 	if not g_game.isOnline() then return end
 	if taskStoreWindow then
-		showTaskStoreProducts(defaultTaskStoreProducts, taskCoinBalance)
+		showTaskStoreProducts(defaultTaskStoreProducts, taskCoinBalance, taskStoreOutfits)
 		taskStoreWindow:show()
 		taskStoreWindow:raise()
 		taskStoreWindow:focus()
@@ -414,22 +417,59 @@ function buyTaskStoreProduct(productId)
 	end
 end
 
-function showTaskStoreProducts(products, balance)
+function buyTaskStoreOutfit(outfitId)
+	local protocol = g_game.getProtocolGame()
+	if protocol then
+		protocol:sendExtendedOpcode(var_0_9, json.encode({ action = "task_store_buy_outfit", id = outfitId }))
+	end
+end
+
+function setTaskStoreCategory(category)
+	if category ~= "items" and category ~= "outfits" then return end
+	taskStoreCategory = category
+	showTaskStoreProducts(taskStoreProducts, taskCoinBalance, taskStoreOutfits)
+end
+
+function showTaskStoreProducts(products, balance, outfits)
 	if not taskStoreWindow then return end
 	var_0_11(taskStoreWindow)
 	taskCoinBalance = balance or 0
+	taskStoreProducts = products or taskStoreProducts
+	taskStoreOutfits = outfits or taskStoreOutfits
 	taskStoreWindow.balance.text:setText("Task Coins: " .. comma_value(taskCoinBalance))
 	taskStoreWindow.products:destroyChildren()
-	for _, product in ipairs(products) do
+	taskStoreWindow.itemsTab:setEnabled(taskStoreCategory ~= "items")
+	taskStoreWindow.outfitsTab:setEnabled(taskStoreCategory ~= "outfits")
+	local entries = taskStoreCategory == "outfits" and taskStoreOutfits or taskStoreProducts
+	for _, product in ipairs(entries) do
 		local row = g_ui.createWidget("TaskStoreProduct", taskStoreWindow.products)
 		var_0_11(row)
-		row.item:setItemId(product.item)
-		row.item:setItemCount(product.count or 1)
-		row.item:setShowCount((product.count or 1) > 1)
+		if taskStoreCategory == "outfits" then
+			row.item:setVisible(false)
+			row.outfit:setVisible(true)
+			row.outfit:setOutfit({ type = product.lookType, addons = 3, head = 78, body = 69, legs = 58, feet = 76 })
+			if row.outfit.setFixedCreatureSize then row.outfit:setFixedCreatureSize(true) end
+		else
+			row.outfit:setVisible(false)
+			row.item:setVisible(true)
+			row.item:setItemId(product.item)
+			row.item:setItemCount(product.count or 1)
+			row.item:setShowCount((product.count or 1) > 1)
+		end
 		row.name:setText(product.name)
-		row.price:setText(comma_value(product.price) .. " Task Coins")
-		row.buy:setEnabled(taskCoinBalance >= product.price)
-		row.buy.onClick = function() buyTaskStoreProduct(product.id) end
+		if taskStoreCategory == "outfits" and product.owned then
+			row.price:setText("Outfit + Addon 1 + Addon 2 owned")
+			row.buy:setText("Owned")
+			row.buy:setEnabled(false)
+		else
+			row.price:setText(comma_value(product.price) .. " Task Coins")
+			row.buy:setEnabled(taskCoinBalance >= product.price)
+			if taskStoreCategory == "outfits" then
+				row.buy.onClick = function() buyTaskStoreOutfit(product.id) end
+			else
+				row.buy.onClick = function() buyTaskStoreProduct(product.id) end
+			end
+		end
 	end
 	taskStoreWindow:show()
 	taskStoreWindow:raise()
