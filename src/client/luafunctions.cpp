@@ -1035,6 +1035,7 @@ void Client::registerLuaFunctions()
     g_lua.bindClassMemberFunction<LocalPlayer>("setMana", &LocalPlayer::setMana);
     g_lua.bindClassMemberFunction<LocalPlayer>("setManaShield", &LocalPlayer::setManaShield);
     g_lua.bindClassMemberFunction<LocalPlayer>("setMagicLevel", &LocalPlayer::setMagicLevel);
+    g_lua.bindClassMemberFunction<LocalPlayer>("setMagicLevelBonuses", &LocalPlayer::setMagicLevelBonuses);
     g_lua.bindClassMemberFunction<LocalPlayer>("setSoul", &LocalPlayer::setSoul);
     g_lua.bindClassMemberFunction<LocalPlayer>("setStamina", &LocalPlayer::setStamina);
     g_lua.bindClassMemberFunction<LocalPlayer>("setKnown", &LocalPlayer::setKnown);
@@ -1055,6 +1056,7 @@ void Client::registerLuaFunctions()
     g_lua.bindClassMemberFunction<LocalPlayer>("getMaxManaShield", &LocalPlayer::getMaxManaShield);
     g_lua.bindClassMemberFunction<LocalPlayer>("getMagicLevel", &LocalPlayer::getMagicLevel);
     g_lua.bindClassMemberFunction<LocalPlayer>("getMagicLevelPercent", &LocalPlayer::getMagicLevelPercent);
+    g_lua.bindClassMemberFunction<LocalPlayer>("getMagicLevelBonuses", &LocalPlayer::getMagicLevelBonuses);
     g_lua.bindClassMemberFunction<LocalPlayer>("getSoul", &LocalPlayer::getSoul);
     g_lua.bindClassMemberFunction<LocalPlayer>("getStamina", &LocalPlayer::getStamina);
     g_lua.bindClassMemberFunction<LocalPlayer>("getOfflineTrainingTime", &LocalPlayer::getOfflineTrainingTime);

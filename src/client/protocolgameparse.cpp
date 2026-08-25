@@ -2766,10 +2766,13 @@ void ProtocolGame::parsePlayerSkills(const InputMessagePtr& msg) const
 
     if (g_game.getFeature(Otc::GameConcotions)) {
         const uint8_t specializedMagicLevels = msg->getU8();
+        std::map<uint8_t, uint16_t> magicLevelBonuses;
         for (uint8_t i = 0; i < specializedMagicLevels; ++i) {
-            msg->getU8();  // element
-            msg->getU16(); // specialized magic level
+            const uint8_t element = msg->getU8();
+            const uint16_t specializedMagicLevel = msg->getU16();
+            magicLevelBonuses[element] = specializedMagicLevel;
         }
+        m_localPlayer->setMagicLevelBonuses(magicLevelBonuses);
     }
 
     if (g_game.getFeature(Otc::GameForgeSkillStats)) {

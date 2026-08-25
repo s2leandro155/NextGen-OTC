@@ -49,6 +49,7 @@ public:
     void setManaShield(uint32_t manaShield, uint32_t maxManaShield);
     void setMagicLevel(uint16_t magicLevel, uint16_t magicLevelPercent);
     void setBaseMagicLevel(uint16_t baseMagicLevel);
+    void setMagicLevelBonuses(const std::map<uint8_t, uint16_t>& bonuses);
     void setSoul(uint8_t soul);
     void setStamina(uint16_t stamina);
     void setKnown(const bool known) { m_known = known; }
@@ -82,6 +83,7 @@ public:
     uint16_t getMagicLevel() { return m_magicLevel; }
     uint16_t getMagicLevelPercent() { return m_magicLevelPercent; }
     uint16_t getBaseMagicLevel() { return m_baseMagicLevel; }
+    const std::map<uint8_t, uint16_t>& getMagicLevelBonuses() const { return m_magicLevelBonuses; }
     uint8_t getSoul() { return m_soul; }
     uint16_t getLevelPercent();
     uint8_t getHarmony() { return m_harmony; }
@@ -195,6 +197,7 @@ private:
 
     stdext::map<Otc::ResourceTypes_t, uint64_t> m_resourcesBalance;
     std::map<uint8_t, double> m_combatAbsorbValues;
+    std::map<uint8_t, uint16_t> m_magicLevelBonuses;
     std::map<Otc::ExperienceRate_t, uint16_t> m_experienceRates;
     std::map<std::pair<uint16_t, uint8_t>, uint32_t> m_inventoryCountCache;
 

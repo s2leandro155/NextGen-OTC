@@ -433,6 +433,15 @@ void LocalPlayer::setBaseMagicLevel(const uint16_t baseMagicLevel)
     callLuaField("onBaseMagicLevelChange", baseMagicLevel, oldBaseMagicLevel);
 }
 
+void LocalPlayer::setMagicLevelBonuses(const std::map<uint8_t, uint16_t>& bonuses)
+{
+    if (m_magicLevelBonuses == bonuses)
+        return;
+
+    m_magicLevelBonuses = bonuses;
+    callLuaField("onMagicLevelBonusesChange", m_magicLevelBonuses);
+}
+
 void LocalPlayer::setSoul(const uint8_t soul)
 {
     if (m_soul == soul)
