@@ -33,6 +33,18 @@ local wasInProtectionZone = false
 local shooterEnabledBeforeFollow = false
 local wasFollowingCreature = false
 local ignoredSpellsIds = {
+	-- Postures are toggles managed exclusively by HelperPosture. They must never
+	-- enter (or survive in an imported) offensive priority list, otherwise the
+	-- Shooter speaks them again when cooldown ends and returns to default stance.
+	[304] = true,
+	[305] = true,
+	[306] = true,
+	[309] = true,
+	[311] = true,
+	[312] = true,
+	[313] = true,
+	[314] = true,
+	[319] = true,
 	[275] = true,
 	[274] = true,
 	[143] = true,
@@ -1370,7 +1382,7 @@ local function tryCastPrioritySpell(config, ctx)
 	local combatTarget = ctx.combatTarget
 	local spell = Spells.getSpellDataById(config.id)
 
-	if not spell then
+	if not spell or ignoredSpellsIds[spell.id] then
 		return false
 	end
 
@@ -2201,7 +2213,10 @@ local function checkMagicShooter(nowMs, targetOverride)
 	local combatActive = combatTarget ~= nil or #creatureList > 0
 	local globalCastReady = nowMs - lastGlobalCastAt >= GLOBAL_CAST_COOLDOWN_MS
 
-	if not combatActive and globalCastReady then
+	-- A posture selected during its shared cooldown remains pending. Give that
+	-- switch priority as soon as cooldown ends, even while actively fighting;
+	-- waiting for combat to stop left the new icon selected without casting it.
+	if globalCastReady then
 		local function postureCooldownReady(spell)
 			return not isSpellOnCooldown(spell, nowMs)
 		end

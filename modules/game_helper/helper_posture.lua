@@ -350,6 +350,7 @@ local function onOfficialVirtuesYellowBorder(spellIds)
 	selection = normalizeSelection(selection)
 
 	local changed = false
+	local hasAnyOfficialStance = next(activeIds) ~= nil
 
 	for _, group in ipairs(groups) do
 		local officialWords = ""
@@ -362,7 +363,26 @@ local function onOfficialVirtuesYellowBorder(spellIds)
 			end
 		end
 
-		if normalizeKey(selection[group.key]) ~= normalizeKey(officialWords) then
+		local pendingWords = tostring(castRequests[group.key] or "")
+
+		-- The server can publish the elemental stance before a queued crippling
+		-- aura becomes castable. An empty value for this group must not erase that
+		-- pending aura while it waits for the shared support cooldown.
+		if normalizeKey(officialWords) ~= "" then
+			if normalizeKey(selection[group.key]) ~= normalizeKey(officialWords) then
+				selection[group.key] = officialWords
+				changed = true
+			end
+
+			-- Positive confirmation that this exact family became active.
+			castRequests[group.key] = nil
+		elseif normalizeKey(pendingWords) ~= "" then
+			-- Keep the requested selection and let castPending consume it.
+		elseif hasAnyOfficialStance then
+			-- Some server revisions/packets update only the stance family that
+			-- changed. Do not infer that another family (notably the MS crippling
+			-- aura) was disabled merely because its id is absent from this update.
+		elseif normalizeKey(selection[group.key]) ~= normalizeKey(officialWords) then
 			selection[group.key] = officialWords
 			castRequests[group.key] = nil
 			changed = true
@@ -502,6 +522,22 @@ local function canCastStance(player, spell)
 	return true
 end
 
+local function isOfficialStanceCooldownActive(spell)
+	local actionBar = modules and modules.game_actionbar
+
+	if not actionBar or type(actionBar.getMultiActionCooldownRemaining) ~= "function" then
+		return false
+	end
+
+	local ok, spellRemaining, groupRemaining = pcall(actionBar.getMultiActionCooldownRemaining, spell)
+
+	if not ok then
+		return false
+	end
+
+	return (tonumber(spellRemaining) or 0) > 0 or (tonumber(groupRemaining) or 0) > 0
+end
+
 function HelperPosture.castPending(player, cooldownReady)
 	player = player or getPlayer()
 
@@ -516,10 +552,10 @@ function HelperPosture.castPending(player, cooldownReady)
 	end
 
 	for _, groupKey in ipairs(STANCE_SELECTION_ORDER) do
-		-- A selected posture is persistent: cast it again whenever its own
-		-- exhaustion expires. castRequests only makes a newly clicked selection
-		-- eligible immediately; clearing it must not disable future renewals.
-		local words = castRequests[groupKey] or selection[groupKey]
+		-- Stances are toggles, not periodic buffs. Casting the selected words a
+		-- second time after exhaustion disables the stance and returns the player
+		-- to the default posture. Only explicit pending requests may be cast.
+		local words = castRequests[groupKey]
 
 		if words and tostring(words) ~= "" then
 			local spell = findStance(groupKey, words, player)
@@ -545,7 +581,17 @@ function HelperPosture.castPending(player, cooldownReady)
 end
 
 function HelperPosture.onGameStart()
+	selection = normalizeSelection(selection)
 	castRequests = {}
+
+	-- Apply each saved stance once when a new game session starts. The official
+	-- yellow-border packet clears this request when the stance is already active
+	-- (for example when the player cast it manually before enabling the Helper).
+	for groupKey, words in pairs(selection) do
+		if normalizeKey(words) ~= "" then
+			castRequests[groupKey] = words
+		end
+	end
 	stanceCooldowns = {}
 	nextCastAt = 0
 
@@ -572,6 +618,10 @@ function HelperPosture.loadFromConfig(config)
 
 	selection = normalizeSelection(data)
 	castRequests = {}
+	-- Loading/autosaving a profile may happen more than once while the Helper is
+	-- running. It must never create another cast request: stance spells toggle
+	-- off when spoken again after their cooldown. onGameStart applies the saved
+	-- selection once per login, and an icon click is handled by setSelection.
 
 	syncActionBarBorders()
 end
@@ -713,12 +763,20 @@ function HelperPosture.refreshUI()
 					-- request and reserve its cooldown here; otherwise the Shooter tick
 					-- speaks the same words a second time and toggles the aura back off.
 					if changed and g_game and g_game.isOnline and g_game.isOnline() and words ~= "" then
-						local castAt = nowMs()
+						if isOfficialStanceCooldownActive(spell) or not canCastStance(getPlayer(), spell) then
+							-- Keep both a switch and an explicit toggle-off pending until
+							-- cooldown/resources are actually available.
+							castRequests[groupKey] = words
+						else
+							local castAt = nowMs()
 
-						g_game.talk(words)
-						castRequests[groupKey] = nil
-						nextCastAt = math.max(nextCastAt, castAt + GLOBAL_POSTURE_CAST_LOCK_MS)
-						reserveStanceCooldown(spell, castAt)
+							g_game.talk(words)
+							-- Keep it pending until the stance protocol confirms activation.
+							-- This also retries safely if the server rejects the first talk.
+							castRequests[groupKey] = words
+							nextCastAt = math.max(nextCastAt, castAt + GLOBAL_POSTURE_CAST_LOCK_MS)
+							reserveStanceCooldown(spell, castAt)
+						end
 					end
 					addEvent(function()
 						HelperPosture.refreshUI()
