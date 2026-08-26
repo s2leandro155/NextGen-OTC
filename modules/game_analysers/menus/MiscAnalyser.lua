@@ -50,11 +50,46 @@ local specialSkillIcons = {
 	[3] = "/images/game/analyzer/misc/transcendence"
 }
 
+-- Wire IDs used by CrystalServer's bestiary/charm protocol. Keep this local:
+-- game_cyclopedia is sandboxed and may not have exported its definition table
+-- yet when the first combat proc reaches the analyser.
+local charmNames = {
+	[0] = "Wound",
+	[1] = "Enflame",
+	[2] = "Poison",
+	[3] = "Freeze",
+	[4] = "Zap",
+	[5] = "Curse",
+	[6] = "Cripple",
+	[7] = "Parry",
+	[8] = "Dodge",
+	[9] = "Adrenaline Burst",
+	[10] = "Numb",
+	[11] = "Cleanse",
+	[12] = "Bless",
+	[13] = "Scavenge",
+	[14] = "Gut",
+	[15] = "Low Blow",
+	[16] = "Divine Wrath",
+	[17] = "Vampiric Embrace",
+	[18] = "Void's Call",
+	[19] = "Savage Blow",
+	[20] = "Fatal Hold",
+	[21] = "Void Inversion",
+	[22] = "Carnage",
+	[23] = "Overpower",
+	[24] = "Overflux"
+}
+
 local function charmName(charmId)
-	local charmModule = modules.game_cyclopedia and modules.game_cyclopedia.Charm
-	if charmModule and charmModule.getCharmById then
+	if charmNames[charmId] then
+		return charmNames[charmId]
+	end
+
+	local cyclopedia = modules.game_cyclopedia and modules.game_cyclopedia.Cyclopedia
+	if cyclopedia and cyclopedia.getCharmDefinition then
 		local ok, charm = pcall(function()
-			return charmModule:getCharmById(charmId)
+			return cyclopedia.getCharmDefinition(charmId)
 		end)
 		if ok and charm and charm.name then
 			return charm.name
