@@ -2807,7 +2807,9 @@ function getVesselBonus()
 				local number = getBonusValueUpgrade(k.bonusID, k.gemID, k.supreme, true)
 				local tooltip = bonus.tooltip
 
-				bonusName = bonusName:gsub("Aug. ", "")
+				-- The original client used an icon glyph before supreme mod names.
+				-- In this asset/font set that glyph was converted to a literal '?'.
+				bonusName = bonusName:gsub("^%?%s*", ""):gsub("Aug%.%s*", "")
 
 				if vocation == 5 and bonusName == "Greater Flurry of Blows" then
 					tooltip = string.format("+%d%% Base Damage", number)
@@ -2828,7 +2830,7 @@ function getVesselBonus()
 
 					bonuses[#bonuses + 1] = {
 						bonusType = "augment",
-						text = short_text(bonusName, 15),
+						text = bonusName,
 						value = number,
 						tooltip = tooltip
 					}

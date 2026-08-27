@@ -1693,6 +1693,7 @@ function WheelOfDestiny.configureVessels()
 		end
 
 		widget.perk:setText(data.text)
+		widget.perk:setTooltip(#data.text > 19 and data.text or "")
 
 		if data.value == -1 then
 			widget.value:setVisible(false)
@@ -3978,79 +3979,36 @@ function WheelOfDestiny.onGemVesselClick(domain)
 	wheelOfDestinyWindow.selection.gemContent.modification2:setText("")
 
 	if data then
+		local function setGemDetail(widget, value, enabled)
+			widget:setText(value or "(Unknown)")
+			widget:setColor(enabled and "#c0c0c0" or "#707070")
+		end
+
 		local formatedName = GemVocations[WheelOfDestiny.vocationId][data.gemType].name:gsub(" %(x 0%)", "")
 		local gemSlot1, gemSlot2, gemSlot3 = 0
-		local decription = "(Unkown)"
+		local decription = "(Unknown)"
 
 		if data.gemType == 0 then
-			local text = {}
-
 			decription, gemSlot1 = Workshop.getGemInformationByBonus(data.lesserBonus, false, data.gemID, 0)
-
-			setStringColor(text, decription, filledCount >= 1 and "#c0c0c0" or "#707070")
-			wheelOfDestinyWindow.selection.gemContent.modification0:setColoredText(text)
+			setGemDetail(wheelOfDestinyWindow.selection.gemContent.modification0, decription, filledCount >= 1)
 		elseif data.gemType == 1 then
-			local text = {}
-
 			decription, gemSlot1 = Workshop.getGemInformationByBonus(data.lesserBonus, false, data.gemID, 0)
-
-			setStringColor(text, decription, filledCount >= 1 and "#c0c0c0" or "#707070")
-			wheelOfDestinyWindow.selection.gemContent.modification0:setColoredText(text)
-
-			text = {}
+			setGemDetail(wheelOfDestinyWindow.selection.gemContent.modification0, decription, filledCount >= 1)
 			decription, gemSlot2 = Workshop.getGemInformationByBonus(data.regularBonus, false, data.gemID, 1)
-
-			setStringColor(text, decription, filledCount >= 2 and "#c0c0c0" or "#707070")
-			wheelOfDestinyWindow.selection.gemContent.modification1:setColoredText(text)
+			setGemDetail(wheelOfDestinyWindow.selection.gemContent.modification1, decription, filledCount >= 2)
 		elseif data.gemType == 2 then
-			local text = {}
-
 			decription, gemSlot1 = Workshop.getGemInformationByBonus(data.lesserBonus, false, data.gemID, 0)
-
-			setStringColor(text, decription, filledCount >= 1 and "#c0c0c0" or "#707070")
-			wheelOfDestinyWindow.selection.gemContent.modification0:setColoredText(text)
-
-			text = {}
+			setGemDetail(wheelOfDestinyWindow.selection.gemContent.modification0, decription, filledCount >= 1)
 			decription, gemSlot2 = Workshop.getGemInformationByBonus(data.regularBonus, false, data.gemID, 1)
-
-			setStringColor(text, decription, filledCount >= 2 and "#c0c0c0" or "#707070")
-			wheelOfDestinyWindow.selection.gemContent.modification1:setColoredText(text)
-
-			text = {}
+			setGemDetail(wheelOfDestinyWindow.selection.gemContent.modification1, decription, filledCount >= 2)
 			decription, gemSlot3 = Workshop.getGemInformationByBonus(data.supremeBonus, true, data.gemID, 2)
-
-			setStringColor(text, decription, filledCount == 3 and "#c0c0c0" or "#707070")
-			wheelOfDestinyWindow.selection.gemContent.modification2:setColoredText(text)
+			setGemDetail(wheelOfDestinyWindow.selection.gemContent.modification2, decription, filledCount == 3)
 		end
 
-		local text = {}
-
-		setStringColor(text, tr("+%s Damage and Healing", data.gemType == 2 and 2 or 1), filledCount == 3 and "#c0c0c0" or "#707070")
-		wheelOfDestinyWindow.selection.gemContent.VRBonus:setColoredText(text)
-
-		local replaceStr = {
-			[0] = "�",
-			"�",
-			"�",
-			"�"
-		}
-		local coloredStr = {}
-
-		setStringColor(coloredStr, formatedName .. " ", "#c0c0c0")
-
-		if data then
-			setStringColor(coloredStr, replaceStr[gemSlot1], "white")
-
-			if data.gemType >= 1 then
-				setStringColor(coloredStr, replaceStr[gemSlot2], "white")
-			end
-
-			if data.gemType >= 2 then
-				setStringColor(coloredStr, replaceStr[gemSlot3], "white")
-			end
-		end
-
-		wheelOfDestinyWindow.selection.gemContent.gemName:setColoredText(coloredStr)
+		setGemDetail(wheelOfDestinyWindow.selection.gemContent.VRBonus,
+			tr("+%s Damage and Healing", data.gemType == 2 and 2 or 1), filledCount == 3)
+		wheelOfDestinyWindow.selection.gemContent.gemName:setText(formatedName)
+		wheelOfDestinyWindow.selection.gemContent.gemName:setColor("#c0c0c0")
 	end
 end
 

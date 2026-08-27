@@ -3,17 +3,17 @@ PerksPanel < Panel
   Label
     id: perk
     !text: tr('Healing Link')
-    width: 102
+    width: 132
     anchors.top: parent.top
     anchors.left: parent.left
     text-align: topleft
     font: Verdana Bold-11px-wheel
     color: #c0c0c0
-    text-auto-resize: true
+    text-auto-resize: false
   Label
     id: value
     !text: tr('0%%')
-    width: 88
+    width: 55
     anchors.top: parent.top
     anchors.right: parent.right
     text-align: topright

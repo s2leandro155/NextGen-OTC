@@ -1351,7 +1351,7 @@ function GemAtelier:onModRedirect()
 	local pageIndex
 	local focusIndex = 0
 
-	for i, k in pairs(Workshop.getFragmentList()) do
+	for i, k in ipairs(Workshop.getFragmentList()) do
 		if isSupreme and k.supreme and k.modID == modID or not isSupreme and not k.supreme and k.modID == modID then
 			pageIndex = math.ceil(i / itemsPerPage)
 			focusIndex = (i - 1) % itemsPerPage + 1
@@ -1366,6 +1366,24 @@ function GemAtelier:onModRedirect()
 
 	Workshop.setCurrentPage(pageIndex)
 	Workshop.showFragmentList(true, false, false, "", focusIndex)
+
+	-- The workshop reuses the same 30 widgets on every page. Resolve the
+	-- destination again from the widget cache instead of trusting focus state;
+	-- otherwise the panel may retain its OTUI placeholders (Dodge / +x%).
+	local fragmentPanel = fragmentWindow:recursiveGetChildById("fragmentContent")
+
+	if fragmentPanel then
+		for _, child in ipairs(fragmentPanel:getChildren()) do
+			local cache = child.cache
+
+			if cache and cache.modID == modID and cache.supreme == isSupreme then
+				fragmentPanel:focusChild(child)
+				Workshop.onSelectChild(nil, child)
+				break
+			end
+		end
+	end
+
 	gemAtelierWindow:hide()
 	fragmentWindow:show(true)
 	gemMenuButton:setChecked(false)

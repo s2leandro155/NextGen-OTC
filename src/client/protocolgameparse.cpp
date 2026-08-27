@@ -7698,30 +7698,6 @@ void ProtocolGame::parseOpenWheelWindow(const InputMessagePtr& msg)
         supremeUpgraded[pos] = val;
     }
 
-    // Additional field (since Canary 15.10+)
-    if (g_game.getProtocolVersion() >= 1510 && msg->getUnreadSize() >= 1) {
-        msg->getU8(); // earnedFromAchievements
-    }
-
-    // Check whether any bytes remained after the parse
-    const uint16_t unread = msg->getUnreadSize();
-    if (unread > 0) {
-        std::ostringstream hexDump;
-        hexDump << std::hex << std::setfill('0');
-        std::vector<uint8_t> leftover;
-
-        // Read the remaining bytes without overrunning the buffer
-        for (uint16_t i = 0; i < unread; ++i) {
-            uint8_t b = msg->getU8();
-            leftover.push_back(b);
-            hexDump << std::setw(2) << static_cast<int>(b) << " ";
-        }
-
-        // Detailed log
-        g_logger.warning(fmt::format("[Wheel C++ Parse] {} bytes remained after parseOpenWheelWindow (discarded).", unread));
-        g_logger.warning(fmt::format("[Wheel C++ Parse] Extra bytes (hex): {}", hexDump.str()));
-    }
-
     // Callback Lua
     g_lua.callGlobalField("g_game", "onDestinyWheel",
         playerId, canView, changeState, vocationId,

@@ -4,6 +4,10 @@ Workshop = {}
 Workshop.__index = Workshop
 fragmentList = {}
 currentWorkshopPage = 1
+local selectedModID
+local selectedModIsSupreme
+local pendingUpgradeModID
+local pendingUpgradeIsSupreme
 
 local function matchText(text, search)
 	if not text or not search then
@@ -93,15 +97,23 @@ function Workshop.createFragments()
 		end
 	end
 
-	for id = 0, #BasicMods do
-		local info = BasicMods[id]
+	-- BasicMods is sparse (for example, IDs 32, 42 and 43 are absent), so the
+	-- length operator can stop before valid entries that come after a gap.
+	local basicModIDs = {}
 
-		if info then
-			info.modID = id
-			info.supreme = false
-
-			table.insert(fragmentList, info)
+	for id, info in pairs(BasicMods) do
+		if type(id) == "number" and info then
+			table.insert(basicModIDs, id)
 		end
+	end
+
+	table.sort(basicModIDs)
+
+	for _, id in ipairs(basicModIDs) do
+		local info = BasicMods[id]
+		info.modID = id
+		info.supreme = false
+		table.insert(fragmentList, info)
 	end
 end
 
@@ -117,9 +129,27 @@ function Workshop.showFragmentList(startUp, nextPage, selectCurrent, searchText,
 	end
 
 	local lastSelectedWidget
+	local selectedIdentity
 
 	if selectCurrent then
 		lastSelectedWidget = fragmentPanel:getFocusedChild()
+
+		if pendingUpgradeModID ~= nil then
+			selectedIdentity = {
+				modID = pendingUpgradeModID,
+				supreme = pendingUpgradeIsSupreme == true
+			}
+		elseif lastSelectedWidget and lastSelectedWidget.cache then
+			selectedIdentity = {
+				modID = lastSelectedWidget.cache.modID,
+				supreme = lastSelectedWidget.cache.supreme == true
+			}
+		elseif selectedModID ~= nil then
+			selectedIdentity = {
+				modID = selectedModID,
+				supreme = selectedModIsSupreme == true
+			}
+		end
 	end
 
 	local currentModList = fragmentList
@@ -151,7 +181,20 @@ function Workshop.showFragmentList(startUp, nextPage, selectCurrent, searchText,
 		end
 	end
 
-	if not startUp and not focusIndex then
+	-- An Enhance response rebuilds the whole Wheel. Return to the page that
+	-- contains the immutable ID captured when the button was pressed.
+	if selectCurrent and selectedIdentity then
+		for index, info in ipairs(currentModList) do
+			if info.modID == selectedIdentity.modID and
+				(info.supreme == true) == selectedIdentity.supreme then
+				currentWorkshopPage = math.ceil(index / 30)
+				break
+			end
+		end
+	end
+
+	if not startUp and not focusIndex and not selectCurrent and
+		(not searchText or string.empty(searchText)) then
 		currentWorkshopPage = nextPage and math.min(maxPages, currentWorkshopPage + 1) or math.max(1, currentWorkshopPage - 1)
 	end
 
@@ -262,10 +305,46 @@ function Workshop.showFragmentList(startUp, nextPage, selectCurrent, searchText,
 	fragmentPanel.onChildFocusChange = Workshop.onSelectChild
 
 	if focusIndex then
-		fragmentPanel:focusChild(fragmentPanel:getChildByIndex(focusIndex))
+		local focusWidget = fragmentPanel:getChildByIndex(focusIndex)
+
+		if focusWidget and focusWidget.cache then
+			-- Focusing the same reusable list widget does not always emit
+			-- onChildFocusChange after changing pages. Refresh the details
+			-- explicitly so a gem mod always opens its own upgrade panel.
+			fragmentPanel:focusChild(focusWidget)
+			Workshop.onSelectChild(nil, focusWidget)
+		end
 	elseif selectCurrent then
-		Workshop.onSelectChild(nil, lastSelectedWidget)
-		fragmentPanel:focusChild(lastSelectedWidget)
+		local restoredWidget
+
+		if selectedIdentity then
+			for _, child in ipairs(fragmentPanel:getChildren()) do
+				local cache = child.cache
+
+				if child:isVisible() and cache and cache.modID == selectedIdentity.modID and
+					(cache.supreme == true) == selectedIdentity.supreme then
+					restoredWidget = child
+					break
+				end
+			end
+		end
+
+		-- If an active filter removes the upgraded mod from this page, do not
+		-- silently select whatever entry reused its old cell.
+		if not selectedIdentity then
+			restoredWidget = lastSelectedWidget
+		end
+
+		if restoredWidget and restoredWidget.cache then
+			fragmentPanel:focusChild(restoredWidget)
+			Workshop.onSelectChild(nil, restoredWidget)
+
+			if pendingUpgradeModID == restoredWidget.cache.modID and
+				pendingUpgradeIsSupreme == (restoredWidget.cache.supreme == true) then
+				pendingUpgradeModID = nil
+				pendingUpgradeIsSupreme = nil
+			end
+		end
 	else
 		fragmentPanel:focusChild(nil)
 		fragmentPanel:focusChild(fragmentPanel:getFirstChild())
@@ -276,6 +355,9 @@ function Workshop.onSelectChild(list, selected)
 	if not selected then
 		return true
 	end
+
+	selectedModID = selected.cache.modID
+	selectedModIsSupreme = selected.cache.supreme == true
 
 	local isSupreme = selected.cache.supreme
 	local supremeTier = WheelOfDestiny.supremeModsUpgrade[selected.cache.modID] or 0
@@ -436,6 +518,13 @@ function Workshop.onUpgradeModification(button)
 	local modID = selectedWidget.cache.modID or -1
 	local supreme = selectedWidget.cache.supreme or false
 	local fragmentType = supreme and 0 or 1
+
+	-- Keep the requested modifier stable while the server sends a complete
+	-- Wheel refresh, which can fire focus-change events for reused cells.
+	pendingUpgradeModID = modID
+	pendingUpgradeIsSupreme = supreme == true
+	selectedModID = modID
+	selectedModIsSupreme = supreme == true
 
 	pos = modID
 
