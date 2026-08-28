@@ -97,7 +97,12 @@ void UIProgressArc::drawSelf(const DrawPoolType drawPane)
         for (int it = 0; it < 4; ++it) {
             const float rout = std::max<float>(radius - m_radialInset, 1.f);
             const float rin = std::max<float>(rout - m_thickness, 0.f);
-            const float fo = rout / radius;
+
+            // Always fit and align arcs against their common outer radius.
+            // Using rout here made the fitting loop compensate m_radialInset by
+            // enlarging the radius, which put inset layers (Harmony/Mana Shield)
+            // back on top of the health or mana arc.
+            const float fo = 1.f;
             const float fi = rin / radius;
 
             minx = miny = 1e9f;

@@ -2,9 +2,21 @@
 
 ThingsLoaderController = Controller:new()
 
-local THINGS_ASSETS_PATH = "/things/assets/"
 local filename
 local loaded = false
+
+local function getThingsAssetsPath(version)
+	local versionPath = "/things/" .. version .. "/"
+	local sharedAssetsPath = "/things/assets/"
+
+	-- Prefer the editable Assets Editor catalog when installed. Keep the
+	-- version-specific catalog as a safe fallback for older installations.
+	if g_resources.directoryExists(sharedAssetsPath) then
+		return sharedAssetsPath
+	end
+
+	return versionPath
+end
 
 function setFileName(name)
 	filename = name
@@ -68,8 +80,7 @@ end
 
 local function load(version)
 	local errorList = {}
-	-- CrystalOTC: per-version assets (/things/1530/), not /things/assets/
-	local THINGS_ASSETS_PATH = "/things/" .. version .. "/"
+	local THINGS_ASSETS_PATH = getThingsAssetsPath(version)
 
 	if version >= 1281 and not g_game.getFeature(GameLoadSprInsteadProtobuf) then
 		local filePath = resolvepath(THINGS_ASSETS_PATH)

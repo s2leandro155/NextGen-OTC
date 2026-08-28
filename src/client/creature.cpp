@@ -713,9 +713,11 @@ void Creature::updateWalkAnimation()
     // in place, and at fast walk it slid (frames could not keep up with the offset). We tie them to
     // STEP PROGRESS, so that one full frame cycle lands exactly on one tile.
     // The phase range stays as before (1..footAnimPhases), so sprite indexing is left untouched.
-    // we compute progress against the SAME step duration the movement uses (diagonal-aware),
-    // otherwise on diagonals the frames would run ahead of the character's offset
-    const uint16_t stepDurationMs = getStepDuration(false);
+    // Progress is measured against the SAME duration the offset uses - the regular step, not the
+    // diagonal one - so one frame cycle lands exactly on one tile crossing. Using the diagonal
+    // duration here would stretch the leg cycle to 3x on diagonals; using it for only one of the
+    // two would slide the feet against the body.
+    const uint16_t stepDurationMs = getStepDuration(true);
     const float stepProgress = stepDurationMs > 0
         ? m_walkTimer.ticksElapsed() / static_cast<float>(stepDurationMs)
         : -1.f;
@@ -813,10 +815,13 @@ void Creature::nextWalkUpdate()
 
 void Creature::updateWalk()
 {
-    // This used getStepDuration(true), i.e. 32 px covered in the time of a REGULAR step - when walking
-    // diagonally the character crossed the tile too fast, then stood still for the remaining 2/3 of
-    // the step time (hence the infamous diagonal "stutter"). We spread the pixels over the full step time.
-    const float walkTicksPerPixel = getStepDuration(false) / static_cast<float>(g_gameConfig.getSpriteSize());
+    // The 32 px of a tile are covered in the time of a REGULAR step, even when the step is
+    // diagonal. A diagonal costs 3x, but that extra time is DWELL on the destination tile, not a
+    // slower crossing: the character arrives at normal speed and then waits out the remainder.
+    // Spending the pixels over the diagonal duration instead makes diagonals glide at 1/3 speed,
+    // which reads as slow motion. The guard at the top of updateWalkAnimation() holds the idle
+    // pose for the leftover time, which is what the "stutter" actually is - and what real Tibia does.
+    const float walkTicksPerPixel = getStepDuration(true) / static_cast<float>(g_gameConfig.getSpriteSize());
 
     const int totalPixelsWalked = std::min<int>(m_walkTimer.ticksElapsed() / walkTicksPerPixel, g_gameConfig.getSpriteSize());
 

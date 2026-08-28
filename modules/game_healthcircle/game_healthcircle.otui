@@ -63,7 +63,6 @@ HarmonyProgressArc < UIProgressArc
   start-angle: 225
   total-span: 90
   ring-thickness: 24
-  arc-slot-count: 5
   empty-track: true
   track-color: #0000003C
   fill-color: #FF9854BF

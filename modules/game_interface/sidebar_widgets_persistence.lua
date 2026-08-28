@@ -17,6 +17,7 @@ local SECTION_FIELD_ORDER = {
 local applyScheduled = false
 local placementByWidgetId = {}
 local fullOrderRestoreEvent
+local delayedRestoreEvents = {}
 local WIDGET_TYPE_TO_ID = {
 	dropTracker = "dropTrackerMiniWindow",
 	analyticsSelector = "analyserMiniWindow",
@@ -806,6 +807,12 @@ connect(g_game, {
 
 			fullOrderRestoreEvent = nil
 		end
+
+		for _, event in ipairs(delayedRestoreEvents) do
+			removeEvent(event)
+		end
+
+		delayedRestoreEvents = {}
 	end,
 	onGameStart = function()
 		layoutRestoreAttempts = 0
@@ -887,6 +894,36 @@ connect(g_game, {
 			end)
 		else
 			SidebarWidgetsPersistence.scheduleApply()
+		end
+
+		-- Several game modules are loaded after game_interface and may open their
+		-- default miniwindows after the first restore pass. Reapply the saved
+		-- character layout while those late modules finish starting up.
+		for _, event in ipairs(delayedRestoreEvents) do
+			removeEvent(event)
+		end
+
+		delayedRestoreEvents = {}
+
+		for _, delay in ipairs({ 500, 1500, 3000, 5000 }) do
+			local event
+
+			event = scheduleEvent(function()
+				for index, pendingEvent in ipairs(delayedRestoreEvents) do
+					if pendingEvent == event then
+						table.remove(delayedRestoreEvents, index)
+						break
+					end
+				end
+
+				if SidebarPersistence and SidebarPersistence.active then
+					layoutRestoreAttempts = 0
+					SidebarWidgetsPersistence.scheduleApply()
+					SidebarWidgetsPersistence.scheduleFullOrderRestore()
+				end
+			end, delay)
+
+			table.insert(delayedRestoreEvents, event)
 		end
 	end
 })

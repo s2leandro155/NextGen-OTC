@@ -1102,7 +1102,8 @@ local function updateHarmonyDisplay()
 	end
 
 	harmonyCircle:setVisible(true)
-	harmonyCircle:setArcFilledSlots(math.min(HARMONY_ARC_SLOTS, player:getHarmony()))
+	local harmony = math.min(HARMONY_ARC_SLOTS, math.max(0, player:getHarmony()))
+	harmonyCircle:setPercent(harmony * (100 / HARMONY_ARC_SLOTS))
 
 	if pair ~= lastHarmonySplitKey then
 		lastHarmonySplitKey = pair
@@ -1304,10 +1305,13 @@ function applyArcScaleByMapPanel()
 
 	local nHealthAux = (sShield and pShield == "health" and 1 or 0) + (sHarm and pHarm == "health" and 1 or 0)
 	local nManaAux = (sShield and pShield == "mana" and 1 or 0) + (sHarm and pHarm == "mana" and 1 or 0)
-	local bandsHealth = 1 + nHealthAux
-	local bandsMana = 1 + nManaAux
-	local hpThickness = math.max(1, math.floor(arcThickness / bandsHealth + 0.5))
-	local mpThickness = math.max(1, math.floor(arcThickness / bandsMana + 0.5))
+	-- Keep the primary health/mana band visually dominant. Auxiliary resources
+	-- (Mana Shield and Monk Harmony) use a thinner inner band, as in the
+	-- official HUD, instead of splitting the available width equally.
+	local hpAuxThickness = math.max(1, math.floor(arcThickness / (2 + nHealthAux) + 0.5))
+	local mpAuxThickness = math.max(1, math.floor(arcThickness / (2 + nManaAux) + 0.5))
+	local hpThickness = nHealthAux > 0 and math.max(1, arcThickness - hpAuxThickness * nHealthAux) or arcThickness
+	local mpThickness = nManaAux > 0 and math.max(1, arcThickness - mpAuxThickness * nManaAux) or arcThickness
 
 	healthCircle:setWidth(arcWidth)
 	healthCircle:setHeight(arcHeight)
@@ -1329,34 +1333,28 @@ function applyArcScaleByMapPanel()
 		sereneCircle:setThickness(sereneSize)
 	end
 
-	local idxHealth = 0
-	local idxMana = 0
+	local healthInset = hpThickness
+	local manaInset = mpThickness
 
 	if sShield and pShield == "health" then
-		idxHealth = idxHealth + 1
-
-		manaShieldCircle:setThickness(hpThickness)
-		manaShieldCircle:setRadialInset(hpThickness * idxHealth)
+		manaShieldCircle:setThickness(hpAuxThickness)
+		manaShieldCircle:setRadialInset(healthInset)
+		healthInset = healthInset + hpAuxThickness
 	elseif sShield and pShield == "mana" then
-		idxMana = idxMana + 1
-
-		manaShieldCircle:setThickness(mpThickness)
-		manaShieldCircle:setRadialInset(mpThickness * idxMana)
+		manaShieldCircle:setThickness(mpAuxThickness)
+		manaShieldCircle:setRadialInset(manaInset)
+		manaInset = manaInset + mpAuxThickness
 	else
 		manaShieldCircle:setThickness(arcThickness)
 		manaShieldCircle:setRadialInset(0)
 	end
 
 	if sHarm and pHarm == "health" then
-		idxHealth = idxHealth + 1
-
-		harmonyCircle:setThickness(hpThickness)
-		harmonyCircle:setRadialInset(hpThickness * idxHealth)
+		harmonyCircle:setThickness(hpAuxThickness)
+		harmonyCircle:setRadialInset(healthInset)
 	elseif sHarm and pHarm == "mana" then
-		idxMana = idxMana + 1
-
-		harmonyCircle:setThickness(mpThickness)
-		harmonyCircle:setRadialInset(mpThickness * idxMana)
+		harmonyCircle:setThickness(mpAuxThickness)
+		harmonyCircle:setRadialInset(manaInset)
 	else
 		harmonyCircle:setThickness(arcThickness)
 		harmonyCircle:setRadialInset(0)

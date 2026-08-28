@@ -228,7 +228,8 @@ function SidebarPersistence.init()
 		onLogout = SidebarPersistence.onLogout
 	})
 	connect(g_app, {
-		onClose = onAppCloseSaveSidebars
+		onClose = onAppCloseSaveSidebars,
+		onExit = onAppCloseSaveSidebars
 	})
 end
 
@@ -239,7 +240,8 @@ function SidebarPersistence.terminate()
 		onLogout = SidebarPersistence.onLogout
 	})
 	disconnect(g_app, {
-		onClose = onAppCloseSaveSidebars
+		onClose = onAppCloseSaveSidebars,
+		onExit = onAppCloseSaveSidebars
 	})
 end
 

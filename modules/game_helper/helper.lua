@@ -14,6 +14,7 @@ local var_0_12 = 0
 local var_0_13 = 0
 local var_0_14 = 0
 local var_0_15 = 180
+local antiParalyzeLastCast = 0
 local shooterPriorityCursor = 1
 local shooterPrioritySignature = ""
 local var_0_16 = {
@@ -1518,7 +1519,9 @@ function init()
 		onOpen = onHelperContainerOpen
 	})
 	connect(LocalPlayer, {
-		onPositionChange = onHelperPositionChange
+		onPositionChange = onHelperPositionChange,
+		onHealthChange = onHelperHealthChange,
+		onStatesChange = onHelperStatesChange
 	})
 
 	helperButton = modules.game_mainpanel.addToggleButton("helperButton", tr("helper"), "/images/options/button_helper", toggle, false, 99999)
@@ -1740,7 +1743,9 @@ function terminate()
 		onOpen = onHelperContainerOpen
 	})
 	disconnect(LocalPlayer, {
-		onPositionChange = onHelperPositionChange
+		onPositionChange = onHelperPositionChange,
+		onHealthChange = onHelperHealthChange,
+		onStatesChange = onHelperStatesChange
 	})
 
 	local var_50_0 = modules.game_interface.getRootPanel()
@@ -4925,6 +4930,23 @@ function isManaPotion(arg_200_0)
 	return false
 end
 
+-- While paralyzed, a held movement key can keep sending walk attempts faster
+-- than the server accepts the healing action. Stop only the blocked step before
+-- healing; the walk module will resume naturally if the key is still held.
+function prepareParalyzedHealing(arg_200_1)
+	if not arg_200_1 or not PlayerStates or not PlayerStates.Paralyze then
+		return
+	end
+
+	local var_200_0 = bit.band(arg_200_1:getStates(), PlayerStates.Paralyze) ~= 0
+	local var_200_1 = arg_200_1:isWalking() or arg_200_1:isPreWalking() or arg_200_1:isServerWalking()
+
+	if var_200_0 and var_200_1 then
+		arg_200_1:lockWalk(150)
+		g_game.stop()
+	end
+end
+
 function usePotion(arg_201_0)
 	local var_201_0 = g_game.getLocalPlayer()
 
@@ -4945,6 +4967,7 @@ function usePotion(arg_201_0)
 	local var_201_1 = false
 
 	if var_201_0:getInventoryCount(arg_201_0) > 0 then
+		prepareParalyzedHealing(var_201_0)
 		g_game.useInventoryItemWith(arg_201_0, var_201_0, 0, true)
 
 		var_0_40[var_0_25.id] = g_clock.millis() + var_0_25.exhaustion
@@ -5719,6 +5742,7 @@ function castHealingSpell(arg_255_0)
 		end
 	end
 
+	prepareParalyzedHealing(var_0_0)
 	g_game.talk(var_255_0.words)
 	onSpellCooldown(var_255_0.id, 500)
 
@@ -5734,8 +5758,19 @@ function checkHealthHealing()
 		return false
 	end
 
-	local var_256_0 = var_0_0:getHealth()
-	local var_256_1 = var_0_0:getMaxHealth()
+	-- Conditions such as paralysis can make the cached LocalPlayer userdata
+	-- stale on some protocol updates. Always use the current player instance
+	-- for healing, otherwise the helper silently stops after the condition.
+	local currentPlayer = g_game.getLocalPlayer()
+
+	if not currentPlayer then
+		return false
+	end
+
+	var_0_0 = currentPlayer
+
+	local var_256_0 = currentPlayer:getHealth()
+	local var_256_1 = currentPlayer:getMaxHealth()
 
 	if var_256_1 <= 0 then
 		return false
@@ -5829,6 +5864,90 @@ function checkHealthHealing()
 	end
 
 	return var_256_3 or var_256_4
+end
+
+-- Health packets keep arriving during movement. Check healing immediately on
+-- each update, so walking or paralysis updates cannot postpone a critical heal.
+function onHelperHealthChange()
+	if not var_0_10 or not g_game.isOnline() then
+		return
+	end
+
+	addEvent(function()
+		if var_0_10 and g_game.isOnline() then
+			checkHealthHealing()
+		end
+	end)
+end
+
+local function tryAntiParalyzeHealing(arg_258_0)
+	if arg_258_0 > 12 or not var_0_10 or not g_game.isOnline() or not g_settings.getBoolean("antiParalyzeEnabled", false) then
+		return
+	end
+
+	local var_258_0 = g_game.getLocalPlayer()
+
+	if not var_258_0 or bit.band(var_258_0:getStates(), PlayerStates.Paralyze) == 0 then
+		return
+	end
+
+	-- Block held movement briefly, then give the stop packet time to precede
+	-- the healing packet on servers that discard actions during paralyzed walk.
+	var_258_0:lockWalk(150)
+	g_game.stop()
+
+	scheduleEvent(function()
+		local var_259_0 = g_game.getLocalPlayer()
+
+		if not var_259_0 or bit.band(var_259_0:getStates(), PlayerStates.Paralyze) == 0 then
+			return
+		end
+
+		local var_259_1 = {}
+
+		for iter_259_0, iter_259_1 in ipairs(helperConfig.spells or {}) do
+			if iter_259_1.id and iter_259_1.id > 0 and not var_0_98[iter_259_1.id] then
+				local var_259_2 = Spells.getSpellDataById(tonumber(iter_259_1.id))
+
+				if var_259_2 and not var_259_2.needTarget then
+					table.insert(var_259_1, var_259_2)
+				end
+			end
+		end
+
+		table.sort(var_259_1, function(arg_260_0, arg_260_1)
+			return (arg_260_0.mana or 0) < (arg_260_1.mana or 0)
+		end)
+
+		local var_259_3 = false
+
+		for iter_259_2, iter_259_3 in ipairs(var_259_1) do
+			if castHealingSpell(iter_259_3.id) then
+				antiParalyzeLastCast = g_clock.millis()
+				var_259_3 = true
+				break
+			end
+		end
+
+		-- Retry until the state really disappears. A server may discard the first
+		-- cast even though the client has already started its local cooldown.
+		scheduleEvent(function()
+			tryAntiParalyzeHealing(arg_258_0 + 1)
+		end, var_259_3 and 550 or 100)
+	end, 50)
+end
+
+function onHelperStatesChange(arg_258_0, arg_258_1, arg_258_2)
+	if not var_0_10 or not g_game.isOnline() or not g_settings.getBoolean("antiParalyzeEnabled", false) then
+		return
+	end
+
+	local var_258_0 = bit.band(arg_258_1 or 0, PlayerStates.Paralyze) ~= 0
+	local var_258_1 = bit.band(arg_258_2 or 0, PlayerStates.Paralyze) ~= 0
+
+	if var_258_0 and not var_258_1 and g_clock.millis() - antiParalyzeLastCast >= 100 then
+		tryAntiParalyzeHealing(1)
+	end
 end
 
 function healingDebug(arg_258_0)
@@ -6088,31 +6207,19 @@ function updateSupportPanel()
 	local var_275_1 = var_0_142("autolootToggle")
 
 	if var_275_1 then
-		var_275_1:setEnabled(var_275_0)
+		local var_275_2 = g_settings.getBoolean("antiParalyzeEnabled", false)
 
-		if var_275_0 then
-			local var_275_2 = g_settings.getBoolean("autolootEnabled", true)
-
-			var_275_1:setText(var_275_2 and "On" or "Off")
-			var_275_1:setIcon(var_275_2 and "/images/store/icon-yes" or "/images/store/icon-no")
-			var_275_1:setColor(var_275_2 and "#7ec77e" or "#c77e7e")
-		else
-			var_275_1:setText("Off")
-			var_275_1:setIcon("/images/store/icon-no")
-			var_275_1:setColor("#777777")
-		end
+		var_275_1:setEnabled(true)
+		var_275_1:setText(var_275_2 and "On" or "Off")
+		var_275_1:setIcon(var_275_2 and "/images/store/icon-yes" or "/images/store/icon-no")
+		var_275_1:setColor(var_275_2 and "#7ec77e" or "#c77e7e")
 	end
 
 	local var_275_3 = var_0_142("autolootHelp")
 
 	if var_275_3 then
-		if var_275_0 then
-			var_275_3:setImageSource("/images/skin/show-gui-help-grey")
-			var_275_3:setTooltip(tr("Loots nearby corpses into your loot pouch. Requires a Loot Pouch in your Store Inbox."))
-		else
-			var_275_3:setImageSource("/images/skin/show-gui-help-red")
-			var_275_3:setTooltip(tr("A Loot Pouch is required to enable this function."))
-		end
+		var_275_3:setImageSource("/images/skin/show-gui-help-grey")
+		var_275_3:setTooltip(tr("Casts the cheapest configured healing spell immediately when you become paralyzed."))
 	end
 
 	local var_275_4 = var_0_142("flaskToggle")
@@ -6127,17 +6234,10 @@ function updateSupportPanel()
 end
 
 function toggleSupportAutoloot()
-	if not var_0_143() then
-		return
-	end
+	local var_276_0 = not g_settings.getBoolean("antiParalyzeEnabled", false)
 
-	local var_276_0 = g_game.getProtocolGame()
-
-	if var_276_0 then
-		var_276_0:sendExtendedOpcode(ExtendedIds.AutolootToggle, "")
-	end
-
-	scheduleEvent(updateSupportPanel, 250)
+	g_settings.set("antiParalyzeEnabled", var_276_0)
+	updateSupportPanel()
 end
 
 function toggleSupportFlask()
