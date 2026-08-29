@@ -1364,8 +1364,33 @@ function onSelectChildItem(widget, selected, oldFocus)
     lastSelectedItem = {
         itemId = itemID,
         tier = itemTier,
-        lastWidget = widget
+        lastWidget = selected
     }
+
+    -- itemList is virtualized: only the visible row pool exists as children.
+    -- Focusing a row can make TextList recalculate the scrollbar from that
+    -- small pool and collapse its range. Restore the range from the complete
+    -- virtual data set after the focus event has finished.
+    scheduleEvent(function()
+        if not marketWindow or marketWindow:isDestroyed() then
+            return
+        end
+
+        local scrollbar = marketWindow:recursiveGetChildById("itemListScroll")
+        if not scrollbar then
+            return
+        end
+
+        local minimum = cache.SCROLL_MARKET_ITEMS.listMin or 0
+        local poolSize = #cache.SCROLL_MARKET_ITEMS.listPool
+        local maximum = math.max(minimum, (cache.SCROLL_MARKET_ITEMS.listMax or 0) - poolSize + 1)
+        local value = math.max(minimum, math.min(scrollbar:getValue(), maximum))
+
+        scrollbar:setMinimum(minimum)
+        scrollbar:setMaximum(maximum)
+        scrollbar:setValue(value)
+        scrollbar:setVisible(true)
+    end, 1)
 
     if itemID == 22118 then
         marketWindow.contentPanel.selectedItem:getItem():setCount(getTransferableTibiaCoins())
