@@ -13,6 +13,8 @@ if not HuntingAnalyser then
 		xpHour = 0,
 		xpGain = 0,
 		rawXPGain = 0,
+		xpForRate = 0,
+		rawXpForRate = 0,
 		startExp = 0,
 		session = 0,
 		launchTime = 0,
@@ -26,12 +28,32 @@ if not HuntingAnalyser then
 	HuntingAnalyser.__index = HuntingAnalyser
 end
 
+-- The Hunt Analyser is intentionally narrow. Keep large signed XP values from
+-- growing over the label; full precision remains available in copy/export and
+-- in the dedicated XP Analyser tooltip.
+local function formatHuntXpValue(value)
+	local number = tonumber(value) or 0
+	local absolute = math.abs(number)
+	local sign = number < 0 and "-" or ""
+
+	if absolute >= 1000000000 then
+		return sign .. string.format("%.2f", absolute / 1000000000):gsub("%.?0+$", "") .. "kkk"
+	elseif absolute >= 1000000 then
+		return sign .. string.format("%.1f", absolute / 1000000):gsub("%.?0+$", "") .. "kk"
+	end
+
+	local rounded = number >= 0 and math.floor(number + 0.5) or math.ceil(number - 0.5)
+	return formatMoney(rounded)
+end
+
 function HuntingAnalyser:create()
 	HuntingAnalyser.launchTime = 0
 	HuntingAnalyser.session = 0
 	HuntingAnalyser.startExp = 0
 	HuntingAnalyser.rawXPGain = 0
 	HuntingAnalyser.xpGain = 0
+	HuntingAnalyser.rawXpForRate = 0
+	HuntingAnalyser.xpForRate = 0
 	HuntingAnalyser.xpHour = 0
 	HuntingAnalyser.rawXpHour = 0
 	HuntingAnalyser.loot = 0
@@ -87,6 +109,8 @@ function HuntingAnalyser:reset()
 	HuntingAnalyser.startExp = 0
 	HuntingAnalyser.rawXPGain = 0
 	HuntingAnalyser.xpGain = 0
+	HuntingAnalyser.rawXpForRate = 0
+	HuntingAnalyser.xpForRate = 0
 	HuntingAnalyser.xpHour = 0
 	HuntingAnalyser.rawXpHour = 0
 	HuntingAnalyser.loot = 0
@@ -141,55 +165,39 @@ function HuntingAnalyser:updateWindow(ignoreVisible)
 	local experience = HuntingAnalyser.xpGain
 
 	if not contentsPanel.xpGain.lastExperience or contentsPanel.xpGain.lastExperience ~= experience then
-		if experience > 1000000 then
-			contentsPanel.xpGain:setText(formatMoney(experience))
-		else
-			contentsPanel.xpGain:setText(formatMoney(experience))
-		end
+		contentsPanel.xpGain:setText(formatHuntXpValue(experience))
 
 		contentsPanel.xpGain.lastExperience = experience
 	end
 
-	HuntingAnalyser.xpHour = AnalyserSession:perHourFromTotal(HuntingAnalyser.xpGain)
+	HuntingAnalyser.xpHour = AnalyserSession:perHourFromTotal(HuntingAnalyser.xpForRate)
 
 	if HuntingAnalyser.xpHour ~= HuntingAnalyser.xpHour then
 		HuntingAnalyser.xpHour = 0
 	end
 
 	if not contentsPanel.xpHour.lastValue or contentsPanel.xpHour.lastValue ~= HuntingAnalyser.xpHour then
-		if HuntingAnalyser.xpHour > 10000000 then
-			contentsPanel.xpHour:setText(formatMoney(HuntingAnalyser.xpHour))
-		else
-			contentsPanel.xpHour:setText(formatMoney(HuntingAnalyser.xpHour))
-		end
+		contentsPanel.xpHour:setText(formatHuntXpValue(HuntingAnalyser.xpHour))
 
 		contentsPanel.xpHour.lastValue = HuntingAnalyser.xpHour
 	end
 
 	local rawExperience = HuntingAnalyser.rawXPGain
 
-	HuntingAnalyser.rawXpHour = AnalyserSession:perHourFromTotal(HuntingAnalyser.rawXPGain)
+	HuntingAnalyser.rawXpHour = AnalyserSession:perHourFromTotal(HuntingAnalyser.rawXpForRate)
 
 	if HuntingAnalyser.rawXpHour ~= HuntingAnalyser.rawXpHour then
 		HuntingAnalyser.rawXpHour = 0
 	end
 
 	if not contentsPanel.rawXpGain.lastValue or contentsPanel.rawXpGain.lastValue ~= rawExperience then
-		if rawExperience > 10000000 then
-			contentsPanel.rawXpGain:setText(formatMoney(rawExperience))
-		else
-			contentsPanel.rawXpGain:setText(formatMoney(rawExperience))
-		end
+		contentsPanel.rawXpGain:setText(formatHuntXpValue(rawExperience))
 
 		contentsPanel.rawXpGain.lastValue = rawExperience
 	end
 
 	if not contentsPanel.rawXpHour.lastValue or contentsPanel.rawXpHour.lastValue ~= HuntingAnalyser.rawXpHour then
-		if HuntingAnalyser.rawXpHour > 10000000 then
-			contentsPanel.rawXpHour:setText(formatMoney(HuntingAnalyser.rawXpHour))
-		else
-			contentsPanel.rawXpHour:setText(formatMoney(HuntingAnalyser.rawXpHour))
-		end
+		contentsPanel.rawXpHour:setText(formatHuntXpValue(HuntingAnalyser.rawXpHour))
 
 		contentsPanel.rawXpHour.lastValue = HuntingAnalyser.rawXpHour
 	end
@@ -453,12 +461,18 @@ function HuntingAnalyser:setDamageTicks(value)
 	HuntingAnalyser.damageTicks = value
 end
 
-function HuntingAnalyser:addRawXPGain(value)
+function HuntingAnalyser:addRawXPGain(value, countForRate)
 	HuntingAnalyser.rawXPGain = HuntingAnalyser.rawXPGain + value
+	if countForRate ~= false and value > 0 then
+		HuntingAnalyser.rawXpForRate = HuntingAnalyser.rawXpForRate + value
+	end
 end
 
-function HuntingAnalyser:addXpGain(value)
+function HuntingAnalyser:addXpGain(value, countForRate)
 	HuntingAnalyser.xpGain = HuntingAnalyser.xpGain + value
+	if countForRate ~= false and value > 0 then
+		HuntingAnalyser.xpForRate = HuntingAnalyser.xpForRate + value
+	end
 end
 
 function HuntingAnalyser:addLootedItems(item, name)

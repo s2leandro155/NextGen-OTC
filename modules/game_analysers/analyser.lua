@@ -1186,10 +1186,10 @@ function onExperienceChange(localPlayer, value, oldValue)
 	if value and oldValue and oldValue > 0 and value < oldValue then
 		local lostExperience = value - oldValue
 
-		HuntingAnalyser:addRawXPGain(lostExperience)
-		HuntingAnalyser:addXpGain(lostExperience)
-		XPAnalyser:addRawXPGain(lostExperience)
-		XPAnalyser:addXpGain(lostExperience)
+		HuntingAnalyser:addRawXPGain(lostExperience, false)
+		HuntingAnalyser:addXpGain(lostExperience, false)
+		XPAnalyser:addRawXPGain(lostExperience, false)
+		XPAnalyser:addXpGain(lostExperience, false)
 	end
 end
 

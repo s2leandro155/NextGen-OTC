@@ -8,6 +8,8 @@ if not XPAnalyser then
 		xpHour = 0,
 		xpGain = 0,
 		rawXPGain = 0,
+		xpForRate = 0,
+		rawXpForRate = 0,
 		startExp = 0,
 		session = 0,
 		launchTime = 0
@@ -30,8 +32,8 @@ local function formatXpShown(n)
 end
 
 function XPAnalyser:refreshXpRatesFromSession()
-	XPAnalyser.xpHour = AnalyserSession:perHourFromTotal(XPAnalyser.xpGain)
-	XPAnalyser.rawXpHour = AnalyserSession:perHourFromTotal(XPAnalyser.rawXPGain)
+	XPAnalyser.xpHour = AnalyserSession:perHourFromTotal(XPAnalyser.xpForRate)
+	XPAnalyser.rawXpHour = AnalyserSession:perHourFromTotal(XPAnalyser.rawXpForRate)
 end
 
 local function updateXpTargetArrow()
@@ -75,6 +77,8 @@ function XPAnalyser.create()
 	XPAnalyser.startExp = 0
 	XPAnalyser.rawXPGain = 0
 	XPAnalyser.xpGain = 0
+	XPAnalyser.rawXpForRate = 0
+	XPAnalyser.xpForRate = 0
 	XPAnalyser.xpHour = 0
 	XPAnalyser.rawXpHour = 0
 	XPAnalyser.level = 0
@@ -102,6 +106,8 @@ function XPAnalyser:reset(allTimeDps, allTimeHps)
 	XPAnalyser.startExp = 0
 	XPAnalyser.rawXPGain = 0
 	XPAnalyser.xpGain = 0
+	XPAnalyser.rawXpForRate = 0
+	XPAnalyser.xpForRate = 0
 	XPAnalyser.xpHour = 0
 	XPAnalyser.rawXpHour = 0
 	XPAnalyser.level = 0
@@ -267,14 +273,20 @@ function XPAnalyser:checkExpHour()
 	XPAnalyser:updateTooltip()
 end
 
-function XPAnalyser:addRawXPGain(value)
+function XPAnalyser:addRawXPGain(value, countForRate)
 	XPAnalyser.rawXPGain = XPAnalyser.rawXPGain + value
+	if countForRate ~= false and value > 0 then
+		XPAnalyser.rawXpForRate = XPAnalyser.rawXpForRate + value
+	end
 
 	XPAnalyser:updateWindow(true)
 end
 
-function XPAnalyser:addXpGain(value)
+function XPAnalyser:addXpGain(value, countForRate)
 	XPAnalyser.xpGain = XPAnalyser.xpGain + value
+	if countForRate ~= false and value > 0 then
+		XPAnalyser.xpForRate = XPAnalyser.xpForRate + value
+	end
 
 	XPAnalyser:updateWindow(true)
 end
