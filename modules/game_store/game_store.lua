@@ -2801,6 +2801,20 @@ function controllerShop:onTerminate()
 end
 
 function onStoreInit(url, coinsPacketSize)
+	-- A server configured with 127.0.0.1 would otherwise make every remote
+	-- player download Store images from their own computer. Keep valid public
+	-- URLs untouched and replace only a loopback hostname with the login host.
+	local storeHostname = type(url) == "string" and url:match("^https?://([^/:]+)") or nil
+	if storeHostname == "127.0.0.1" or storeHostname == "localhost" then
+		local configuredHost = G and (G.host or G.loginHost) or nil
+		local loginHostname = configuredHost and (configuredHost:match("^https?://([^/:]+)") or configuredHost:match("^([^/:]+)")) or nil
+
+		if loginHostname and loginHostname ~= "" and loginHostname ~= "127.0.0.1" and loginHostname ~= "localhost" then
+			url = url:gsub("^(https?://)[^/:]+", "%1" .. loginHostname, 1)
+			g_logger.info("Store image URL adjusted to the connected server: " .. url)
+		end
+	end
+
 	GameStore.website.IMAGES_URL = url
 end
 
