@@ -2,6 +2,16 @@
 
 deathController = Controller:new()
 
+local autoRespawnEvent
+local AUTO_RESPAWN_DELAY = 5000
+
+local function cancelAutoRespawn()
+	if autoRespawnEvent then
+		removeEvent(autoRespawnEvent)
+		autoRespawnEvent = nil
+	end
+end
+
 function deathController:onInit()
 	deathController:registerEvents(g_game, {
 		onDeath = display
@@ -9,10 +19,12 @@ function deathController:onInit()
 end
 
 function deathController:onTerminate()
+	cancelAutoRespawn()
 	deathController.ui = destroyWindows()
 end
 
 function deathController:onGameEnd()
+	cancelAutoRespawn()
 	deathController.ui = destroyWindows()
 end
 
@@ -70,6 +82,7 @@ function display(deathType, penalty)
 end
 
 function openWindow(deathType, penalty)
+	cancelAutoRespawn()
 	deathController.ui = destroyWindows()
 	deathController.ui = g_ui.displayUI("deathwindow", rootWidget)
 
@@ -119,9 +132,8 @@ function openWindow(deathType, penalty)
 	local cancelButton = window:recursiveGetChildById("buttonCancel")
 
 	local function storeFunc()
-		if g_game.setDead then
-			g_game.setDead(false)
-		end
+		cancelAutoRespawn()
+		g_game.requestRespawn()
 
 		if modules.game_store and modules.game_store.gameOpenStore then
 			modules.game_store.gameOpenStore()
@@ -131,14 +143,14 @@ function openWindow(deathType, penalty)
 	end
 
 	local function okFunc()
-		if g_game.setDead then
-			g_game.setDead(false)
-		end
+		cancelAutoRespawn()
+		g_game.requestRespawn()
 
 		deathController.ui = destroyWindows()
 	end
 
 	local function cancelFunc()
+		cancelAutoRespawn()
 		g_game.safeLogout()
 
 		deathController.ui = destroyWindows()
@@ -158,4 +170,15 @@ function openWindow(deathType, penalty)
 	if cancelButton then
 		cancelButton.onClick = cancelFunc
 	end
+
+	-- Avoid an immediate-relog race: let the death packet and UI settle, then
+	-- perform the same respawn request as the Ok button.
+	autoRespawnEvent = scheduleEvent(function()
+		autoRespawnEvent = nil
+
+		if g_game.isOnline() and g_game.isDead() then
+			g_game.requestRespawn()
+			deathController.ui = destroyWindows()
+		end
+	end, AUTO_RESPAWN_DELAY)
 end

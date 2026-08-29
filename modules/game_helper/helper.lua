@@ -9295,7 +9295,9 @@ function onHelperPositionChange(arg_354_0)
 		end
 	end
 
-	if var_0_48 and not var_354_0 then
+	-- The old Exercise Training control was replaced by Auto SSA. Keep the
+	-- legacy protection-zone transition from switching the new option off.
+	if var_0_48 and not var_354_0 and not g_settings.getBoolean("helperAutoSSAEnabled", false) then
 		local var_354_3 = var_0_2 and var_0_2:recursiveGetChildById("autoTrainingCheck")
 
 		if var_354_3 and var_354_3:isChecked() then
@@ -9309,6 +9311,12 @@ function onHelperPositionChange(arg_354_0)
 end
 
 function checkExerciseEvent()
+	-- The old Exercise Training slot is now Auto SSA. Its former dummy/training
+	-- routine must not manage the checkbox or overwrite the fixed SSA icon.
+	if g_settings.getBoolean("helperAutoSSAEnabled", false) then
+		return
+	end
+
 	if not var_0_10 then
 		return
 	end

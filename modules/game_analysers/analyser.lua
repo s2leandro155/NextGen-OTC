@@ -1173,9 +1173,24 @@ function toggleAnalysers(buttonId)
 	end
 end
 
-function onExperienceChange(localPlayer, value)
+function onExperienceChange(localPlayer, value, oldValue)
 	HuntingAnalyser:setupStartExp(value)
 	XPAnalyser:setupStartExp(value)
+
+	-- Regular monster XP is reported by onUpdateExperience. A death loss only
+	-- arrives through LocalPlayer:onExperienceChange, so account for decreases
+	-- here without duplicating positive gains.
+	value = tonumber(value)
+	oldValue = tonumber(oldValue)
+
+	if value and oldValue and oldValue > 0 and value < oldValue then
+		local lostExperience = value - oldValue
+
+		HuntingAnalyser:addRawXPGain(lostExperience)
+		HuntingAnalyser:addXpGain(lostExperience)
+		XPAnalyser:addRawXPGain(lostExperience)
+		XPAnalyser:addXpGain(lostExperience)
+	end
 end
 
 function onUpdateExperience(rawExp, exp)

@@ -148,6 +148,10 @@ void Game::processSessionEnd(const uint8_t reason)
 
 void Game::processLogin()
 {
+    // A successful login packet is also the server's confirmation that a dead
+    // player has respawned on the existing connection.
+    g_game.m_dead = false;
+
     g_lua.callGlobalField("g_game", "onLogin");
 }
 
@@ -670,6 +674,16 @@ void Game::safeLogout()
         return;
 
     m_protocolGame->sendLogout();
+}
+
+void Game::requestRespawn()
+{
+    // CrystalServer respawns a dead player after receiving ClientEnterGame on
+    // the connection that delivered the death packet.
+    if (!m_online || !m_dead || !m_protocolGame || !m_protocolGame->isConnected())
+        return;
+
+    m_protocolGame->sendEnterGame();
 }
 
 bool Game::walk(const Otc::Direction direction)
