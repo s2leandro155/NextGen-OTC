@@ -3,13 +3,13 @@
 local WALK_DELAY_DEFAULT_MS = 100
 
 local function syncAllowInspectSetting(enabled)
-	if not g_game.isOnline() or not g_game.inspectionPlayer then
+	if not g_game.isOnline() or not g_game.inspectPlayer then
 		return
 	end
 
 	local flag = enabled and InspectionParseFlags.AllowAll or InspectionParseFlags.DismissAll
 
-	g_game.inspectionPlayer(flag)
+	g_game.inspectPlayer(flag)
 end
 
 local function getPendingOptionValue(options, key)
@@ -2046,6 +2046,12 @@ return {
 		value = true
 	},
 	askBeforeSorting = {
+		value = true
+	},
+	askBeforeMoving = {
+		value = true
+	},
+	stayLoggedIn = {
 		value = true
 	},
 	allowInspect = {

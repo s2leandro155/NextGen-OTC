@@ -211,4 +211,4 @@ UIWidget
     anchors.right: parent.right
     anchors.bottom: parent.bottom
     color: $var-text-color
-    @onClick: modules.game_screenshot.resetValues()
+    @onClick: modules.client_options.resetPageToDefaults("miscScreenshots")

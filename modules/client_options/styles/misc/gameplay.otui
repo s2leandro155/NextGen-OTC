@@ -70,3 +70,14 @@ UIWidget
       anchors.verticalCenter: parent.verticalCenter
       margin-right: 1
       !tooltip: tr("If \"Quick Loot Nearby Corpses\" is enabled, your character will loot\nup to 30 monster corpses per field, including the field you're\nstanding on and the adjacent fields. If disabled, only the top corpse\non the targeted field will be quick looted.")
+
+  QtButton
+    id: resetBtn
+    !text: tr('Reset')
+    size: 60 20
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    margin-right: 1
+    margin-bottom: 1
+    color: $var-text-color
+    @onClick: modules.client_options.resetPageToDefaults("miscGameplay")

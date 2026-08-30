@@ -1,6 +1,14 @@
 ﻿-- chunkname: @/game_interface/gameinterface.lua
 local closeCountWindow -- forward declaration (used before its declaration in the decompiled file)
 
+local function quickLootVariant()
+	if modules.client_options and modules.client_options.getOption then
+		return modules.client_options.getOption("quickLootCorpses") and 1 or 0
+	end
+
+	return 0
+end
+
 gameRootPanel = nil
 gameMapPanel = nil
 gameMainRightPanel = nil
@@ -1380,7 +1388,7 @@ local function addUseThingMenuOptions(menu, thing, shortcuts)
 
 	if thing:isLyingCorpse() and not thing:isPlayerCorpse() and g_game.getFeature(GameThingQuickLoot) and modules.game_quickloot and thing:getPosition().x ~= 65535 then
 		menu.addOption(menu, tr("Loot corpse"), function()
-			g_game.sendQuickLoot(1, thing)
+			g_game.sendQuickLoot(quickLootVariant(), thing)
 		end)
 	end
 end
@@ -1515,8 +1523,8 @@ local function predictInspectionFlagAfterAction(currentFlag, actionType)
 end
 
 local function sendInspectionPlayerAction(actionType, creatureThing, creatureName)
-	if not g_game.inspectionPlayer then
-		g_logger.warning("[game_interface] g_game.inspectionPlayer unavailable — recompile the client.")
+	if not g_game.inspectPlayer then
+		g_logger.warning("[game_interface] g_game.inspectPlayer unavailable — recompile the client.")
 
 		return
 	end
@@ -1531,7 +1539,7 @@ local function sendInspectionPlayerAction(actionType, creatureThing, creatureNam
 
 	local currentFlag = normalizeInspectionFlag(getCreatureInspectionFlag(creatureThing))
 
-	g_game.inspectionPlayer(actionType, creatureId)
+	g_game.inspectPlayer(actionType, creatureId)
 	syncCreatureInspectionFlag(creatureId, predictInspectionFlagAfterAction(currentFlag, actionType))
 end
 
@@ -2480,7 +2488,7 @@ function createThingMenu(menuPosition, lookThing, useThing, creatureThing, mapTi
 				end)
 			end
 
-			if modules.game_inspect and g_game.inspectionPlayer then
+			if modules.game_inspect and g_game.inspectPlayer then
 				local playerName = localPlayer:getName()
 
 				menu:addOption(tr("Inspect %s", playerName), function()
@@ -2490,7 +2498,7 @@ function createThingMenu(menuPosition, lookThing, useThing, creatureThing, mapTi
 						modules.game_inspect.beginCharacterInspectRequest(localPlayer:getId())
 					end
 
-					g_game.inspectionPlayer(inspectFlag, 0)
+					g_game.inspectPlayer(inspectFlag, 0)
 				end)
 			end
 
@@ -2748,7 +2756,7 @@ local function tryQuickLootCorpse(useThing, lookThing)
 		return true
 	end
 
-	g_game.sendQuickLoot(1, corpse)
+	g_game.sendQuickLoot(quickLootVariant(), corpse)
 
 	return true
 end
@@ -2765,7 +2773,7 @@ local function handleContainerOrCorpse(thing, quickLoot)
 	end
 
 	if quickLoot and isGroundLootTarget(thing) and canQuickLoot() then
-		g_game.sendQuickLoot(1, thing)
+		g_game.sendQuickLoot(quickLootVariant(), thing)
 
 		return true
 	end

@@ -407,6 +407,8 @@ end
 
 panels = {}
 
+local optionDefaults = {}
+
 local simpleButtons = {
 	{
 		icon = "/images/icons/icon_interface",
@@ -2052,6 +2054,8 @@ function controller:onInit()
 			options[k] = obj
 		end
 
+		optionDefaults[k] = obj.value
+
 		g_settings.setDefault(k, obj.value)
 	end
 
@@ -2208,10 +2212,10 @@ function controller:onGameStart()
 			value = allowInspectOption.value ~= nil and allowInspectOption.value or allowInspectOption
 		end
 
-		if g_game.inspectionPlayer then
+		if g_game.inspectPlayer then
 			local flag = value and InspectionParseFlags.AllowAll or InspectionParseFlags.DismissAll
 
-			g_game.inspectionPlayer(flag)
+			g_game.inspectPlayer(flag)
 		end
 	end
 end
@@ -2712,6 +2716,39 @@ function setupOptionsMainButton()
 			end
 		end, false, 1001)
 	end
+end
+
+local function collectPanelOptionKeys(widget, found)
+	for _, child in ipairs(widget:getChildren()) do
+		local id = child:getId()
+
+		if id and options[id] and not found[id] then
+			found[id] = true
+		end
+
+		collectPanelOptionKeys(child, found)
+	end
+
+	return found
+end
+
+function resetPageToDefaults(panelKey)
+	local panel = panels and panels[panelKey]
+	if not panel then
+		return 0
+	end
+
+	local count = 0
+	for key in pairs(collectPanelOptionKeys(panel, {})) do
+		local default = optionDefaults[key]
+		if default ~= nil then
+			setOption(key, default)
+			count = count + 1
+		end
+	end
+
+	g_settings.save()
+	return count
 end
 
 function getOption(key)
