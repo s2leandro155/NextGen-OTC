@@ -197,10 +197,18 @@ void LuaInterface::registerGlobalFunction(const std::string_view functionName, c
     setGlobal(functionName);
 }
 
+static const std::string& prefixedKey(const std::string_view prefix, const std::string& key)
+{
+    thread_local std::string scratch;
+    scratch.assign(prefix);
+    scratch.append(key);
+    return scratch;
+}
+
 int LuaInterface::luaObjectGetEvent(LuaInterface* lua)
 {
     // stack: obj, key
-    const auto& obj = lua->toObject(-2);
+    auto* const obj = lua->toObjectPtr(-2);
     const auto& key = lua->toString(-1);
     assert(obj);
 
@@ -210,7 +218,7 @@ int LuaInterface::luaObjectGetEvent(LuaInterface* lua)
     lua->getMetatable(); // pushes obj metatable
     lua->getField("fieldmethods"); // push obj fieldmethods
     lua->remove(-2); // removes obj metatable
-    lua->getField("get_" + key); // pushes get method
+    lua->getField(prefixedKey("get_", key)); // pushes get method
     lua->remove(-2); // remove obj fieldmethods
     if (!lua->isNil()) { // is the get method not nil?
         lua->insert(-2); // moves obj to the top
@@ -258,7 +266,7 @@ int LuaInterface::luaObjectSetEvent(LuaInterface* lua)
     lua->getMetatable(); // pushes obj metatable
     lua->getField("fieldmethods"); // push obj fieldmethods
     lua->remove(-2); // removes obj metatable
-    lua->getField("set_" + key); // pushes set method
+    lua->getField(prefixedKey("set_", key)); // pushes set method
     lua->remove(-2); // remove obj fieldmethods
     if (!lua->isNil()) { // is the set method not nil?
         lua->insert(-3); // moves func to -3
@@ -1384,6 +1392,17 @@ LuaObjectPtr LuaInterface::toObject(const int index)
         auto* const objRef = static_cast<LuaObjectPtr*>(toUserdata(index));
         if (objRef && *objRef)
             return *objRef;
+    }
+    return nullptr;
+}
+
+LuaObject* LuaInterface::toObjectPtr(const int index)
+{
+    assert(hasIndex(index));
+    if (isUserdata(index)) {
+        auto* const objRef = static_cast<LuaObjectPtr*>(toUserdata(index));
+        if (objRef && *objRef)
+            return objRef->get();
     }
     return nullptr;
 }

@@ -366,6 +366,7 @@ public:
     std::string toString(int index = -1);
     void* toUserdata(int index = -1);
     LuaObjectPtr toObject(int index = -1);
+    LuaObject* toObjectPtr(int index = -1);
 
     int getTop() const;
     int stackSize() const { return getTop(); }

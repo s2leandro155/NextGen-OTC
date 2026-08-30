@@ -169,7 +169,7 @@ void UIWidget::initText()
     m_baseTextColor = m_color;
 }
 
-void UIWidget::updateText()
+void UIWidget::rebuildTextLayout()
 {
     if ((hasEventListener(EVENT_TEXT_CLICK) || hasEventListener(EVENT_TEXT_HOVER)) && m_textEvents.empty())
         processCodeTags();
@@ -208,6 +208,11 @@ void UIWidget::updateText()
     }
 
     m_textCachedScreenCoords = {};
+}
+
+void UIWidget::updateText()
+{
+    rebuildTextLayout();
     repaint();
 }
 
@@ -319,7 +324,7 @@ void UIWidget::drawText(const Rect& screenCoords)
     // Hack to fix font rendering in atlas
     if (m_font->getAtlasRegion() != m_atlasRegion) {
         m_atlasRegion = m_font->getAtlasRegion();
-        updateText();
+        rebuildTextLayout();
     }
 
     if (screenCoords != m_textCachedScreenCoords) {

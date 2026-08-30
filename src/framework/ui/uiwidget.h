@@ -990,6 +990,7 @@ private:
 
 protected:
     virtual void updateText();
+    void rebuildTextLayout();
     virtual bool isTextEdit() { return false; }
     void drawText(const Rect& screenCoords);
     void computeHtmlTextIntrinsicSize();
