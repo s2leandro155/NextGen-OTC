@@ -55,7 +55,11 @@ bool LocalPlayer::canWalk(const bool ignoreLock)
     // Handle ongoing movement cases
     if (isWalking()) {
         if (isAutoWalking()) return true;  // Allow auto-walking
-        if (isPreWalking()) return false;  // Prevent pre-walk interruptions
+        // Keyboard walking must be allowed to queue the next predicted step too.
+        // Blocking every pre-walk here makes fast characters wait for one server
+        // acknowledgement per tile, while click-to-walk remains smooth because it
+        // submits a path. The queue is still bounded by getWalkMaxSteps() above.
+        if (isPreWalking()) return g_game.getWalkMaxSteps() > 0;
     }
 
     // allow only if walk done, ex. diagonals may need additional ticks before taking another step
