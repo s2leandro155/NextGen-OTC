@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (c) 2010-2026 OTClient <https://github.com/edubart/otclient>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -21,6 +21,7 @@
  */
 
 #include "graphicalapplication.h"
+#include <framework/graphics/glutil.h>
 
 #include "asyncdispatcher.h"
 #include "clock.h"
@@ -35,6 +36,8 @@
 #include "framework/input/mouse.h"
 #include "framework/ui/uimanager.h"
 #include <framework/util/stats.h>
+#include <framework/util/profiler.h>
+#include <framework/core/configmanager.h>
 
 #ifdef FRAMEWORK_SOUND
 #include <framework/sound/soundmanager.h>
@@ -100,6 +103,7 @@ void GraphicalApplication::init(std::vector<std::string>& args, ApplicationConte
 
     m_mapProcessFrameCounter.init();
     m_graphicFrameCounter.init();
+
 }
 
 void GraphicalApplication::deinit()
@@ -304,12 +308,18 @@ void GraphicalApplication::run()
                 VkDrawFeeder::instance().consumeAllPools();
             }
 #else
+            // Whether there is a GL context to draw with is DrawPoolManager::draw's business,
+            // not this loop's: a window that deliberately creates none - the Cocoa/Metal one -
+            // runs the frame path there, and a frame that path declines consumes the pool flags
+            // rather than diving into null GLEW pointers. Deciding it here as well would mean
+            // two places had to agree about which renderer is live.
             g_drawPool.draw();
 #endif
         }
 
         // update screen pixels
         {
+            PROFILE_ZONE(Present);
             AUTO_STAT(STATS_RENDER, "SwapBuffers");
 
             // When the Vulkan context doesn't exist or dies along the way (drawFrame returns false
@@ -334,6 +344,11 @@ void GraphicalApplication::run()
             g_window.swapBuffers();
 #endif
         }
+
+        // Counted here rather than in the frame counter, which is a pacing device and skips
+        // ticks; the profiler needs the number of frames its samples were actually spread over.
+        g_profiler.countFrame();
+        g_profiler.poll();
 
         if (m_graphicFrameCounter.update()) {
             g_dispatcher.addEvent([this, fps = FPS()] {
@@ -368,6 +383,7 @@ void GraphicalApplication::poll()
 }
 void GraphicalApplication::mainPoll()
 {
+    PROFILE_ZONE(MainPoll);
     AUTO_STAT(STATS_MAIN, "MainPoll");
     {
         AUTO_STAT(STATS_MAIN, "ClockUpdate");
@@ -411,8 +427,12 @@ void GraphicalApplication::resize(const Size& size)
     g_ui.resize(size / scale);
     m_onInputEvent = false;
 
+    // The UI lays out in logical units (above), but the target it composites into is sized in
+    // DEVICE pixels and given the scale as its coordinate space. Sizing it logically and letting
+    // UIManager::render blit it to the full physical viewport is what made the whole UI render at
+    // 1x and get bilinearly upscaled on every Retina display.
     g_mainDispatcher.addEvent([size, scale] {
-        g_drawPool.get(DrawPoolType::FOREGROUND)->setFramebuffer(size / scale);
+        g_drawPool.get(DrawPoolType::FOREGROUND)->setFramebuffer(size, scale);
     });
 }
 
@@ -437,6 +457,21 @@ void GraphicalApplication::setLoadingAsyncTexture(bool v) {
         m_drawEvents->onLoadingAsyncTextureChanged(v);
 }
 
+void GraphicalApplication::saveReadbackAsPng(ReadbackResult&& readback, std::string file)
+{
+    g_asyncDispatcher.detach_task([readback = std::move(readback), file = std::move(file)] {
+        try {
+            Image image(readback.size, 4, readback.pixels.data());
+            // No flipVertically here, deliberately: IRenderBackend::readPixels delivers
+            // top-left origin. The legacy sites flip because they call glReadPixels themselves.
+            image.setOpacity(255);
+            image.savePNG(file);
+        } catch (stdext::exception& e) {
+            g_logger.error(std::string("Can't save screenshot: ") + e.what());
+        }
+    });
+}
+
 void GraphicalApplication::doScreenshot(std::string file)
 {
     if (file.empty()) {
@@ -444,6 +479,18 @@ void GraphicalApplication::doScreenshot(std::string file)
     }
 
     g_mainDispatcher.addEvent([file] {
+        // On the compiled path the readback is a request against the frame's backbuffer target,
+        // with the crop stated in top-left pixels. Same GL call underneath; the difference is
+        // that the coordinate convention is now the boundary's rather than each call site's.
+        if (auto* backend = g_drawPool.getBackend()) {
+            ReadbackResult readback;
+            if (backend->readPixels(ReadbackRequest{ {}, Rect(0, 0, g_graphics.getViewportSize()) }, readback)
+                && readback.ok) {
+                saveReadbackAsPng(std::move(readback), file);
+                return;
+            }
+        }
+
         auto resolution = g_graphics.getViewportSize();
         const int width = resolution.width();
         const int height = resolution.height();
@@ -468,8 +515,14 @@ void GraphicalApplication::doMapScreenshot(std::string fileName)
     if (m_drawEvents) m_drawEvents->doMapScreenshot(fileName);
 }
 
-float GraphicalApplication::getHUDScale() const { return g_window.getDisplayDensity(); }
+float GraphicalApplication::getHUDScale() const { return m_hudScale; }
 void GraphicalApplication::setHUDScale(const float v) {
-    g_window.setDisplayDensity(v);
+    m_hudScale = v;
+    resize(g_graphics.getViewportSize());
+}
+
+float GraphicalApplication::getDevicePixelRatio() const { return m_devicePixelRatio; }
+void GraphicalApplication::setDevicePixelRatio(const float v) {
+    m_devicePixelRatio = v;
     resize(g_graphics.getViewportSize());
 }

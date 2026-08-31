@@ -124,6 +124,25 @@ class SoundManager
         POLL_DELAY = 100
     };
 public:
+    // Spatial item-ambient queries used by the modern MapView. The current Crystal
+    // soundbank does not expose these entries yet, so the compatibility implementation
+    // returns an empty set while keeping the renderer/map API intact.
+    static constexpr uint32_t ITEM_AMBIENT_FLOOR_COST = 3;
+    static constexpr uint32_t ITEM_AMBIENT_NEAR_MARGIN = 4;
+    struct ItemAmbientQuery
+    {
+        std::vector<uint16_t> clientIds;
+        uint32_t maxDistance{ 0 };
+        uint32_t effectId{ 0 };
+    };
+    const std::vector<ItemAmbientQuery>& getItemAmbientQueries() const
+    {
+        static const std::vector<ItemAmbientQuery> empty;
+        return empty;
+    }
+    uint32_t getItemAmbientGeneration() const { return 0; }
+    void setItemAmbientCounts(const std::vector<uint16_t>&, const std::vector<uint16_t>&) {}
+
     void init();
     void terminate();
     void poll();

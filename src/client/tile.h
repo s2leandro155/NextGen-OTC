@@ -82,6 +82,7 @@ public:
     bool isEmpty() { return m_things.empty(); }
     bool isDrawable() { return !isEmpty() || !m_walkingCreatures.empty() || hasEffect() || hasAttachedEffects(); }
     bool isCovered(int8_t firstFloor);
+    void resetCoveredCache(int8_t firstFloor);
     bool isCompletelyCovered(uint8_t firstFloor, bool resetCache);
     bool isLoading() const;
 

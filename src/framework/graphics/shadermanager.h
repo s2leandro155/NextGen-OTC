@@ -24,13 +24,26 @@
 
 #include "declarations.h"
 
+#include <shared_mutex>
+
  //@bindsingleton g_shaders
 class ShaderManager
 {
 public:
+    // The client extension of the framework's uniform-location space. ITEM_ID_UNIFORM used to
+    // be 10 - the same slot PainterShaderProgram::TRANSFORM_MATRIX_UNIFORM binds u_TransformMatrix
+    // to, and writes on every single draw - so an item shader binding u_ItemId would have had its
+    // uniform aliased by a matrix, and a backend uploading the parameter block onto these slots
+    // would have corrupted the transform. It was latent rather than live, because nothing in
+    // modules/ or mods/ ever called setupItemShader; it is retired here anyway, because a
+    // parameter block that cannot be uploaded in full is not a parameter block.
+    //
+    // 20 is chosen over renumbering 11-19: those are already bound by shipped shaders' setup
+    // calls, and moving them would change nothing while breaking any out-of-repo module that
+    // hardcoded one. MAX_UNIFORM_LOCATIONS is 30.
     enum
     {
-        ITEM_ID_UNIFORM = 10,
+        ITEM_ID_UNIFORM = 20,
         OUTFIT_ID_UNIFORM = 11,
         MOUNT_ID_UNIFORM = 12,
         SHADER_ID_UNIFORM = 13,
@@ -59,14 +72,23 @@ public:
 
     void addMultiTexture(std::string_view name, std::string_view file);
 
+    // Forgets the name and empties its slot. The slot itself is kept: an id indexes m_shadersVector
+    // and is baked into every material handle and every Thing that names the shader, so compacting
+    // the vector would silently renumber every shader registered after this one.
+    bool removeShader(std::string_view name);
+
     PainterShaderProgramPtr getShader(std::string_view name);
-    PainterShaderProgramPtr getShaderById(const uint8_t id) const {
-        return id > 0 && id <= m_shadersVector.size() ? m_shadersVector[id - 1] : nullptr;
-    }
+    PainterShaderProgramPtr getShaderById(uint8_t id) const;
 
 private:
     void putShader(std::string name, const PainterShaderProgramPtr& shader);
 
+    // Registration happens on the main thread, from inside the g_mainDispatcher lambdas that
+    // compile and link. Lookup happens on the map and async threads: getShader is bound straight to
+    // Lua, and getShaderById is called while recording the draw pools. stdext::map is open
+    // addressing, so an insert can rehash and move the whole slot array out from under a concurrent
+    // find - and m_shadersVector reallocates as it grows. Both need guarding.
+    mutable std::shared_mutex m_mutex;
     stdext::map<std::string, PainterShaderProgramPtr> m_shaders;
     std::vector<PainterShaderProgramPtr> m_shadersVector;
 };

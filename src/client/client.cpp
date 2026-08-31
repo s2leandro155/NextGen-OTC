@@ -33,7 +33,9 @@
 #include "thingtypemanager.h"
 #include "uimap.h"
 #include "framework/core/eventdispatcher.h"
+#include "framework/core/graphicalapplication.h"
 #include "framework/graphics/drawpoolmanager.h"
+#include "framework/graphics/render/renderhandles.h"
 #include "framework/graphics/shadermanager.h"
 #include "framework/ui/uimanager.h"
 #ifdef FRAMEWORK_EDITOR
@@ -164,5 +166,35 @@ void Client::doMapScreenshot(std::string file)
         file = "screenshot_map.png";
     }
 
-    g_drawPool.get(DrawPoolType::MAP)->getFrameBuffer()->doScreenshot(file, g_gameConfig.getSpriteSize() * 3, g_gameConfig.getSpriteSize() * 3);
+    const auto& framebuffer = g_drawPool.get(DrawPoolType::MAP)->getFrameBuffer();
+    if (!framebuffer)
+        return;
+
+    if (auto* backend = g_drawPool.getBackend()) {
+        g_mainDispatcher.addEvent([backend, framebuffer, file] {
+            if (!framebuffer->isValid())
+                return;
+
+            // The map target carries a three-tile margin - one tile left and top, two right and
+            // bottom - and the screenshot is the visible region inside it. GL expressed that as
+            // `glReadPixels(x / 3, y / 1.5, w - x, h - y)` with x = y = 3 sprites, which reads as
+            // an accident and is not one: those divisors are how a bottom-left origin spells a
+            // one-tile top-left inset. Stated directly here, in the top-left pixels the boundary
+            // uses, it is just the inset.
+            const int inset = g_gameConfig.getSpriteSize();
+            const auto& size = framebuffer->getSize();
+
+            ReadbackResult readback;
+            const ReadbackRequest request{
+                RenderHandles::poolTarget(DrawPoolType::MAP),
+                Rect(inset, inset, size.width() - inset * 3, size.height() - inset * 3)
+            };
+
+            if (backend->readPixels(request, readback) && readback.ok)
+                GraphicalApplication::saveReadbackAsPng(std::move(readback), file);
+        });
+        return;
+    }
+
+    framebuffer->doScreenshot(file, g_gameConfig.getSpriteSize() * 3, g_gameConfig.getSpriteSize() * 3);
 }

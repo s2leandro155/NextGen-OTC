@@ -21,9 +21,14 @@
  */
 
 #include "mapview.h"
+#include <framework/util/profiler.h>
+
+#include <framework/graphics/render/poolcompiler.h>
 
 #include <framework/graphics/drawpoolmanager.h>
+#include <framework/sound/soundmanager.h>
 
+#include "ambientlight.h"
 #include "animatedtext.h"
 #include "creature.h"
 #include "game.h"
@@ -46,6 +51,13 @@
 
 MapView::MapView() : m_lightView(std::make_unique<LightView>(Size())), m_pool(g_drawPool.get(DrawPoolType::MAP))
 {
+    // A map view opened mid-session inherits the world light that is already in effect, so it
+    // does not have to spend a fade catching up to a sky everyone else can already see. Having
+    // inherited one, it also has something to fade *from*, so it need not snap the next value.
+    const auto& worldLight = g_map.getLight();
+    m_ambientFrom = m_ambientTo = AmbientFade::resolve(worldLight.color, worldLight.intensity);
+    m_ambientSeeded = worldLight.intensity != 0;
+
     m_floors.resize(g_gameConfig.getMapMaxZ() + 1);
     m_floorThreads.resize(g_asyncDispatcher.get_thread_count());
     for (auto& thread : m_floorThreads)
@@ -61,7 +73,64 @@ MapView::~MapView()
 #endif
 }
 
+void MapView::declareCompositionMaterial() const
+{
+    MaterialParams params;
+    params.resolution = { static_cast<float>(m_rectDimension.width()),
+                          static_cast<float>(m_rectDimension.height()) };
+
+    MaterialHandle material;
+    std::array<TextureHandle, 3> extraTex{};
+    float opacity = 1.f;
+
+    if (m_shader) {
+        const auto& camera = m_posInfo.camera;
+        const auto& center = m_posInfo.srcRect.center();
+        const auto& globalCoord = Point(camera.x - m_drawDimension.width() / 2,
+                                        -(camera.y - m_drawDimension.height() / 2)) * m_tileSize;
+
+        params.mapCenterCoord = { center.x / static_cast<float>(m_rectDimension.width()),
+                                  1.f - center.y / static_cast<float>(m_rectDimension.height()) };
+        params.mapGlobalCoord = { globalCoord.x / static_cast<float>(m_rectDimension.height()),
+                                  globalCoord.y / static_cast<float>(m_rectDimension.height()) };
+        params.mapZoom = m_pool->getScaleFactor();
+
+        Point last = transformPositionTo2D(camera, m_shaderPosition);
+        last.y = -last.y; // reverse vertical axis, as the callback does
+        params.walkOffset = { last.x / static_cast<float>(m_rectDimension.width()),
+                              last.y / static_cast<float>(m_rectDimension.height()) };
+
+        material = PoolCompiler::materialOf(m_shader.get());
+
+        // u_Tex1..3. GL binds these from inside Painter::drawArrays off the bound program, so
+        // the composition blit gets them for free there; a backend that does not share Painter
+        // has to be told, and this is the only site that can tell it - the composition packet is
+        // built by the frame assembler, which never sees a PainterShaderProgram. Fog and Snow
+        // are the two shaders that use them, and both are map shaders, so this is exactly the
+        // site that matters.
+        size_t unit = 0;
+        for (const auto& texture : m_shader->getMultiTextures()) {
+            if (unit >= extraTex.size())
+                break;
+            if (texture)
+                extraTex[unit++] = TextureHandle{ texture->getUniqueId() };
+        }
+
+        // A read-only sample of the same fade ramp the callback computes. It deliberately does
+        // NOT advance the switch: m_shader/m_nextShader/m_shaderSwitchDone stay the callback's
+        // to mutate, so declaring changes nothing about what GL draws.
+        if (!m_shaderSwitchDone && m_fadeOutTime > 0)
+            opacity = std::max(0.f, 1.f - (m_fadeTimer.timeElapsed() / m_fadeOutTime));
+        else if (m_shaderSwitchDone && m_fadeInTime > 0)
+            opacity = std::min<float>(m_fadeTimer.timeElapsed() / m_fadeInTime, 1.f);
+    }
+
+    g_drawPool.setCompositionMaterial(material, params, opacity, extraTex);
+}
+
 void MapView::registerEvents() {
+    declareCompositionMaterial();
+
     g_drawPool.addAction([this, camera = m_posInfo.camera, srcRect = m_posInfo.srcRect] {
         m_pool->onBeforeDraw([=, this] {
             float fadeOpacity = 1.f;
@@ -103,10 +172,11 @@ void MapView::registerEvents() {
             g_painter->resetShaderProgram();
             g_painter->resetOpacity();
         });
-    });
+    }, ActionIdiom::MapShaderBind);
 }
 
 void MapView::preLoad() {
+    PROFILE_ZONE(MapPreLoad);
     // update visible tiles cache when needed
     if (m_updateVisibleTiles)
         updateVisibleTiles();
@@ -120,13 +190,176 @@ void MapView::preLoad() {
     }
 
     g_map.updateAttachedWidgets(static_self_cast<MapView>());
+
+    updateItemAmbientSounds();
+}
+
+// A waterfall or a campfire loops while enough of its items are near enough.
+// The soundbank says which item ids count, how many are needed and how close
+// they have to be; only the map can answer how many there are, so the count
+// happens here.
+//
+// Deliberately NOT counted off the renderer's visible-tile cache. That cache is
+// a drawing concept: it is resized by zoom and by the window, and it drops
+// floors the moment they are covered - so walking TOWARDS a source could
+// silence it, and zooming out could make it audible. Distance from the player
+// is the only thing that should decide, so the map itself is walked instead.
+void MapView::updateItemAmbientSounds()
+{
+    const auto& queries = g_sounds.getItemAmbientQueries();
+    if (queries.empty())
+        return;
+
+    // The answer only moves when items or the player do, and either way a
+    // fraction of a second late is inaudible - so this is throttled rather than
+    // hung off every tile update.
+    if (m_itemAmbientTimer.ticksElapsed() < 250)
+        return;
+
+    m_itemAmbientTimer.restart();
+
+    if (m_itemAmbientGeneration != g_sounds.getItemAmbientGeneration()) {
+        m_itemAmbientGeneration = g_sounds.getItemAmbientGeneration();
+        m_itemAmbientIndex.clear();
+        for (size_t i = 0; i < queries.size(); ++i) {
+            for (const uint16_t clientId : queries[i].clientIds)
+                m_itemAmbientIndex[clientId].push_back(static_cast<uint8_t>(i));
+        }
+
+        m_itemAmbientReach = 0;
+        for (const auto& query : queries)
+            m_itemAmbientReach = std::max<uint32_t>(m_itemAmbientReach, query.maxDistance);
+        m_itemAmbientReach += SoundManager::ITEM_AMBIENT_NEAR_MARGIN;
+    }
+
+    m_itemAmbientCounts.assign(queries.size(), 0);
+    m_itemAmbientNearby.assign(queries.size(), 0);
+
+    const auto& cameraPosition = m_posInfo.camera;
+    if (!cameraPosition.isValid())
+        return;
+
+    // [snd-trace] disabled - uncomment with the two blocks below to restore the scan trace
+    // // While tracing, record WHICH items answered each query and how far off they
+    // // were - including the ones that matched but were out of reach, which is the
+    // // only way to tell "nothing here" from "just too far" from outside.
+    // const bool trace = g_sounds.isSoundDebug();
+    // std::vector<std::string> counted, tooFar;
+    // if (trace) {
+        // counted.assign(queries.size(), std::string());
+        // tooFar.assign(queries.size(), std::string());
+    // }
+
+    const int reach = static_cast<int>(m_itemAmbientReach);
+    const int floorCost = static_cast<int>(SoundManager::ITEM_AMBIENT_FLOOR_COST);
+    const int floorSpan = reach / std::max(floorCost, 1);
+    const int maxZ = g_gameConfig.getMapMaxZ();
+
+    for (int dz = -floorSpan; dz <= floorSpan; ++dz) {
+        const int z = static_cast<int>(cameraPosition.z) + dz;
+        if (z < 0 || z > maxZ)
+            continue;
+
+        // Every floor of separation spends part of the budget, so the higher
+        // ones are walked over a smaller square rather than the full one.
+        const int spent = std::abs(dz) * floorCost;
+        const int span = reach - spent;
+        if (span < 0)
+            continue;
+
+        for (int dy = -span; dy <= span; ++dy) {
+            for (int dx = -span; dx <= span; ++dx) {
+                const Position tilePosition(static_cast<uint16_t>(cameraPosition.x + dx),
+                                            static_cast<uint16_t>(cameraPosition.y + dy),
+                                            static_cast<uint8_t>(z));
+
+                const auto& tile = g_map.getTile(tilePosition);
+                if (!tile)
+                    continue;
+
+                // Chebyshev on the ground plus what the floors cost. A source
+                // one floor down is genuinely further away than one beside you,
+                // and no camera decision can change that.
+                const int distance = std::max(std::abs(dx), std::abs(dy)) + spent;
+
+                for (const auto& thing : tile->getThings()) {
+                    // creatures share this vector and override getId(), so ask
+                    // for the client id directly and skip anything not an item
+                    if (!thing->isItem())
+                        continue;
+
+                    const auto entry = m_itemAmbientIndex.find(thing->getClientId());
+                    if (entry == m_itemAmbientIndex.end())
+                        continue;
+
+                    for (const uint8_t query : entry->second) {
+                        // The near band is measured from THIS query's radius,
+                        // not from how far the walk happens to reach: the walk
+                        // is sized for the widest query, and reusing it here
+                        // would call an item twelve tiles from a three-tile
+                        // entry "just out of reach", which is most of a city.
+                        const int radius = static_cast<int>(queries[query].maxDistance);
+                        const int nearLimit = radius + static_cast<int>(SoundManager::ITEM_AMBIENT_NEAR_MARGIN);
+
+                        if (distance > nearLimit)
+                            continue; // too far to count and too far to matter
+
+                        const bool inRange = distance <= radius;
+                        if (inRange)
+                            ++m_itemAmbientCounts[query];
+                        else
+                            ++m_itemAmbientNearby[query];
+
+                        // if (trace) {
+                            // auto& into = inRange ? counted[query] : tooFar[query];
+                            // if (into.size() < 220)
+                                // into += fmt::format(" {}@d{}{}", thing->getClientId(), distance,
+                                                    // dz == 0 ? std::string() : fmt::format(",z{:+d}", dz));
+                        // }
+                    }
+                }
+            }
+        }
+    }
+
+    // if (trace) {
+        // if (m_itemAmbientDebugLast.size() != m_itemAmbientCounts.size())
+            // m_itemAmbientDebugLast.assign(m_itemAmbientCounts.size(), 0xFFFF);
+
+        // // one line per query whose answer moved, not one per scan
+        // for (size_t i = 0; i < m_itemAmbientCounts.size(); ++i) {
+            // if (m_itemAmbientDebugLast[i] == m_itemAmbientCounts[i])
+                // continue;
+
+            // m_itemAmbientDebugLast[i] = m_itemAmbientCounts[i];
+            // g_logger.info("[snd] scan entry {} radius={} count={} nearby={}{}{}",
+                          // queries[i].effectId, queries[i].maxDistance,
+                          // m_itemAmbientCounts[i], m_itemAmbientNearby[i],
+                          // counted[i].empty() ? std::string() : "  counted:" + counted[i],
+                          // tooFar[i].empty() ? std::string() : "  toofar:" + tooFar[i]);
+        // }
+    // }
+
+    g_sounds.setItemAmbientCounts(m_itemAmbientCounts, m_itemAmbientNearby);
 }
 
 void MapView::drawFloor()
 {
+    PROFILE_ZONE(DrawFloor);
+    updateAmbientFade();
+
     const auto& cameraPosition = m_posInfo.camera;
 
     const uint32_t flags = Otc::DrawThings;
+
+    // Scratch space for one diagonal run, hoisted out of the floor loop: it was allocating and
+    // freeing once per floor, which is up to eight heap round-trips a frame for a buffer whose
+    // contents never outlive the run. Raw Tile* rather than TilePtr because EVERY visible tile
+    // passes through here - it is the staging list, not a list of walkers - so a shared_ptr
+    // element cost an atomic increment and decrement per tile per frame to own something that is
+    // already owned for the whole draw by m_floors[z].cachedVisibleTiles. That cache is rebuilt
+    // only by updateVisibleTiles, which runs in preLoad on this same thread, before this.
+    std::vector<Tile*> walkingTiles;
 
     for (int_fast8_t z = m_floorMax; z >= m_floorMin; --z) {
         const float fadeLevel = getFadeLevel(z);
@@ -138,22 +371,44 @@ void MapView::drawFloor()
         const bool alwaysTransparent = m_floorViewMode == Otc::ALWAYS_WITH_TRANSPARENCY && z < m_cachedFirstVisibleFloor && _camera.coveredUp(cameraPosition.z - z);
 
         const auto& map = m_floors[z].cachedVisibleTiles;
+        walkingTiles.clear();
 
-        for (const auto& tile : map.tiles) {
+        for (size_t i = 0, tileCount = map.tiles.size(); i < tileCount; ++i) {
+            const auto& tile = map.tiles[i];
             uint32_t tileFlags = flags;
 
             if (!m_drawViewportEdge && !tile->canRender(tileFlags, cameraPosition, m_viewport))
                 continue;
 
-            if (alwaysTransparent) {
-                const bool inRange = tile->getPosition().isInRange(_camera, g_gameConfig.getTileTransparentFloorViewRange(), g_gameConfig.getTileTransparentFloorViewRange(), true);
-                g_drawPool.setOpacity(inRange ? .16 : .7);
+            walkingTiles.emplace_back(tile.get());
+
+            // Delay this diagonal run until its upper-right dependency has no walking
+            // creature, then render the run in reverse to preserve creature occlusion.
+            //
+            // The neighbour is usually just the next entry in the cache, so a position
+            // comparison answers this instead of a hash lookup: updateVisibleTiles walks each
+            // diagonal by stepping (x+1, y-1), which IS the upper-right neighbour. Only usually,
+            // though - the cache omits tiles that are not drawable or are fully covered, and
+            // then the next entry is a different tile and the map has to be asked after all.
+            const Position upperRight = tile->getPosition().translated(1, -1, 0);
+            Tile* upperRightTile = (i + 1 < tileCount && map.tiles[i + 1]->getPosition() == upperRight)
+                ? map.tiles[i + 1].get()
+                : g_map.getTile(upperRight).get();
+
+            if (!upperRightTile || upperRightTile->getWalkingCreatures().empty()) {
+                for (const auto& walkingTile : std::ranges::reverse_view(walkingTiles)) {
+                    if (alwaysTransparent) {
+                        const bool inRange = walkingTile->getPosition().isInRange(_camera, g_gameConfig.getTileTransparentFloorViewRange(), g_gameConfig.getTileTransparentFloorViewRange(), true);
+                        g_drawPool.setOpacity(inRange ? .16 : .7);
+                    }
+
+                    walkingTile->draw(transformPositionTo2D(walkingTile->getPosition()), tileFlags);
+
+                    if (alwaysTransparent)
+                        g_drawPool.resetOpacity();
+                }
+                walkingTiles.clear();
             }
-
-            tile->draw(transformPositionTo2D(tile->getPosition()), tileFlags);
-
-            if (alwaysTransparent)
-                g_drawPool.resetOpacity();
         }
 
         for (const auto& missile : g_map.getFloorMissiles(z))
@@ -198,7 +453,21 @@ void MapView::drawFloor()
 }
 
 void MapView::drawLights() {
+    PROFILE_ZONE(DrawLights);
     const auto& cameraPosition = m_posInfo.camera;
+
+    // Where light-grid cell (0,0) sits in the world. Inverting transformPositionTo2D leaves
+    // exactly this, floor offset and all, so a tile keeps the same cloud sample whichever floor
+    // it is seen from - and the shadows slide past the player as they walk instead of riding
+    // along with the camera.
+    m_lightView->setCloudOrigin({ cameraPosition.x - m_virtualCenterOffset.x,
+                                  cameraPosition.y - m_virtualCenterOffset.y });
+
+    // onTileUpdate flips this when an opaque thing comes or goes. The stock reset path runs
+    // inside isCompletelyCovered(), which this pass never calls, so without it a roof answer
+    // would stay cached long after the roof itself was gone.
+    const bool resetIndoorCache = m_resetIndoorCache;
+    m_resetIndoorCache = false;
 
     for (int_fast8_t z = m_floorMax; z >= m_floorMin; --z) {
         const float fadeLevel = getFadeLevel(z);
@@ -218,8 +487,20 @@ void MapView::drawLights() {
             }
         }
 
-        for (const auto& tile : map.tiles)
-            tile->drawLight(transformPositionTo2D(tile->getPosition()), m_lightView.get());
+        for (const auto& tile : map.tiles) {
+            const auto& point = transformPositionTo2D(tile->getPosition());
+
+            // Floors run deepest first, so the tile the player actually sees at this screen
+            // position is the last to write its mark and wins the slot. firstFloor 0 asks "is
+            // anything at all drawn above me", i.e. am I under a roof - a different question
+            // from the m_cachedFirstVisibleFloor queries elsewhere, cached in its own bits.
+            if (resetIndoorCache)
+                tile->resetCoveredCache(0);
+
+            m_lightView->markIndoor(point, tile->isCovered(0));
+
+            tile->drawLight(point, m_lightView.get());
+        }
 
         for (const auto& missile : g_map.getFloorMissiles(z))
             missile->draw(transformPositionTo2D(missile->getPosition()), false, m_lightView.get());
@@ -227,6 +508,15 @@ void MapView::drawLights() {
 }
 
 void MapView::drawCreatureInformation() {
+    PROFILE_ZONE(DrawCreatureInfo);
+    // This pool is drawn after the map framebuffer has already been blitted, so nothing in it
+    // inherits the map's magnification. Track it explicitly, otherwise names and bars keep their
+    // native size while the sprites under them grow, and shrink away to nothing on a large panel.
+    if (m_scaleCreatureInformation) {
+        const float density = g_window.getDisplayDensity();
+        g_app.setCreatureInformationScale(density > 0.f ? getMapMagnification() / density : getMapMagnification());
+    }
+
     g_drawPool.scale(g_app.getCreatureInformationScale());
 
     uint32_t ownFlags = Otc::DrawThings;
@@ -311,6 +601,7 @@ void MapView::drawForeground(const Rect& rect)
 
 void MapView::updateVisibleTiles()
 {
+    PROFILE_ZONE(UpdateVisibleTiles);
     // there is no tile to render on invalid positions
     if (!m_posInfo.camera.isValid())
         return;
@@ -460,11 +751,47 @@ void MapView::updateRect(const Rect& rect) {
         requestUpdateMapPosInfo();
     }
 
+    // updateGeometry changes the geometry at once but can only queue the framebuffer resize, and
+    // g_mainDispatcher runs a callback inline only on the main thread - setAntiAliasingMode reaches
+    // it from Lua on the map thread, so the resize lands a frame or two later. Notice when the
+    // buffer finally catches up and force a repaint: on a static scene the content hash never
+    // changes, so the pool would otherwise keep blitting whatever the buffer happened to hold.
+    if (const auto& fb = m_pool->getFrameBuffer(); fb && fb->isValid()) {
+        const auto& fbSize = fb->getSize();
+        const bool bufferChanged = fbSize != m_lastFrameBufferSize;
+        if (bufferChanged) {
+            m_lastFrameBufferSize = fbSize;
+            requestUpdateMapPosInfo();
+        }
+
+        // Repaint on the frame the buffer changes - it is a brand new, blank texture - and then for
+        // as long as it is still not the one the geometry describes. The flag is set from one thread
+        // and consumed on another, so a single request can be lost; if it is, a static scene has no
+        // other reason to redraw and keeps blitting the stale frame.
+        if (bufferChanged || fbSize != m_rectDimension.size())
+            m_pool->repaint();
+    }
+
     if (m_posInfo.rect != rect || m_updateMapPosInfo) {
         m_updateMapPosInfo = false;
 
         m_posInfo.rect = rect;
+
+        // updateGeometry is otherwise only reached from setVisibleDimension/setAntiAliasingMode,
+        // so without this the buffer resolution would never follow a resize. It only fires when the
+        // ideal multiple actually changes - a handful of times across a whole splitter drag, not
+        // once per pixel - because rebuilding the framebuffer is not cheap.
+        if (getIdealRenderScale(m_visibleDimension) != m_posInfo.scaleFactor)
+            updateGeometry(m_visibleDimension);
+
         m_posInfo.srcRect = calcFramebufferSource(rect.size());
+
+        // Never sample past the texture that exists right now. While the resize is still in flight
+        // the source rect describes the buffer we asked for, not the one bound, and reading beyond
+        // it is what tore streaks down the right and bottom edges.
+        if (m_lastFrameBufferSize.isValid())
+            m_posInfo.srcRect &= Rect(0, 0, m_lastFrameBufferSize);
+
         m_posInfo.drawOffset = m_posInfo.srcRect.topLeft();
         m_posInfo.horizontalStretchFactor = rect.width() / static_cast<float>(m_posInfo.srcRect.width());
         m_posInfo.verticalStretchFactor = rect.height() / static_cast<float>(m_posInfo.srcRect.height());
@@ -482,7 +809,7 @@ void MapView::updateRect(const Rect& rect) {
 
 void MapView::updateGeometry(const Size& visibleDimension)
 {
-    float scaleFactor = m_antiAliasingMode == Otc::ANTIALIASING_SMOOTH_RETRO ? 2.f : 1.f;
+    float scaleFactor = getIdealRenderScale(visibleDimension);
 
     auto maxAwareRange = std::max<size_t>(visibleDimension.width(), visibleDimension.height());
 
@@ -496,18 +823,31 @@ void MapView::updateGeometry(const Size& visibleDimension)
         scaleFactor /= 2;
     }
 
+    const auto& drawDimension = visibleDimension + 3;
+    const int maxTextureSize = g_graphics.getMaxTextureSize();
+
+    const auto bufferSizeFor = [&](const float scale) {
+        return drawDimension * static_cast<uint16_t>(g_gameConfig.getSpriteSize() * scale);
+    };
+
+    // Step the multiple down rather than bailing out: a view too large for the ideal scale is
+    // still perfectly drawable at a smaller one, just not as close to a pixel-exact blit.
+    auto bufferSize = bufferSizeFor(scaleFactor);
+    while (scaleFactor > 1.f && (bufferSize.width() > maxTextureSize || bufferSize.height() > maxTextureSize)) {
+        scaleFactor -= 1.f;
+        bufferSize = bufferSizeFor(scaleFactor);
+    }
+
+    if (bufferSize.width() > maxTextureSize || bufferSize.height() > maxTextureSize) {
+        g_logger.traceError("reached max zoom out");
+        return;
+    }
+
     m_pool->setScaleFactor(scaleFactor);
 
     m_posInfo.scaleFactor = scaleFactor;
 
-    const uint16_t tileSize = g_gameConfig.getSpriteSize() * m_pool->getScaleFactor();
-    const auto& drawDimension = visibleDimension + 3;
-    const auto& bufferSize = drawDimension * tileSize;
-
-    if (bufferSize.width() > g_graphics.getMaxTextureSize() || bufferSize.height() > g_graphics.getMaxTextureSize()) {
-        g_logger.traceError("reached max zoom out");
-        return;
-    }
+    const uint16_t tileSize = g_gameConfig.getSpriteSize() * scaleFactor;
 
     m_visibleDimension = visibleDimension;
     m_drawDimension = drawDimension;
@@ -524,7 +864,12 @@ void MapView::updateGeometry(const Size& visibleDimension)
     }
 
     g_mainDispatcher.addEvent([this, bufferSize] {
-        m_pool->getFrameBuffer()->resize(bufferSize);
+        // A resized framebuffer is a brand new, blank texture, but the pool keeps reusing its
+        // buffer for as long as its content hash says nothing changed. Without forcing a repaint
+        // the grown area is never drawn into and the blit samples uninitialised memory - which
+        // showed up as streaks down the right and bottom edges until the camera happened to move.
+        if (m_pool->getFrameBuffer()->resize(bufferSize))
+            m_pool->repaint();
     });
 
     const uint8_t left = std::min<uint8_t>(g_map.getAwareRange().left, (m_drawDimension.width() / 2) - 1);
@@ -554,23 +899,102 @@ void MapView::onFloorChange(const uint8_t /*floor*/, const uint8_t /*previousFlo
     updateLight();
 }
 
-void MapView::onGlobalLightChange(const Light&)
+void MapView::onGlobalLightChange(const Light& light)
 {
+    const auto& target = AmbientFade::resolve(light.color, light.intensity);
+
+    if (!m_ambientSeeded) {
+        // Nothing to fade from on the first value of the session - the map has never been lit,
+        // and ramping up out of black over ten seconds would look like a bug at login.
+        m_ambientSeeded = true;
+        m_ambientFrom = m_ambientTo = target;
+        m_ambientFading = false;
+    } else {
+        // Start from where the light is right now, not from the last value the server sent.
+        // Updates land every 10 s while a fade runs for 10.2, so a new one nearly always
+        // interrupts one in flight, and continuing from the interrupted midpoint is exactly
+        // what makes consecutive fades read as a single ramp instead of a series of them.
+        m_ambientFrom = blendedAmbient();
+        m_ambientTo = target;
+        m_ambientFading = true;
+        m_ambientFadeTimer.restart();
+    }
+
+    updateLight();
+}
+
+AmbientFade::Value MapView::blendedAmbient() const
+{
+    if (!m_ambientFading)
+        return m_ambientTo;
+
+    return AmbientFade::blend(m_ambientFrom, m_ambientTo,
+                              AmbientFade::progress(m_ambientFadeTimer.ticksElapsed()));
+}
+
+// Driven from drawFloor(), which is the always-drawn pane: the light pass switches itself off
+// in broad daylight, so ticking there would leave the first fade out of day with nothing to
+// start it. LightView's pixel cache is keyed on the colour's 8-bit form, so running this every
+// frame only rebuilds the light grid on the frames a channel actually moves.
+void MapView::updateAmbientFade()
+{
+    if (!m_ambientFading)
+        return;
+
+    if (m_ambientFadeTimer.ticksElapsed() >= AmbientFade::DURATION_MS) {
+        m_ambientFading = false;
+        m_ambientFrom = m_ambientTo;
+    }
+
     updateLight();
 }
 
 void MapView::updateLight()
 {
-    Light ambientLight = getCameraPosition().z > g_gameConfig.getMapSeaFloor() ? Light() : g_map.getLight();
-    ambientLight.intensity = std::max<uint8_t >(m_minimumAmbientLight * 255, ambientLight.intensity);
-    m_lightView->setGlobalLight(ambientLight);
+    // Underground is not "indoors": there is no sky being blocked, and the dark ambience down
+    // there is the point rather than something to attenuate further. The official client draws
+    // the same line at the sea floor - below it the whole light grid starts from black, and
+    // neither the cloud field nor the roof factor runs at all.
+    const bool underground = getCameraPosition().z > g_gameConfig.getMapSeaFloor();
+    const float attenuation = underground ? 0.f : m_cloudsIndoorIntensity;
+
+    // Underground the world light is gone outright rather than faded away: a floor change is
+    // not a time of day, and a ten-second ramp down a ladder would read as a bug. Everywhere
+    // else this is the cross-faded world light with its level folded into the colour, which is
+    // the form the ambient lift below expects - it works on a finished 8-bit colour, exactly
+    // as the official client's does.
+    const AmbientFade::Value world = blendedAmbient();
+    const Color worldColor = underground ? Color::black
+                                         : world.base * (world.intensity / static_cast<float>(UINT8_MAX));
+
+    const Color ambientColor = AmbientLight::lift(worldColor, AmbientLight::level(m_minimumAmbientLight),
+                                                  underground ? AmbientLight::TINT_UNDERGROUND
+                                                              : AmbientLight::TINT_SURFACE);
+
+    // A roofed tile is shaded after the ambience is mixed in, not before, and by the square of
+    // what an open tile keeps. Both are the official client's ordering, and together they mean
+    // Ambient Light is not a floor an interior bottoms out at - an interior loses its share of
+    // the ambience along with everything else. Torches still work indoors because this shades
+    // the light a tile receives rather than painting over the finished scene, where a multiply
+    // could only ever darken what it covers.
+    const Color indoorColor = ambientColor * AmbientLight::indoorFactor(attenuation);
+
+    m_lightView->setGlobalLight(ambientColor, AmbientLight::brightestChannel(ambientColor));
+    m_lightView->setIndoorLight(indoorColor, AmbientLight::brightestChannel(indoorColor));
+    m_lightView->setCloudShading(1.f - AmbientLight::keptUnderAttenuation(attenuation));
     m_lightView->setEnabled(isDrawingLights());
 }
 
 void MapView::onTileUpdate(const Position& pos, const ThingPtr& thing, const Otc::Operation op)
 {
-    if (thing && thing->isOpaque() && op == Otc::OPERATION_REMOVE)
-        m_resetCoveredCache = true;
+    if (thing && thing->isOpaque()) {
+        if (op == Otc::OPERATION_REMOVE)
+            m_resetCoveredCache = true;
+
+        // A roof going up changes the indoor shading exactly as much as one coming down, and
+        // nothing else invalidates the firstFloor-0 answers that pass caches.
+        m_resetIndoorCache = true;
+    }
 
     if (op == Otc::OPERATION_CLEAN) {
         if (m_lastHighlightTile && m_lastHighlightTile->getPosition() == pos)
@@ -725,6 +1149,59 @@ void MapView::setFloorViewMode(const Otc::FloorViewMode floorViewMode)
     requestUpdateVisibleTiles();
 }
 
+// Upper bound on the render multiple. At 4 a 15x11 view is a 2304x1792 buffer (~16 MB), which
+// every GPU this client runs on can hold, and by then the residual blit ratio is within 12% of
+// 1:1 - past that there is nothing left to win.
+static constexpr float MAX_RENDER_SCALE = 4.f;
+
+// The map is rasterised into an offscreen buffer at an integer number of buffer pixels per sprite
+// pixel, then blitted to the panel. Any non-integer ratio in that final blit is what smears the
+// art: neighbouring destination pixels get different bilinear weights, so one column of a sprite
+// edge is crisp and the next is half-grey. Picking the multiple closest to the panel's own size
+// keeps that ratio within 1 +/- 0.5/N of pixel-exact, so a bigger panel lands *closer* to 1:1 -
+// the opposite of a fixed multiple, which drifts further out the more the map is enlarged.
+float MapView::getIdealRenderScale(const Size& visibleDimension) const
+{
+    // "Smooth Retro" keeps its meaning as an extra supersampling step on top of the ideal.
+    const float supersample = m_antiAliasingMode == Otc::ANTIALIASING_SMOOTH_RETRO ? 2.f : 1.f;
+
+    const int nativeWidth = visibleDimension.width() * g_gameConfig.getSpriteSize();
+    if (nativeWidth <= 0 || m_posInfo.rect.isEmpty())
+        return supersample;
+
+    const float ratio = m_posInfo.rect.width() / static_cast<float>(nativeWidth);
+
+    // Hysteresis. Rounding alone flips between two multiples the moment the panel sits on a .5
+    // boundary, and the panel does sit there at some sizes - every flip rebuilds the framebuffer,
+    // so the map tears continuously for as long as it lasts. Hold the multiple already in effect
+    // until the panel is clearly past the halfway point; the dead zone is in whole steps, which is
+    // supersample-sized because that is how much the total moves per step. The margin over the
+    // natural half-step is deliberately small - it only has to swallow jitter, not shift the choice.
+    const float applied = m_posInfo.scaleFactor;
+    if (applied >= 1.f && std::abs(ratio * supersample - applied) <= 0.55f * supersample)
+        return applied;
+
+    return std::clamp<float>(std::round(ratio) * supersample, 1.f, MAX_RENDER_SCALE);
+}
+
+float MapView::getMapMagnification() const
+{
+    const int nativeWidth = m_visibleDimension.width() * g_gameConfig.getSpriteSize();
+    if (nativeWidth <= 0 || m_posInfo.rect.isEmpty())
+        return DEFAULT_DISPLAY_DENSITY;
+
+    return m_posInfo.rect.width() / static_cast<float>(nativeWidth);
+}
+
+void MapView::setScaleCreatureInformation(const bool enable)
+{
+    m_scaleCreatureInformation = enable;
+
+    // Nothing else writes this global, so hand it back to its default when switching off.
+    if (!enable)
+        g_app.setCreatureInformationScale(DEFAULT_DISPLAY_DENSITY);
+}
+
 void MapView::setAntiAliasingMode(const Otc::AntialiasingMode mode)
 {
     m_antiAliasingMode = mode;
@@ -842,6 +1319,9 @@ Rect MapView::calcFramebufferSource(const Size& destSize)
     const auto& srcVisible = m_visibleDimension * m_tileSize;
 
     Size srcSize = destSize;
+    // Preserve the classic fractional zoom used by the UI. The framebuffer may be
+    // rendered at a higher integer resolution, but the sampled area must still
+    // follow the user's fractional zoom or tiles are visibly oversized.
     srcSize.scale(m_zoomFraction < 1.f ? srcVisible * m_zoomFraction : srcVisible, Fw::KeepAspectRatio);
     drawOffset.x += (srcVisible.width() - srcSize.width()) / 2;
     drawOffset.y += (srcVisible.height() - srcSize.height()) / 2;

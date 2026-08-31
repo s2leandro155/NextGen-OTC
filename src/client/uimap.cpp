@@ -21,6 +21,7 @@
  */
 
 #include "uimap.h"
+#include <framework/graphics/glutil.h>
 
 #include "lightview.h"
 #include "map.h"
@@ -55,6 +56,8 @@ void UIMap::draw(const DrawPoolType drawPane) {
     if (drawPane == DrawPoolType::MAP) {
         g_drawPool.preDraw(drawPane, [this] {
             m_mapView->drawFloor();
+            if (m_mapFramesDrawn < 3)
+                ++m_mapFramesDrawn;
         }, [this] {
             m_mapView->registerEvents();
         }, m_mapView->m_posInfo.rect, m_mapView->m_posInfo.srcRect, Color::black);
@@ -81,10 +84,10 @@ void UIMap::drawSelf(const DrawPoolType drawPane)
 
     if (drawPane == DrawPoolType::FOREGROUND) {
         g_drawPool.addBoundingRect(m_mapRect.expanded(1), Color::black);
-        g_drawPool.addAction([] {glDisable(GL_BLEND); });
+        g_drawPool.addAction([] {glDisable(GL_BLEND); }, ActionIdiom::BlendOff);
         g_drawPool.addFilledRect(m_mapRect, Color::alpha);
-        g_drawPool.setVkMapHole(m_mapRect);
-        g_drawPool.addAction([] {glEnable(GL_BLEND); });
+        g_drawPool.setMapHole(m_mapRect);
+        g_drawPool.addAction([] {glEnable(GL_BLEND); }, ActionIdiom::BlendOn);
     }
 }
 
@@ -157,6 +160,7 @@ bool UIMap::isDrawingManaBar() { return m_mapView->isDrawingManaBar(); }
 bool UIMap::isSwitchingShader() { return m_mapView->isSwitchingShader(); }
 
 void UIMap::setShadowFloorIntensity(const float intensity) { m_mapView->setShadowFloorIntensity(intensity); }
+void UIMap::setCloudsIndoorIntensity(const float intensity) { m_mapView->setCloudsIndoorIntensity(intensity); }
 
 std::vector<CreaturePtr> UIMap::getSpectators(const bool multiFloor) { return m_mapView->getSpectators(multiFloor); }
 
@@ -190,6 +194,8 @@ void UIMap::setCursorAnimations(const bool enable) { m_mapView->setCursorAnimati
 
 void UIMap::setAntiAliasingMode(const Otc::AntialiasingMode mode) { m_mapView->setAntiAliasingMode(mode); }
 
+void UIMap::setScaleCreatureInformation(const bool enable) { m_mapView->setScaleCreatureInformation(enable); }
+
 void UIMap::setFloorFading(const uint16_t v) { m_mapView->setFloorFading(v); }
 
 MapViewPtr UIMap::getMapView() const { return m_mapView; }
@@ -216,7 +222,6 @@ bool UIMap::setFloatZoom(const float zoom)
         ++dimension;
 
     const auto oldZoom = m_zoom;
-
     m_zoom = dimension;
     updateVisibleDimension();
     m_mapView->setZoomFraction(m_zoomFloat / dimension);

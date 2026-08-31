@@ -78,7 +78,41 @@ void Tile::draw(const Point& dest, const int flags, LightView* lightView)
     }
 
     for (const auto& thing : m_things) {
-        if (!thing->isGround() && !thing->isGroundBorder() && !thing->isOnBottom())
+        if (!thing->isGround() && !thing->isGroundBorder())
+            break;
+
+        drawThing(thing, dest, flags, drawElevation);
+    }
+
+    // Draw NE/SW walkers that are leaving this tile before bottom objects, so those
+    // objects correctly occlude the creature during the diagonal transition.
+    if (!m_walkingCreatures.empty()) {
+        g_drawPool.setDrawOrder(DrawOrder::THIRD);
+        for (const auto& creature : m_walkingCreatures) {
+            if (creature->getDirection() != Otc::Direction::NorthEast && creature->getDirection() != Otc::Direction::SouthWest)
+                continue;
+
+            // A creature stepping into this tile belongs to the regular later pass.
+            if (creature->getLastStepToPosition() == getPosition())
+                continue;
+
+            const auto& cDest = Point(
+                dest.x + ((creature->getPosition().x - m_position.x) * g_gameConfig.getSpriteSize() - creature->getDrawElevation()) * g_drawPool.getScaleFactor(),
+                dest.y + ((creature->getPosition().y - m_position.y) * g_gameConfig.getSpriteSize() - creature->getDrawElevation()) * g_drawPool.getScaleFactor()
+            );
+
+            if (flags == Otc::DrawLights)
+                creature->drawLight(cDest, lightView);
+            else
+                creature->draw(cDest, flags & Otc::DrawThings);
+        }
+        g_drawPool.resetDrawOrder();
+    }
+
+    for (const auto& thing : m_things) {
+        if (thing->isGround() || thing->isGroundBorder())
+            continue;
+        if (!thing->isOnBottom())
             break;
 
         drawThing(thing, dest, flags, drawElevation);
@@ -150,6 +184,17 @@ void Tile::drawCreature(const Point& dest, const int flags, const bool forceDraw
 
     g_drawPool.setDrawOrder(DrawOrder::THIRD);
     for (const auto& creature : m_walkingCreatures) {
+        // NE/SW creatures leaving this tile were already drawn before bottom objects - but that
+        // early pass only exists in Tile::draw. Lights arrive through Tile::drawLight, which has
+        // no such pass, so skipping them here would drop the light for the whole diagonal step:
+        // a walker belongs to exactly one walking tile at a time, and for NE/SW that tile is
+        // never the destination until the step ends. Order does not matter to the light pass -
+        // LightView::updatePixels max()es the sources per tile - so letting it through is enough.
+        if (flags != Otc::DrawLights &&
+            (creature->getDirection() == Otc::Direction::NorthEast || creature->getDirection() == Otc::Direction::SouthWest) &&
+            creature->getLastStepToPosition() != getPosition())
+            continue;
+
         const auto& cDest = Point(
             dest.x + ((creature->getPosition().x - m_position.x) * g_gameConfig.getSpriteSize() - creature->getDrawElevation()) * g_drawPool.getScaleFactor(),
             dest.y + ((creature->getPosition().y - m_position.y) * g_gameConfig.getSpriteSize() - creature->getDrawElevation()) * g_drawPool.getScaleFactor()
@@ -736,6 +781,18 @@ bool Tile::isCovered(const int8_t firstFloor)
     }
 
     return (m_isCovered & idState) == idState;
+}
+
+// Drops the cached isCovered() answer for one firstFloor so the next call rescans. The only
+// existing reset runs inside isCompletelyCovered(), which the light pass never calls; and since
+// each firstFloor owns its own pair of bits, clearing one cannot disturb the floor-visibility
+// answers cached under another.
+void Tile::resetCoveredCache(const int8_t firstFloor)
+{
+    const uint32_t idChecked = 1 << firstFloor;
+    const uint32_t idState = 1 << (firstFloor + g_gameConfig.getMapMaxZ());
+
+    m_isCovered &= ~(idChecked | idState);
 }
 
 bool Tile::isClickable()

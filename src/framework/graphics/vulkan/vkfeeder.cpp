@@ -317,9 +317,9 @@ void VkDrawFeeder::feedPool(VkSpriteBatch& batch, DrawPool* pool, const VkExtent
             pool->m_objectsDraw[0].swap(pool->m_objectsDraw[1]);
             pool->m_shouldRepaint.store(false, std::memory_order_relaxed);
         }
-        fbDest = pool->m_vkFbDest;
-        fbSrc = pool->m_vkFbSrc;
-        mapHole = pool->m_vkMapHole;
+        fbDest = pool->m_fbDest;
+        fbSrc = pool->m_fbSrc;
+        mapHole = pool->m_mapHole;
     }
 
     if (pool->m_objectsDraw[1].empty())
@@ -358,21 +358,21 @@ void VkDrawFeeder::feedPool(VkSpriteBatch& batch, DrawPool* pool, const VkExtent
 
     for (const auto& obj : pool->m_objectsDraw[1]) {
         // Bind/release markers of a temporary GL framebuffer (also actions, but with metadata).
-        if (obj.vkFbMarker == 1) {
+        if (obj.fbMarker == 1) {
             fbStack.push_back(FbFrame{ batch.externalVertexCount(),
-                                       static_cast<float>(obj.vkFbSize.width()),
-                                       static_cast<float>(obj.vkFbSize.height()) });
+                                       static_cast<float>(obj.fbSize.width()),
+                                       static_cast<float>(obj.fbSize.height()) });
             continue;
         }
 
-        if (obj.vkFbMarker == 2) {
+        if (obj.fbMarker == 2) {
             if (fbStack.empty())
                 continue; // release without bind - the list was truncated, nothing to transform
 
             const FbFrame frame = fbStack.back();
             fbStack.pop_back();
 
-            Rect dest = obj.vkFbDest;
+            Rect dest = obj.fbDest;
             if (!dest.isValid())
                 dest = Rect(0, 0, static_cast<int>(frame.width), static_cast<int>(frame.height));
 
@@ -381,7 +381,7 @@ void VkDrawFeeder::feedPool(VkSpriteBatch& batch, DrawPool* pool, const VkExtent
             const float dx = static_cast<float>(dest.x());
             const float dy = static_cast<float>(dest.y());
             const bool toScreen = fbStack.empty(); // nested: we stay in the outer one's local coords
-            const float opacity = std::clamp(obj.vkFbOpacity, 0.0f, 1.0f);
+            const float opacity = std::clamp(obj.fbOpacity, 0.0f, 1.0f);
 
             VkSpriteVertex* data = batch.externalVertexData();
             const uint32_t end = batch.externalVertexCount();
@@ -391,9 +391,9 @@ void VkDrawFeeder::feedPool(VkSpriteBatch& batch, DrawPool* pool, const VkExtent
                 float ly = data[i].pos[1];
 
                 // as in FrameBuffer::prepare: 1 = horizontal flip, 2 = vertical
-                if (obj.vkFbFlip == 1)
+                if (obj.fbFlip == 1)
                     lx = frame.width - lx;
-                else if (obj.vkFbFlip == 2)
+                else if (obj.fbFlip == 2)
                     ly = frame.height - ly;
 
                 float x = dx + lx * sx;
@@ -453,11 +453,11 @@ void VkDrawFeeder::feedPool(VkSpriteBatch& batch, DrawPool* pool, const VkExtent
         // writing alpha=0 with blending DISABLED (UIMap::drawSelf). For us the map already lies
         // UNDER the interface on the same image, so the equivalent is CUTTING OUT the previously
         // emitted geometry of this pool within that rectangle. A shape only counts as the map
-        // window when it MATCHES the rect UIMap registered on the pool (m_vkMapHole) - guessing
+        // window when it MATCHES the rect UIMap registered on the pool (m_mapHole) - guessing
         // by "untextured + alpha=0" alone used to cut holes through regular UI (any widget with
         // an alpha-0 fill), letting the world show through e.g. the prey window.
         if (hasFb && fbStack.empty() && !st.texture && st.textureId == 0 && rgba[3] == 0) {
-            // Bounding box in pool-local coordinates - the same space m_vkMapHole lives in.
+            // Bounding box in pool-local coordinates - the same space m_mapHole lives in.
             float lx0 = 0.0f, ly0 = 0.0f, lx1 = 0.0f, ly1 = 0.0f;
             for (int i = 0; i < count; ++i) {
                 float x = positions[i * 2];

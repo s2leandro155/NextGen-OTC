@@ -22,6 +22,9 @@
 
 #include "texture.h"
 
+#include "render/resourceregistry.h"
+#include "glutil.h"
+
 #include "drawpoolmanager.h"
 #include "graphics.h"
 #include "image.h"
@@ -34,8 +37,9 @@
 #include <mutex>
 #include <vector>
 
- // UINT16_MAX = just to avoid conflicts with GL generated ID.
-static std::atomic_uint32_t UID(UINT16_MAX);
+ // Seeded above every GL-generated id (see TEXTURE_UNIQUE_ID_SEED in texture.h, which the
+ // renderer boundary static_asserts against).
+static std::atomic_uint32_t UID(TEXTURE_UNIQUE_ID_SEED);
 
 // --- Batched GL texture deletion queue ---------------------------------------------------------
 // WHY we defer at all: ~Texture can run on any thread (GC of things runs on the map thread,
@@ -53,7 +57,8 @@ namespace
 {
     struct PendingTextureDeletion
     {
-        uint32_t id;
+        uint32_t id;       // OpenGL name; 0 when the texture never reached a GL context
+        uint32_t uniqueId; // process-wide identity, which every texture has on every backend
         bool smooth;
     };
 
@@ -73,11 +78,13 @@ size_t Texture::getDeletionBatchCount() { return g_deletionBatches.load(std::mem
 Texture::Texture() : m_uniqueId(UID.fetch_add(1)) {
     generateHash();
     g_stats.addTexture();
+    ResourceRegistry::instance().registerTexture(this);
 }
 Texture::Texture(const Size& size) : m_uniqueId(UID.fetch_add(1))
 {
     generateHash();
     g_stats.addTexture();
+    ResourceRegistry::instance().registerTexture(this);
     if (!setupSize(size))
         return;
 
@@ -97,6 +104,7 @@ Texture::Texture(const ImagePtr& image, const bool buildMipmaps, const bool comp
 {
     generateHash();
     g_stats.addTexture();
+    ResourceRegistry::instance().registerTexture(this);
 
     setProp(Prop::compress, compress);
     setProp(Prop::buildMipmaps, buildMipmaps);
@@ -109,12 +117,23 @@ Texture::~Texture()
 #ifndef NDEBUG
     assert(!g_app.isTerminated());
 #endif
-    if (g_graphics.ok() && m_id != 0) {
-        // Just the identifier goes into the queue - the real glDeleteTextures is done by
+    // Queued when there is either a GL name to delete or an atlas region to release. The region
+    // half is what Phase 5 added: on a backend that creates no GL textures m_id is zero for every
+    // texture in the client, so making the GL name the sole entry condition would have leaked
+    // every region there. The region test rather than an unconditional queue is deliberate - a
+    // texture that never reached a GPU and never entered an atlas has nothing to retire, and
+    // taking the queue's mutex for it costs a lock on every one of them, including during static
+    // destruction, where the mutex may already be gone.
+    const bool holdsAtlasRegion =
+        std::ranges::any_of(m_atlas, [](const AtlasRegion* region) { return region != nullptr; });
+
+    if (g_graphics.ok() && (m_id != 0 || holdsAtlasRegion)) {
+        // Just the identifiers go into the queue - the real glDeleteTextures is done by
         // flushDeletedTextures() on the main thread, with one call for the whole batch.
         std::scoped_lock lock(g_pendingDeletionMutex);
-        g_pendingDeletions.emplace_back(m_id, isSmooth());
+        g_pendingDeletions.emplace_back(m_id, m_uniqueId, isSmooth());
     }
+    ResourceRegistry::instance().unregisterTexture(m_uniqueId);
     g_stats.removeTexture();
 }
 
@@ -143,17 +162,20 @@ void Texture::flushDeletedTextures()
     ids.clear();
     ids.reserve(batch.size());
 
-    for (const auto& [id, smooth] : batch) {
-        // The atlas indexes its regions by the source texture's identifier, so it must release
-        // them BEFORE the identifier returns to the GL pool - otherwise a new texture with the
-        // same id would inherit someone else's region and show the wrong graphic. TextureAtlas::removeTexture()
-        // has no lock of its own, and atlases are modified during flush on the render thread,
-        // i.e. the same thread as this function - which is why this is a safe place.
-        g_drawPool.removeTextureFromAtlas(id, smooth);
-        ids.push_back(id);
+    for (const auto& [id, uniqueId, smooth] : batch) {
+        // The atlas indexes its regions by the source texture's UNIQUE id, so it must release
+        // them here, while this thread is the render thread - TextureAtlas::removeTexture() has
+        // no lock of its own and atlases are modified during maintenance on this same thread.
+        // (Until Phase 5 the key was the GL name, and this had to run before the name returned to
+        // the GL pool or a new texture would inherit someone else's region. The unique id is
+        // never reused, so that particular race is gone; the threading requirement is not.)
+        g_drawPool.removeTextureFromAtlas(uniqueId, smooth);
+        if (id != 0)
+            ids.push_back(id);
     }
 
-    glDeleteTextures(static_cast<GLsizei>(ids.size()), ids.data());
+    if (!ids.empty())
+        glDeleteTextures(static_cast<GLsizei>(ids.size()), ids.data());
 
     g_deletedTextures.fetch_add(ids.size(), std::memory_order_relaxed);
     g_deletionBatches.fetch_add(1, std::memory_order_relaxed);
@@ -167,8 +189,19 @@ void Texture::create()
     // exclusively for textures that never made it into GL (m_id == 0) and thus were never
     // drawn. Since we know the source file, we load it back at exactly the moment of the first
     // draw. Thanks to this, freeing the pixels CANNOT end up as a blank graphic.
-    if (!m_image && m_id == 0 && !m_source.empty())
+    // `isUploaded()` is the non-GL equivalent of `m_id != 0`: a backend that owns its own GPU
+    // copy already has these pixels, so re-reading the file would be pure waste - and, since
+    // this runs once per frame per drawn texture, perpetual waste.
+    if (!m_image && m_id == 0 && !m_source.empty() && !isUploaded())
         m_image = Image::load(m_source);
+
+    // Pure Vulkan/Metal mode: the same reasoning as the constructor a hundred lines up,
+    // which already returns here - createTexture() reaches glGenTextures, and with no GL
+    // context that is a null GLEW pointer (or, against Apple's OpenGL.framework, a
+    // segfault). m_image is deliberately kept rather than cleared: those pixels are
+    // exactly what a non-GL backend uploads later.
+    if (!g_window.hasGLContext())
+        return;
 
     if (m_image) {
         createTexture();
@@ -177,9 +210,15 @@ void Texture::create()
     }
 }
 
-void Texture::updateImage(const ImagePtr& image) { m_image = image; setupSize(image->getSize()); }
+void Texture::updateImage(const ImagePtr& image) { m_image = image; setupSize(image->getSize()); bumpContentRevision(); }
 
 void Texture::updatePixels(uint8_t* pixels, const int level, const int channels, const bool compress) {
+    // The pixels change while the handle does not, which is exactly what a content hash cannot
+    // otherwise see. Today only LightView takes this route and its pool owns no retained target,
+    // so nothing depends on it yet - which is the reason to record it now rather than after a
+    // streaming texture lands in the MAP target and quietly stops updating.
+    bumpContentRevision();
+
     bind();
 
     // glTexImage2D reallocates the whole texture on every call, and LightView refreshes its own
@@ -255,13 +294,18 @@ void Texture::setSmooth(const bool smooth)
 
     setProp(Prop::smooth, smooth);
 
+    // Atlas membership is not conditional on a GL name - a texture can hold a region on a
+    // backend that never creates one - so the filter-group move happens regardless. Only the
+    // GL filter update needs the name.
+    if (canCacheInAtlas()) {
+        g_drawPool.removeTextureFromAtlas(m_uniqueId, !smooth);
+        return;
+    }
+
     if (!m_id) return;
 
-    if (!canCacheInAtlas()) {
-        bind();
-        setupFilters();
-    } else
-        g_drawPool.removeTextureFromAtlas(m_id, !smooth);
+    bind();
+    setupFilters();
 }
 
 void Texture::allowAtlasCache() {

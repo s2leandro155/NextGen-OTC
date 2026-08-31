@@ -192,6 +192,7 @@ void ConfigManager::loadPublicConfig(const std::string& fileName) {
         m_publicConfig.graphics.mapAtlasSize = reader.GetInteger("graphics", "mapAtlasSize", m_publicConfig.graphics.mapAtlasSize);
         m_publicConfig.graphics.foregroundAtlasSize = reader.GetInteger("graphics", "foregroundAtlasSize", m_publicConfig.graphics.foregroundAtlasSize);
         m_publicConfig.graphics.renderBackend = reader.Get("graphics", "renderBackend", m_publicConfig.graphics.renderBackend);
+        m_publicConfig.graphics.renderPath = reader.Get("graphics", "renderPath", m_publicConfig.graphics.renderPath);
         
         m_publicConfig.font.widget = reader.Get("font", "widget", m_publicConfig.font.widget);
         m_publicConfig.font.staticText = reader.Get("font", "static-text", m_publicConfig.font.staticText);

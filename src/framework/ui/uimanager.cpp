@@ -20,6 +20,7 @@
  * THE SOFTWARE.
  */
 #include "uimanager.h"
+#include <framework/util/profiler.h>
 #include <framework/graphics/drawpoolmanager.h>
 
 #include "uiwidget.h"
@@ -67,6 +68,8 @@ void UIManager::render(DrawPoolType drawPane) const
 {
     if (drawPane != DrawPoolType::FOREGROUND)
         return;
+
+    PROFILE_ZONE(UITraversal);
 
     g_drawPool.preDraw(drawPane, [this, drawPane] {
         m_rootWidget->draw(m_rootWidget->getRect(), drawPane);

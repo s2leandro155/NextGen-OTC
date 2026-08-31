@@ -60,6 +60,13 @@ void PainterShaderProgram::setupUniforms()
 bool PainterShaderProgram::link()
 {
     m_startTime = g_clock.seconds();
+
+    // An inert program - one built with no GL context, kept only so that a draw can name the
+    // material it wanted - has no attribute or uniform locations to bind. Reporting failure is
+    // accurate and is what the callers already tolerate: Painter keeps the object either way.
+    if (!hasGLProgram())
+        return false;
+
     bindAttributeLocation(VERTEX_ATTR, "a_Vertex");
     bindAttributeLocation(TEXCOORD_ATTR, "a_TexCoord");
     if (!ShaderProgram::link())
@@ -131,9 +138,34 @@ void PainterShaderProgram::setResolution(const Size& resolution)
     m_resolution = resolution;
 }
 
+namespace
+{
+    bool g_shaderFixedTimeEnabled = false;
+    float g_shaderFixedTimeValue = 0.f;
+}
+
+void PainterShaderProgram::setFixedTime(const float seconds)
+{
+    g_shaderFixedTimeEnabled = true;
+    g_shaderFixedTimeValue = seconds;
+}
+
+void PainterShaderProgram::clearFixedTime() { g_shaderFixedTimeEnabled = false; }
+bool PainterShaderProgram::hasFixedTime() { return g_shaderFixedTimeEnabled; }
+
+float PainterShaderProgram::currentTime()
+{
+    // Note this is NOT what an unpinned program uploads: updateTime() subtracts the program's
+    // own m_startTime, so u_Time is per-program. A frame-global cannot reproduce that, and does
+    // not have to - the GL backend still uploads u_Time through updateTime(). What matters is
+    // that when the pin is on, everything agrees on one value.
+    return g_shaderFixedTimeEnabled ? g_shaderFixedTimeValue : g_clock.seconds();
+}
+
 void PainterShaderProgram::updateTime()
 {
-    const float time = g_clock.seconds() - m_startTime;
+    const float time = g_shaderFixedTimeEnabled ? g_shaderFixedTimeValue
+                                                : g_clock.seconds() - m_startTime;
     if (m_time == time)
         return;
 

@@ -21,6 +21,7 @@
  */
 
 #include "framebuffer.h"
+#include "glutil.h"
 
 #include "graphics.h"
 #include "image.h"
@@ -56,20 +57,31 @@ FrameBuffer::~FrameBuffer()
     }
 }
 
-bool FrameBuffer::resize(const Size& size)
+bool FrameBuffer::resize(const Size& size, const float contentScale)
 {
     assert(size.isValid());
 
-    if (m_texture && m_texture->getSize() == size)
+    const float scale = contentScale > 0.f ? contentScale : 1.f;
+    const Size logical = scale == 1.f
+        ? size
+        : Size(std::max<int>(1, static_cast<int>(size.width() / scale)),
+               std::max<int>(1, static_cast<int>(size.height() / scale)));
+
+    if (m_texture && m_texture->getSize() == size && m_contentScale == scale)
         return false;
+
+    m_contentScale = scale;
+    m_logicalSize = logical;
 
     m_texture = std::make_shared<Texture>(size);
     m_texture->setSmooth(m_smooth);
     m_texture->setUpsideDown(true);
-    m_textureMatrix = g_painter->getTransformMatrix(size);
+    // The projection spans the LOGICAL extent while the viewport covers the whole device-pixel
+    // texture, so geometry recorded in logical units rasterises across every physical pixel.
+    m_textureMatrix = g_painter->getTransformMatrix(logical);
 
     m_screenCoordsBuffer.clear();
-    m_screenCoordsBuffer.addRect(Rect{ 0, 0, size });
+    m_screenCoordsBuffer.addRect(Rect{ 0, 0, logical });
 
     // Pure Vulkan mode: without a context we do not attach the texture to the FBO (m_fbo == 0).
     if (!g_window.hasGLContext())
@@ -81,6 +93,23 @@ bool FrameBuffer::resize(const Size& size)
     const GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
     if (status != GL_FRAMEBUFFER_COMPLETE)
         g_logger.warning("Unable to setup framebuffer object");
+    else {
+        // Texture::setupPixels allocates with a null data pointer, so a newly attached texture holds
+        // whatever happened to be in that memory. Anything sampling it before the pool has drawn a
+        // full frame into it - a resize still in flight, or a linear filter reaching a texel past
+        // the drawn region - reads uninitialised bytes and paints them on screen as coloured
+        // streaks. Start it defined; the worst a transient can then look is empty.
+        // glClear obeys the scissor test, which Painter leaves enabled while clipping.
+        const auto scissorWasEnabled = glIsEnabled(GL_SCISSOR_TEST);
+        if (scissorWasEnabled)
+            glDisable(GL_SCISSOR_TEST);
+
+        glClearColor(0.f, 0.f, 0.f, 0.f);
+        glClear(GL_COLOR_BUFFER_BIT);
+
+        if (scissorWasEnabled)
+            glEnable(GL_SCISSOR_TEST);
+    }
 
     internalRelease();
 
@@ -130,6 +159,29 @@ void FrameBuffer::draw()
     g_painter->drawCoords(m_coordsBuffer, DrawMode::TRIANGLE_STRIP);
     g_painter->resetCompositionMode();
     if (m_disableBlend) glEnable(GL_BLEND);
+}
+
+void FrameBuffer::bindAsTarget()
+{
+    internalBind();
+
+    m_oldSize = g_painter->getResolution();
+    m_oldTextureMatrix = g_painter->getProjectionMatrix();
+
+    g_painter->setResolution(getSize(), m_textureMatrix);
+}
+
+void FrameBuffer::releaseAsTarget() const
+{
+    internalRelease();
+    g_painter->setResolution(m_oldSize, m_oldTextureMatrix);
+}
+
+void FrameBuffer::drawClearQuad(const Color& color)
+{
+    g_painter->resetTexture();
+    g_painter->setColor(color);
+    g_painter->drawCoords(m_screenCoordsBuffer, DrawMode::TRIANGLE_STRIP);
 }
 
 void FrameBuffer::internalBind()

@@ -32,6 +32,7 @@
 #include <framework/proxy/proxy.h>
 #include <framework/stdext/net.h>
 #include <framework/util/crypt.h>
+#include <framework/util/profiler.h>
 #include <framework/util/stats.h>
 
 #ifdef FRAMEWORK_GRAPHICS
@@ -136,6 +137,15 @@ void Application::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_platform", "isBrowser", &Platform::isBrowser, &g_platform);
     g_lua.bindSingletonFunction("g_platform", "isConsole", &Platform::isConsole, &g_platform);
     g_lua.bindSingletonFunction("g_platform", "openDir", &Platform::openDir, &g_platform);
+
+    // Frame profiler (toggle from the Lua console without rebuilding).
+    g_lua.registerSingletonClass("g_profiler");
+    g_lua.bindSingletonFunction("g_profiler", "setEnabled", &Profiler::setEnabled, &g_profiler);
+    g_lua.bindSingletonFunction("g_profiler", "isEnabled", &Profiler::isEnabled, &g_profiler);
+    g_lua.bindSingletonFunction("g_profiler", "setReportInterval", &Profiler::setReportInterval, &g_profiler);
+    g_lua.bindSingletonFunction("g_profiler", "getReportInterval", &Profiler::getReportInterval, &g_profiler);
+    g_lua.bindSingletonFunction("g_profiler", "report", &Profiler::report, &g_profiler);
+    g_lua.bindSingletonFunction("g_profiler", "reset", &Profiler::reset, &g_profiler);
 
     // Application
     g_lua.registerSingletonClass("g_app");

@@ -339,6 +339,7 @@ set(SOURCE_FILES
         framework/stdext/qrcodegen.cpp
         framework/util/color.cpp
         framework/util/crypt.cpp
+        framework/util/profiler.cpp
         framework/util/stats.cpp
         framework/proxy/proxy.cpp
         framework/proxy/proxy_client.cpp
@@ -415,6 +416,12 @@ if (TOGGLE_FRAMEWORK_GRAPHICS)
           framework/graphics/coordsbuffer.cpp
           framework/graphics/textureatlas.cpp
           framework/graphics/drawpool.cpp
+          framework/graphics/render/poolcompiler.cpp
+          framework/graphics/render/frameassembler.cpp
+          framework/graphics/render/recordingbackend.cpp
+          framework/graphics/render/resourceregistry.cpp
+          framework/graphics/render/materialregistry.cpp
+          framework/graphics/render/glbackend.cpp
           framework/graphics/drawpoolmanager.cpp
           framework/graphics/fontmanager.cpp
           framework/graphics/ttfloader.cpp
@@ -593,11 +600,18 @@ target_compile_definitions(otclient_core PRIVATE ENABLE_DISCORD_RPC=${OTCLIENT_E
 # *****************************************************************************
 if(MSVC)
 
-  # cpp-httplib versions from the current vcpkg baseline require Windows 10+.
+  # Keep Windows 10 as the default while allowing a separate compatibility
+  # build for older Windows/Windows Server installations.
+  set(OTCLIENT_WINDOWS_TARGET "0x0A00" CACHE STRING "Minimum supported Windows version (_WIN32_WINNT)")
+  if(OTCLIENT_WINDOWS_TARGET STREQUAL "0x0601")
+    set(OTCLIENT_NTDDI_TARGET "0x06010000")
+  else()
+    set(OTCLIENT_NTDDI_TARGET "0x0A000000")
+  endif()
   target_compile_definitions(otclient_core
           PUBLIC
-          NTDDI_VERSION=0x0A000000
-          _WIN32_WINNT=0x0A00
+          NTDDI_VERSION=${OTCLIENT_NTDDI_TARGET}
+          _WIN32_WINNT=${OTCLIENT_WINDOWS_TARGET}
   )
 
   target_compile_definitions(otclient_core PRIVATE CRASH_HANDLER)

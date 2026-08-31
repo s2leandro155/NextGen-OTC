@@ -25,6 +25,14 @@
 #include "declarations.h"
 #include <framework/core/timer.h>
 
+#include <atomic>
+
+// The unique-id counter is seeded here, above every id GL generates, so that a Texture's
+// unique id can double as its logical render handle. The renderer boundary reserves everything
+// BELOW this value for render-target textures and static_asserts against it, so lowering it
+// would make a sprite's handle compare equal to a render target's.
+inline constexpr uint32_t TEXTURE_UNIQUE_ID_SEED = UINT16_MAX;
+
 class Texture
 {
 public:
@@ -54,6 +62,38 @@ public:
 
     const Size& getSize() const { return m_size; }
     auto getTransformMatrixId() const { return m_transformMatrixId; }
+
+    // --- pixels for a backend that is not OpenGL ------------------------------------------
+    // Read-only view of the CPU pixel copy. create() deliberately keeps it when there is no GL
+    // context precisely so that a backend which owns its own GPU textures can upload from it,
+    // and this is how that backend reaches it without joining the friend list.
+    const ImagePtr& getPendingImage() const { return m_image; }
+
+    // The non-GL twin of create()'s `m_image = nullptr` after uploadPixels. A backend that has
+    // copied these pixels onto the GPU says so, and the CPU copy goes with it.
+    //
+    // Both halves matter. Without the flag, `m_id` stays 0 forever under such a backend, so
+    // create() would reload the file from disk on every single frame the texture is drawn -
+    // its "the garbage collector freed my pixels" recovery path, firing perpetually. Without
+    // freeing the image, the process would carry every sprite twice.
+    void markUploaded() { setProp(Prop::uploaded, true); m_image = nullptr; }
+    bool isUploaded() const { return getProp(Prop::uploaded); }
+
+    // --- content identity -----------------------------------------------------------------
+    // Bumped whenever the pixels a sampler would read change WITHOUT the logical handle
+    // changing: an animation advancing to its next frame, or an in-place pixel update.
+    //
+    // The frame compiler folds this into a pool's content hash. It has to: a retained target is
+    // re-composited rather than re-rendered when the compiled output is byte-identical, and an
+    // animation advancing produces byte-identical output by design - the handle is stable on
+    // purpose. Phase 3 caught that case for OpenGL by folding in the native texture id, which
+    // an AnimatedTexture re-aims every tick; that signal does not exist for a backend where the
+    // native id is always 0, and it never covered updatePixels at all. This does both.
+    //
+    // Relaxed atomic because it is written on the main thread (TextureManager::poll) and read on
+    // a producer thread (PoolCompiler). Only the change matters, never the ordering.
+    uint32_t getContentRevision() const { return m_contentRevision.load(std::memory_order_relaxed); }
+    void bumpContentRevision() { m_contentRevision.fetch_add(1, std::memory_order_relaxed); }
 
     auto getAtlasRegion(Fw::TextureAtlasType type) const { return m_atlas[type]; }
     const AtlasRegion* getAtlasRegion() const;
@@ -111,6 +151,8 @@ protected:
 
     uint16_t m_transformMatrixId{ 0 };
 
+    std::atomic_uint32_t m_contentRevision{ 0 };
+
     ImagePtr m_image;
 
     // Path of the file this texture was created from (set by TextureManager when loading from disk).
@@ -136,7 +178,8 @@ protected:
         repeat = 1 << 3,
         compress = 1 << 4,
         buildMipmaps = 1 << 5,
-        _allowAtlasCache = 1 << 6
+        _allowAtlasCache = 1 << 6,
+        uploaded = 1 << 7 // a non-GL backend owns a GPU copy of these pixels; see markUploaded
     };
 
     uint16_t m_props{ 0 };

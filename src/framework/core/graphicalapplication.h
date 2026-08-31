@@ -22,6 +22,8 @@
 
 #pragma once
 
+#include <framework/graphics/render/irenderbackend.h>
+
 #include "application.h"
 
 #include <framework/core/inputevent.h>
@@ -113,6 +115,12 @@ public:
     float getHUDScale() const;
     void setHUDScale(float v);
 
+    // Changing either scale relayouts the UI, so both go through here rather than through
+    // g_window: PlatformWindow can only record the value, and a setter that silently leaves the
+    // interface laid out for the previous one is a trap.
+    float getDevicePixelRatio() const;
+    void setDevicePixelRatio(float v);
+
     float getCreatureInformationScale() const { return m_creatureInformationScale; }
     void setCreatureInformationScale(const float v) { m_creatureInformationScale = v; }
 
@@ -137,6 +145,11 @@ public:
     void setDrawEvents(const ApplicationDrawEventsPtr& drawEvents) { m_drawEvents = drawEvents; }
     void doScreenshot(std::string file);
     void doMapScreenshot(std::string file);
+
+    // Encodes a completed readback to PNG off the render thread. Shared by the two screenshot
+    // entry points so that "how a readback becomes a file" is stated once - the backend has
+    // already delivered top-left pixels, so unlike the legacy sites this does NOT flip.
+    static void saveReadbackAsPng(ReadbackResult&& readback, std::string file);
 #ifdef __EMSCRIPTEN__
     void mainLoop();
 #endif
@@ -158,6 +171,8 @@ private:
     float m_creatureInformationScale{ DEFAULT_DISPLAY_DENSITY };
     float m_animatedTextScale{ DEFAULT_DISPLAY_DENSITY };
     float m_staticTextScale{ DEFAULT_DISPLAY_DENSITY };
+    float m_hudScale{ DEFAULT_DISPLAY_DENSITY };
+    float m_devicePixelRatio{ DEFAULT_DISPLAY_DENSITY };
 
     AdaptativeFrameCounter m_mapProcessFrameCounter;
     AdaptativeFrameCounter m_graphicFrameCounter;

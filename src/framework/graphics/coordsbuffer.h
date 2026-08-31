@@ -44,6 +44,11 @@ public:
     {
         m_vertexArray.addRect(dest);
     }
+
+    void addTriangleF(const PointF& a, const PointF& b, const PointF& c)
+    {
+        m_vertexArray.addTriangleF(a, b, c);
+    }
     void addRect(const Rect& dest, const Rect& src)
     {
         m_vertexArray.addRect(dest);

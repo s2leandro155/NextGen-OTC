@@ -22,6 +22,7 @@
 
 #include "painter.h"
 
+#include "glutil.h"
 #include "framework/graphics/texture.h"
 #include "framework/graphics/texturemanager.h"
 #include "shader/shadersources.h"
@@ -31,6 +32,30 @@ std::unique_ptr<Painter> g_painter = nullptr;
 
 namespace
 {
+// DrawMode and BlendEquation used to BE their GL constants. They are API-neutral enums now,
+// so the GL numbering lives here - in the only file that hands either of them to GL.
+[[nodiscard]] constexpr GLenum glPrimitiveOf(const DrawMode mode)
+{
+    switch (mode) {
+        case DrawMode::TRIANGLES:      return GL_TRIANGLES;
+        case DrawMode::TRIANGLE_STRIP: return GL_TRIANGLE_STRIP;
+        case DrawMode::NONE:           return GL_NONE;
+    }
+    return GL_TRIANGLES;
+}
+
+[[nodiscard]] constexpr GLenum glBlendEquationOf(const BlendEquation equation)
+{
+    switch (equation) {
+        case BlendEquation::ADD:            return GL_FUNC_ADD;
+        case BlendEquation::MAX:            return GL_MAX;
+        case BlendEquation::MIN:            return GL_MIN;
+        case BlendEquation::SUBTRACT:       return GL_FUNC_SUBTRACT;
+        case BlendEquation::REVER_SUBTRACT: return GL_FUNC_REVERSE_SUBTRACT;
+    }
+    return GL_FUNC_ADD;
+}
+
 [[nodiscard]] std::string joinPainterShaderSources(const std::string_view first, const std::string_view second)
 {
     std::string source;
@@ -50,13 +75,8 @@ Painter::Painter()
 {
     setResolution(g_window.getSize());
 
-    // Pure Vulkan mode (no GL context): no shader programs and no GL state.
-    // The painter lives on as a carrier of resolution/matrices (used e.g. by text layout),
-    // but does not perform a single GL call. On an emergency fallback to GL, main.cpp
-    // creates the Painter from scratch - this time with the programs.
-    if (!g_window.hasGLContext())
-        return;
-
+    // Note setResolution above would otherwise reach glViewport with no context, so
+    // updateGlViewport carries its own hasGLContext() check.
     const auto& getProgram = [](const std::string_view vertexSourceCode, const std::string_view fragmentSourceCode) {
         auto program = std::make_shared<PainterShaderProgram>();
         assert(program);
@@ -71,6 +91,20 @@ Painter::Painter()
     m_drawReplaceColorProgram = getProgram(joinPainterShaderSources(glslMainWithTexCoordsVertexShader, glslPositionOnlyVertexShader), joinPainterShaderSources(glslMainFragmentShader, glslReplaceColorFragmentShader));
     m_drawLineProgram = getProgram(lineVertexShader, lineFragmentShader);
 
+    // No GL context: the four programs above exist but compiled nothing - ShaderProgram guards
+    // every GL entry point on the id it could not create. They are still built rather than
+    // skipped, because a frame compiler names a material by WHICH program a draw bound, and the
+    // replace-colour program is the one every marked creature and highlighted item binds. Leaving
+    // it null cost that material its identity, and cost DrawPool::setShaderProgram its ability to
+    // set any shader at all, since it guards on "is the current one already the replace-colour
+    // program" and null compared equal to null.
+    //
+    // Everything below this point is live GL state, and the painter lives on either way as the
+    // carrier of resolution and matrices that text layout reads. On an emergency fallback to GL,
+    // main.cpp builds a fresh Painter - that one gets real programs.
+    if (!g_window.hasGLContext())
+        return;
+
     PainterShaderProgram::release();
 
     refreshState();
@@ -81,16 +115,30 @@ Painter::Painter()
     PainterShaderProgram::enableAttributeArray(PainterShaderProgram::TEXCOORD_ATTR);
 }
 
-void Painter::drawCoords(const CoordsBuffer& coordsBuffer, DrawMode drawMode)
+void Painter::drawCoords(const CoordsBuffer& coordsBuffer, const DrawMode drawMode)
 {
-    const int vertexCount = coordsBuffer.getVertexCount();
-    if (vertexCount == 0)
+    drawArrays(coordsBuffer.getVertexArray(), coordsBuffer.getTextureCoordArray(),
+               coordsBuffer.getVertexCount(), coordsBuffer.getTextureCoordCount() > 0, drawMode);
+}
+
+// The single draw primitive. drawCoords is the CoordsBuffer-shaped door onto it; GLBackend
+// comes in the other door, with a (positions, texCoords, count) slice of a compiled vertex
+// arena. Deliberately one implementation rather than two: the whole point of Phase 3 is that
+// the compiled path and the legacy path produce the same pixels, and two copies of the uniform
+// upload sequence would be two chances for them not to.
+void Painter::drawArrays(const float* vertices, const float* texCoords, const int vertexCount,
+                         const bool hasTexCoords, const DrawMode drawMode)
+{
+    if (vertexCount == 0 || !vertices)
         return;
 
-    if (coordsBuffer.getTextureCoordCount() > 0 && m_glTextureId == 0)
+    // Texture coordinates with nothing bound to sample: GL draws nothing rather than drawing
+    // the geometry untextured. Load-bearing - it is how a texture that is not resident yet
+    // simply misses a frame instead of appearing as a solid-colour rectangle.
+    if (hasTexCoords && m_glTextureId == 0)
         return;
 
-    const bool textured = coordsBuffer.getTextureCoordCount() > 0 && m_glTextureId > 0;
+    const bool textured = hasTexCoords && m_glTextureId > 0;
 
     m_drawProgram = m_shaderProgram ? m_shaderProgram : textured ? m_drawTexturedProgram.get() : m_drawSolidColorProgram.get();
 
@@ -107,15 +155,15 @@ void Painter::drawCoords(const CoordsBuffer& coordsBuffer, DrawMode drawMode)
     if (textured) {
         m_drawProgram->setTextureMatrix(m_textureMatrix);
         m_drawProgram->bindMultiTextures();
-        m_drawProgram->setAttributeArray(PainterShaderProgram::TEXCOORD_ATTR, coordsBuffer.getTextureCoordArray(), 2);
+        m_drawProgram->setAttributeArray(PainterShaderProgram::TEXCOORD_ATTR, texCoords, 2);
     } else
         PainterShaderProgram::disableAttributeArray(PainterShaderProgram::TEXCOORD_ATTR);
 
     // set vertex array
-    m_drawProgram->setAttributeArray(PainterShaderProgram::VERTEX_ATTR, coordsBuffer.getVertexArray(), 2);
+    m_drawProgram->setAttributeArray(PainterShaderProgram::VERTEX_ATTR, vertices, 2);
 
     // draw the element in coords buffers
-    glDrawArrays(static_cast<GLenum>(drawMode), 0, vertexCount);
+    glDrawArrays(glPrimitiveOf(drawMode), 0, vertexCount);
 
     if (!textured)
         PainterShaderProgram::enableAttributeArray(PainterShaderProgram::TEXCOORD_ATTR);
@@ -301,6 +349,20 @@ void Painter::updateGlClipRect() const
     }
 }
 void Painter::updateGlTexture() const { if (m_glTextureId != 0) glBindTexture(GL_TEXTURE_2D, m_glTextureId); }
-void Painter::updateGlBlendEquation() const { glBlendEquation(static_cast<GLenum>(m_blendEquation)); }
+void Painter::updateGlBlendEquation() const { glBlendEquation(glBlendEquationOf(m_blendEquation)); }
 void Painter::updateGlAlphaWriting() const { glColorMask(1, 1, 1, m_alphaWriting); }
-void Painter::updateGlViewport() const { glViewport(0, 0, m_resolution.width(), m_resolution.height()); }
+void Painter::updateGlViewport() const
+{
+    // Reached from setResolution, which the constructor calls *before* its hasGLContext()
+    // guard - the painter is deliberately kept alive as a carrier of resolution and
+    // matrices even when there is no GL context. Every other GL entry point in this file
+    // is reachable only from a draw, which the render loop already gates.
+    //
+    // This was latent until a second GL-less window appeared: XQuartz's libGL returned
+    // harmlessly when called with no current context, so the stray glViewport went
+    // unnoticed. Apple's OpenGL.framework segfaults instead.
+    if (!g_window.hasGLContext())
+        return;
+
+    glViewport(0, 0, m_resolution.width(), m_resolution.height());
+}

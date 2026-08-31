@@ -33,6 +33,8 @@ struct GraphicsConfig
     // Render backend: "gl" (default, current path) or "vulkan" (new renderer,
     // under construction). With "vulkan" and a failed initialization the client falls back to "gl".
     std::string renderBackend = "gl";
+    // "legacy" keeps the proven DrawPool replay path; "frame" enables the new RenderFrame pipeline.
+    std::string renderPath = "frame";
 };
 
 struct FontConfig

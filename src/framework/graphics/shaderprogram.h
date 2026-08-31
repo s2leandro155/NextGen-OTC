@@ -22,6 +22,8 @@
 
 #pragma once
 
+#include "glutil.h"
+
 #include "declarations.h"
 #include <framework/luaengine/luaobject.h>
 
@@ -107,6 +109,11 @@ public:
 
     bool isLinked() const { return m_linked; }
     uint32_t getProgramId() const { return m_programId; }
+
+    // False when this program compiled nothing because there was no GL context to compile into.
+    // Such a program is not a failure: it exists so that a draw can still say WHICH material it
+    // wanted, which is all a non-OpenGL backend needs from it. See the constructor.
+    bool hasGLProgram() const { return m_programId != 0; }
     size_t hash() const { return m_hash; }
     ShaderList getShaders() { return m_shaders; }
 

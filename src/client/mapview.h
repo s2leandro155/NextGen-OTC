@@ -25,6 +25,7 @@
 #include <framework/graphics/declarations.h>
 #include <framework/luaengine/luaobject.h>
 
+#include "ambientfade.h"
 #include "framework/core/timer.h"
 #include "staticdata.h"
 #include "framework/core/inputevent.h"
@@ -39,6 +40,7 @@ public:
     void drawForeground(const Rect& rect);
     void drawCreatureInformation();
     void preLoad();
+    void updateItemAmbientSounds();
 
     // floor visibility related
     uint8_t getLockedFirstVisibleFloor() const { return m_lockedFirstVisibleFloor; }
@@ -71,6 +73,11 @@ public:
     void setShadowFloorIntensity(const float intensity) { m_shadowFloorIntensity = intensity; updateLight(); }
     float getShadowFloorIntensity() const { return m_shadowFloorIntensity; }
 
+    // "Clouds & Indoor Effect", 0..1: how far roofed tiles darken relative to open air.
+    // 0 is the option switched off; 1 is the full shading its 100% asks for.
+    void setCloudsIndoorIntensity(const float intensity) { m_cloudsIndoorIntensity = intensity; updateLight(); }
+    float getCloudsIndoorIntensity() const { return m_cloudsIndoorIntensity; }
+
     void setDrawNames(const bool enable) { m_drawNames = enable; }
     bool isDrawingNames() const { return m_drawNames; }
 
@@ -97,10 +104,6 @@ public:
     void setDrawOtherNpcIcons(const bool enable) { m_drawOtherNpcIcons = enable; }
     void setDrawOtherMarks(const bool enable) { m_drawOtherMarks = enable; }
     bool isDrawingOwnMarks() const { return m_drawOwnMarks; }
-
-    // smooth zoom: fractional crop of the framebuffer srcRect (1.0 = full visibleDimension view)
-    void setZoomFraction(const float fraction) { m_zoomFraction = std::clamp<float>(fraction, 0.05f, 1.f); requestUpdateMapPosInfo(); }
-    float getZoomFraction() const { return m_zoomFraction; }
 
     void setDrawHarmony(const bool enable) { m_drawHarmony = enable; }
     bool isDrawingHarmony() const { return m_drawHarmony; }
@@ -135,6 +138,18 @@ public:
 
     void setCrosshairTexture(const std::string& texturePath);
     void setAntiAliasingMode(Otc::AntialiasingMode mode);
+
+    // Creature names/bars are drawn in their own pool, after the map blit, so they do not
+    // inherit the map's magnification. When enabled they are scaled to match it, which keeps
+    // them proportional to the sprites instead of shrinking away as the panel grows.
+    void setScaleCreatureInformation(bool enable);
+    bool isScalingCreatureInformation() const { return m_scaleCreatureInformation; }
+    void setZoomFraction(const float fraction) { m_zoomFraction = std::clamp<float>(fraction, 0.05f, 1.f); requestUpdateMapPosInfo(); }
+    float getZoomFraction() const { return m_zoomFraction; }
+
+    // On-screen size of one tile relative to a native sprite pixel, i.e. how much the finished
+    // map is magnified. 1.0 means one sprite pixel per device pixel.
+    float getMapMagnification() const;
 
     void onMouseMove(const Position& mousePos, bool isVirtualMove = false);
     void onKeyRelease(const InputEvent& inputEvent);
@@ -197,9 +212,13 @@ private:
     void updateHighlightTile(const Position& mousePos);
     void destroyHighlightTile();
 
+    AmbientFade::Value blendedAmbient() const;
+    void updateAmbientFade();
+
     void updateLight();
     void updateViewportDirectionCache();
     void updateGeometry(const Size& visibleDimension);
+    float getIdealRenderScale(const Size& visibleDimension) const;
     void updateVisibleTiles();
     void updateRect(const Rect& rect);
     void updateViewport(const Otc::Direction dir = Otc::InvalidDirection) { m_viewport = m_viewPortDirection[dir]; }
@@ -207,6 +226,11 @@ private:
     void requestUpdateMapPosInfo() { m_updateMapPosInfo = true; }
 
     void registerEvents();
+
+    // States the map-shader composition as data, alongside the callback that performs it.
+    // Read-only with respect to the shader-switch state machine: the callback still owns
+    // that, so declaring costs the GL path nothing but a few float divisions.
+    void declareCompositionMaterial() const;
 
     uint8_t calcFirstVisibleFloor(bool checkLimitsFloorsView) const;
     uint8_t calcLastVisibleFloor() const;
@@ -250,14 +274,26 @@ private:
     uint16_t m_floorFading = 500;
 
     float m_minimumAmbientLight{ 0 };
+
+    // Endpoints of the world-light cross-fade and the clock it runs on. `from` is whatever the
+    // light was when the last server value landed - not the last value itself - so a fade
+    // interrupted mid-way continues from where the eye left it.
+    AmbientFade::Value m_ambientFrom;
+    AmbientFade::Value m_ambientTo;
+    Timer m_ambientFadeTimer;
+    bool m_ambientFading{ false };
+    bool m_ambientSeeded{ false };
+
     float m_fadeInTime{ 0 };
     float m_fadeOutTime{ 0 };
     float m_shadowFloorIntensity{ 0 };
+    float m_cloudsIndoorIntensity{ 0 };
 
     Rect m_rectDimension;
 
     Size m_drawDimension;
     Size m_visibleDimension;
+    Size m_lastFrameBufferSize;
 
     Point m_virtualCenterOffset;
     Point m_moveOffset;
@@ -274,6 +310,7 @@ private:
     bool m_updateVisibleTiles{ true };
     bool m_updateMapPosInfo{ true };
     bool m_resetCoveredCache{ true };
+    bool m_resetIndoorCache{ true };
     bool m_shaderSwitchDone{ true };
     bool m_drawHealthBars{ true };
     bool m_drawOwnName{ true };
@@ -285,10 +322,13 @@ private:
     bool m_drawOtherHealthBars{ true };
     bool m_drawOtherNpcIcons{ true };
     bool m_drawOtherMarks{ true };
-    float m_zoomFraction{ 1.f };
     bool m_drawManaBar{ true };
     bool m_drawNames{ true };
     bool m_smooth{ true };
+    // Keep creature names, health bars and icons at the classic 1:1 client size.
+    // Scaling them with the enlarged framebuffer makes every overhead label oversized.
+    bool m_scaleCreatureInformation{ false };
+    float m_zoomFraction{ 1.f };
     bool m_follow{ true };
     bool m_drawingLight{ true };
     bool m_drawHarmony{ true };
@@ -308,6 +348,22 @@ private:
     Otc::AntialiasingMode m_antiAliasingMode{ Otc::ANTIALIASING_DISABLED };
 
     std::vector<FloorData> m_floors;
+
+    // Item ambients: item client id -> the soundbank entries it feeds. Only the
+    // map knows what is on screen, so the counting happens here and the sound
+    // framework is handed nothing but numbers.
+    stdext::map<uint16_t, std::vector<uint8_t>> m_itemAmbientIndex;
+    std::vector<uint16_t> m_itemAmbientCounts;
+    // Items that matched a query but fell outside its radius. Still on screen,
+    // so a loop they fed is worth holding rather than restarting.
+    std::vector<uint16_t> m_itemAmbientNearby;
+    // Widest radius any query asks for, plus the near margin: how far the map
+    // is walked. Recomputed with the index, on a soundbank change.
+    uint32_t m_itemAmbientReach{ 0 };
+    // Debug only: last traced answer per query, so tracing reports changes.
+    std::vector<uint16_t> m_itemAmbientDebugLast;
+    uint32_t m_itemAmbientGeneration{ 0 };
+    Timer m_itemAmbientTimer;
     std::vector<std::vector<FloorData>> m_floorThreads;
 
     std::vector<TilePtr> m_foregroundTiles;

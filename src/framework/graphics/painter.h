@@ -35,6 +35,11 @@ public:
     void clearRect(const Color& color, const Rect& rect);
 
     void drawCoords(const CoordsBuffer& coordsBuffer, DrawMode drawMode = DrawMode::TRIANGLES);
+
+    // The primitive drawCoords delegates to, taking geometry as two parallel float2 arrays
+    // rather than as a CoordsBuffer - which is the shape a compiled VertexArena slice has.
+    void drawArrays(const float* vertices, const float* texCoords, int vertexCount,
+                    bool hasTexCoords, DrawMode drawMode = DrawMode::TRIANGLES);
     void drawLine(const std::vector<float>& vertex, int size, int width) const;
 
     float getOpacity() const { return m_opacity; }
@@ -80,7 +85,12 @@ public:
     void resetColor() { setColor(Color::white); }
     void resetShaderProgram() { setShaderProgram(nullptr); }
     void resetTransformMatrix() { setTransformMatrix(DEFAULT_MATRIX3); }
-    bool isReplaceColorShader(const PainterShaderProgram* shader) const { return m_drawReplaceColorProgram.get() == shader; }
+    // The null check is not redundant. DrawPool::setShaderProgram asks this about the CURRENT
+    // state's shader, which is null by default - so without it, a configuration where the
+    // replace-colour program itself is null would answer "yes, it is already set" to every
+    // question and silently refuse to set any shader at all.
+    bool isReplaceColorShader(const PainterShaderProgram* shader) const
+    { return shader != nullptr && m_drawReplaceColorProgram.get() == shader; }
 
 protected:
     void refreshState() const;
