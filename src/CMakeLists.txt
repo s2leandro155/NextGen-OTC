@@ -603,6 +603,16 @@ target_link_libraries(
   unofficial::inih::inireader
 )
 
+# The local protobuf target owns the protoc custom commands that generate
+# appearances.pb.*, sounds.pb.* and staticdata.pb.*. Linking only against
+# protobuf::libprotobuf gives us the runtime library, but neither the generated
+# include directory nor a build-order dependency. That race is visible on clean
+# builds (notably the Windows Server GitHub runner), where soundmanager.cpp may
+# be compiled before sounds.pb.h exists.
+if(TOGGLE_FRAMEWORK_PROTOBUF)
+  target_link_libraries(otclient_core PUBLIC protobuf)
+endif()
+
 if(NOT MSVC)
   target_link_options(otclient_core PUBLIC -flto=auto)
 endif()

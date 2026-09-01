@@ -64,7 +64,18 @@ jobs:
 
       - name: Build client
         shell: pwsh
-        run: cmake --build build/windows-server --target otclient
+        run: |
+          # Build and verify the generated protocol headers explicitly. The
+          # otclient_core target also depends on this target in CMake, so this
+          # step doubles as an early, clear diagnostic if protoc ever breaks.
+          cmake --build build/windows-server --target protobuf
+
+          $soundsHeader = "$env:GITHUB_WORKSPACE/build/windows-server/src/protobuf/sounds.pb.h"
+          if (-not (Test-Path -LiteralPath $soundsHeader)) {
+            throw "Protobuf generation did not create $soundsHeader"
+          }
+
+          cmake --build build/windows-server --target otclient
 
       - name: Prepare runnable package
         shell: pwsh
