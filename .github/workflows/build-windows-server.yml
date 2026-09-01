@@ -1,0 +1,98 @@
+name: Build - Windows Server OpenGL
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CMAKE_BUILD_PARALLEL_LEVEL: 2
+  VCPKG_BINARY_SOURCES: "clear;files,${{ github.workspace }}/.vcpkg-binary-cache,readwrite"
+
+jobs:
+  build-windows-server:
+    name: windows-server-opengl-x64
+    runs-on: windows-2022
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Read vcpkg baseline
+        id: vcpkg
+        shell: pwsh
+        run: |
+          $json = Get-Content vcpkg.json -Raw | ConvertFrom-Json
+          $commit = $json.'builtin-baseline'
+          if ($commit -notmatch '^[0-9a-f]{40}$') {
+            throw 'vcpkg.json must contain a full 40-character builtin-baseline.'
+          }
+          "commit=$commit" >> $env:GITHUB_OUTPUT
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ github.workspace }}/.vcpkg-binary-cache
+            ${{ github.workspace }}/build/windows-server/vcpkg_installed
+            ${{ github.workspace }}/vcpkg/downloads
+            ${{ github.workspace }}/vcpkg/packages
+          key: windows-server-vcpkg-${{ hashFiles('vcpkg.json') }}
+
+      - name: Install vcpkg
+        uses: lukka/run-vcpkg@a400452f634fe49e9f18d388aeb1809dcc642136
+        with:
+          vcpkgGitCommitId: ${{ steps.vcpkg.outputs.commit }}
+
+      - name: Install CMake and Ninja
+        uses: lukka/get-cmake@v3.31.6
+
+      - name: Set up MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Configure OpenGL client for Windows Server
+        shell: pwsh
+        run: |
+          cmake -S . -B build/windows-server -G Ninja `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_TOOLCHAIN_FILE="$env:GITHUB_WORKSPACE/vcpkg/scripts/buildsystems/vcpkg.cmake" `
+            -DVCPKG_TARGET_TRIPLET=x64-windows-static `
+            -DOTCLIENT_WINDOWS_TARGET=0x0601 `
+            -DBUILD_TESTING=OFF
+
+      - name: Build client
+        shell: pwsh
+        run: cmake --build build/windows-server --target otclient
+
+      - name: Prepare runnable package
+        shell: pwsh
+        run: |
+          $artifact = "$env:GITHUB_WORKSPACE/artifacts/windows-server"
+          New-Item -ItemType Directory -Force -Path $artifact | Out-Null
+
+          $exe = @(
+            "$env:GITHUB_WORKSPACE/otclient.exe",
+            "$env:GITHUB_WORKSPACE/build/windows-server/bin/otclient.exe"
+          ) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+
+          if (-not $exe) {
+            throw 'The main otclient.exe was not generated.'
+          }
+
+          Copy-Item -LiteralPath $exe -Destination "$artifact/CrystalOTC-WindowsServer.exe"
+          Get-ChildItem -LiteralPath (Split-Path $exe) -Filter '*.dll' -ErrorAction SilentlyContinue |
+            Copy-Item -Destination $artifact
+
+          foreach ($item in @('init.lua', 'data', 'modules', 'mods')) {
+            if (Test-Path -LiteralPath $item) {
+              Copy-Item -LiteralPath $item -Destination $artifact -Recurse -Force
+            }
+          }
+
+      - name: Upload Windows Server package
+        uses: actions/upload-artifact@v4
+        with:
+          name: CrystalOTC-WindowsServer-OpenGL-x64
+          path: artifacts/windows-server
+          if-no-files-found: error

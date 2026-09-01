@@ -564,23 +564,30 @@ MarketMainWindow < Panel
 
   TextList
     id: itemList
-    size: 160 263
+    size: 160 258
     anchors.top: prev.bottom
     anchors.left: parent.left
-    margin-top: 3
+    margin-top: 5
     text-wrap: true
     vertical-scrollbar: itemListScroll
+    keep-scroll-range: true
+    layout:
+      type: verticalBox
+      cell-size: 160 36
+      flow: true
+    image-source: /images/ui/1pixel-down-frame
+    image-border: 5
     background-color: #404040
-    border-width: 1
-    border-color-top: #141414
-    border-color-left: #141414
-    border-color-bottom: #747575
-    border-color-right: #747575
+    border-width: 0
+    padding-left: 1
+    padding-top: 1
+    padding-bottom: 1
+    step: 1
     @onSetup: |
       g_keyboard.bindKeyPress('Up', function() focusPrevItemWidget(self) end, self)
       g_keyboard.bindKeyPress('Down', function() focusNextItemWidget(self) end, self)
 
-  VerticalScrollBar
+  VerticalQtScrollBar
     id: itemListScroll
     anchors.top: prev.top
     anchors.bottom: prev.bottom

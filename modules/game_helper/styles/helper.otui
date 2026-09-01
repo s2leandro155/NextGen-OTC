@@ -1306,7 +1306,7 @@ ToolsPanel < Panel
         id: toolsLabel
         anchors.top: prev.bottom
         anchors.left: parent.left
-        !text: tr('Exercise Training')
+        !text: tr('Auto SSA')
         font: Verdana Bold-11px
         color: #c0c0c0
         text-auto-resize: true
@@ -1319,9 +1319,7 @@ ToolsPanel < Panel
         margin-top: 7
         margin-left: 2
         image-source: /images/game/actionbar/actionbarslot
-        @onClick: updateButton(self)
-        @onHoverChange: updateButton(self)
-        @onMouseRelease: updateButton(self)
+        item-id: 3081
       CheckBox
         id: autoTrainingCheck
         width: 100
@@ -1332,7 +1330,7 @@ ToolsPanel < Panel
         font: Verdana Bold-11px
         color: #c0c0c0
         text-offset: 13 -3
-        @onCheckChange: modules.game_helper.toggleExerciseTraining(self:isChecked())
+        @onCheckChange: modules.game_helper.toggleAutoSSA(self:isChecked())
         change-cursor-image: false
         $hover !disabled:
         color: #c0c0c0
@@ -1346,6 +1344,7 @@ ToolsPanel < Panel
         color: #c0c0c0
         text-offset: -10 0
         enabled: false
+        visible: false
         @onSetup: |
           self:addOption("")
           self:setCurrentOption("")
@@ -1356,7 +1355,7 @@ ToolsPanel < Panel
         margin-left: 5
         margin-top: 4
         image-source: /images/skin/show-gui-help-grey
-        !tooltip: tr('Feature is being developed.')
+        !tooltip: tr('Automatically equips a Stone Skin Amulet when the amulet slot is empty or another amulet is equipped.')
     VerticalSeparator
       id: separator1
       anchors.top: toolsTitle.bottom
@@ -1427,7 +1426,7 @@ ToolsPanel < Panel
         id: toolsLabel2
         anchors.top: prev.bottom
         anchors.left: parent.left
-        !text: tr('Auto Eat Food')
+        !text: tr('Auto Might Ring')
         font: Verdana Bold-11px
         color: #c0c0c0
         text-auto-resize: true
@@ -1439,7 +1438,7 @@ ToolsPanel < Panel
         margin-left: 5
         margin-top: 2
         image-source: /images/skin/show-gui-help-grey
-        !tooltip: tr('Select a food item, then choose the minimum food time.\nWhen your food time drops below it, the chosen food is eaten automatically.')
+        !tooltip: tr('Automatically equips a Might Ring when the ring slot is empty or another ring is equipped.')
       UIButton
         id: autoFoodItem
         size: 34 34
@@ -1448,8 +1447,7 @@ ToolsPanel < Panel
         margin-top: 7
         margin-left: 2
         image-source: /images/game/actionbar/actionbarslot
-        @onClick: updateButton(self)
-        @onMouseRelease: updateButton(self)
+        item-id: 3048
       CheckBox
         id: autoFoodCheck
         width: 100
@@ -1460,7 +1458,7 @@ ToolsPanel < Panel
         font: Verdana Bold-11px
         color: #c0c0c0
         text-offset: 13 -3
-        @onCheckChange: modules.game_helper.toggleAutoEat(self:isChecked())
+        @onCheckChange: modules.game_helper.toggleAutoMightRing(self:isChecked())
         change-cursor-image: false
         $hover !disabled:
           color: #c0c0c0
@@ -1473,7 +1471,8 @@ ToolsPanel < Panel
         margin-left: 5
         color: #c0c0c0
         text-offset: -10 0
-        @onOptionChange: modules.game_helper.setAutoFoodMinTime(self:getCurrentOption().text)
+        visible: false
+        enabled: false
         @onSetup: |
           self:addOption("1min")
           self:addOption("2min")

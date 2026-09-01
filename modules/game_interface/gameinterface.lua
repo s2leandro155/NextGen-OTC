@@ -928,7 +928,7 @@ end
 
 function saveSidebarsBeforeLogout()
 	if SidebarPersistence and SidebarPersistence.saveNow then
-		SidebarPersistence.saveNow()
+		SidebarPersistence.saveNow(true)
 	end
 end
 
@@ -2671,6 +2671,23 @@ function createThingMenu(menuPosition, lookThing, useThing, creatureThing, mapTi
 		menu:addOption(tr(optionText .. " loot list"), function()
 			actionFunction(lookThing:getId())
 		end)
+
+		-- Quick Loot and the NPC Sell All blacklist are independent: one decides
+		-- what to collect and the other what must never be sold. Expose both in
+		-- the same item context menu so adding loot does not silently risk it.
+		if modules.game_npcmodal and modules.game_npcmodal.isSellAllIgnoredItem then
+			local itemId = lookThing:getId()
+			local ignoredForSellAll = modules.game_npcmodal.isSellAllIgnoredItem(itemId)
+			local sellAllOption = ignoredForSellAll and "Remove from Sell All BlackList" or "Add to Sell All BlackList"
+
+			menu:addOption(tr(sellAllOption), function()
+				if ignoredForSellAll then
+					modules.game_npcmodal.removeSellAllIgnoredItem(itemId)
+				else
+					modules.game_npcmodal.addSellAllIgnoredItem(itemId)
+				end
+			end)
+		end
 	end
 
 	if isSupplyStashMenuAvailable() then

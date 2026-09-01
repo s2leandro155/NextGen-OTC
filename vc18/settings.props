@@ -5,8 +5,8 @@
     <PREPROCESSOR_DEFS>
         WIN32;
         _CRT_SECURE_NO_WARNINGS;
-        _WIN32_WINNT=0x0600;
-        NTDDI_VERSION=0x06000000;
+        _WIN32_WINNT=0x0A00;
+        NTDDI_VERSION=0x0A000000;
         CRASH_HANDLER;
         FRAMEWORK_GRAPHICS;
         FRAMEWORK_NET;
@@ -23,7 +23,7 @@
         dbghelp.lib;
         gdi32.lib;
         discord-rpc.lib;
-        glew32.lib;
+        libglew32.lib;
         kernel32.lib;
         ole32.lib;
         physfs-static.lib;
@@ -41,7 +41,7 @@
         vorbis.lib;
         vorbisfile.lib;
         pugixml.lib;
-        zlib.lib;
+        zs.lib;
     </OTCLIENT_LIBDEPS>
 
     <OTCLIENT_LIBDEPS_D>
@@ -50,7 +50,7 @@
         discord-rpc.lib;
         dbghelp.lib;
         gdi32.lib;
-        glew32d.lib;
+        libglew32d.lib;
         kernel32.lib;
         ole32.lib;
         lua51.lib;
@@ -67,7 +67,7 @@
         vorbisfile.lib;
         winmm.lib;
         pugixml.lib;
-        zlibd.lib;
+        zsd.lib;
         openal32.lib;
     </OTCLIENT_LIBDEPS_D>
   </PropertyGroup>

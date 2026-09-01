@@ -35,6 +35,7 @@ class ThingTypeManager
 public:
     void init();
     void terminate();
+    void unloadTextures();
 
     bool loadDat(std::string file);
     bool loadOtml(std::string file);

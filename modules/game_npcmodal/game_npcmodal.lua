@@ -38,12 +38,16 @@ local npcTradeSelectedEntry, npcTradeLookThing
 local npcTradeCurrentUnitPrice = 0
 local npcTradeQuantity = 0
 local sellAllModal, sellAllButton, sellAllPendingEvent
+local sellAllQueue, sellAllQueueIndex, sellAllRunId = {}, 0, 0
+local cancelSellAll, continueSellAllAfterPlayerGoods
+local quickSellWindow, quickSellBlacklistWindow
 
 lootPouchItems = {}
 sellAllIgnoredItems = {}
 
 local FilterText2 = ""
 local FilterText3 = ""
+local sellAllActiveTab = "sell"
 
 local function isSameNpcTradeItem(itemA, itemB)
 	if not itemA or not itemB then
@@ -213,12 +217,38 @@ local function playerHasLootPouch()
 	return next(lootPouchItems) ~= nil
 end
 
+local function isGoldenBuyerTrade()
+	if npcNameLabel and not npcNameLabel:isDestroyed() then
+		local npcName = tostring(npcNameLabel:getText() or ""):lower()
+		if npcName:find("golden buyer", 1, true) then
+			return true
+		end
+	end
+
+	-- When two NPCs are in range, the modal may keep the first NPC's title
+	-- (for example Quentin) even though the trade packet came from Golden
+	-- Buyer. "all loot in pouch" is exclusive to Golden Buyer's offer list,
+	-- so use it as a stable fallback instead of relying only on the title.
+	for _, entries in ipairs({ BuyNpcTradeItems or {}, SellNpcTradeItems or {} }) do
+		for _, entry in ipairs(entries) do
+			local offerName = tostring(entry.name or ""):lower()
+			if offerName:find("all loot in pouch", 1, true) then
+				return true
+			end
+		end
+	end
+
+	return false
+end
+
 local function refreshSellAllButtonVisibility()
 	if not sellAllButton or sellAllButton:isDestroyed() then
 		return
 	end
 
-	sellAllButton:setVisible(npcModalTrade and playerHasLootPouch())
+	-- The loot-pouch market is a Golden Buyer feature. Other NPC shops keep
+	-- the standard trade window even when the player is carrying a loot pouch.
+	sellAllButton:setVisible(npcModalTrade and isGoldenBuyerTrade())
 end
 
 local function getEquippedItemCounts()
@@ -561,6 +591,46 @@ local function loadSellAllIgnoreList()
 	if needResaveFormat then
 		saveSellAllIgnoreList()
 	end
+end
+
+function isSellAllIgnoredItem(itemId)
+	itemId = tonumber(itemId)
+
+	return itemId ~= nil and sellAllIgnoredItems[itemId] == true
+end
+
+function addSellAllIgnoredItem(itemId)
+	itemId = tonumber(itemId)
+
+	if not itemId or itemId <= 0 then
+		return false
+	end
+
+	sellAllIgnoredItems[itemId] = true
+	saveSellAllIgnoreList()
+
+	if sellAllModal and not sellAllModal:isDestroyed() and sellAllModal:isVisible() then
+		refreshSellAllModalLists()
+	end
+
+	return true
+end
+
+function removeSellAllIgnoredItem(itemId)
+	itemId = tonumber(itemId)
+
+	if not itemId or itemId <= 0 then
+		return false
+	end
+
+	sellAllIgnoredItems[itemId] = nil
+	saveSellAllIgnoreList()
+
+	if sellAllModal and not sellAllModal:isDestroyed() and sellAllModal:isVisible() then
+		refreshSellAllModalLists()
+	end
+
+	return true
 end
 
 local refreshNpcTradeItemList, revalidateNpcTradeQuantity
@@ -1602,6 +1672,8 @@ end
 
 function init()
 	g_ui.importStyle("game_npcmodal")
+	g_ui.importStyle("/modules/styles/quicksell.otui")
+	g_ui.importStyle("/modules/styles/blacklist.otui")
 	connect(g_game, {
 		onGameStart = npcModalOnSellAllGameStart,
 		onGameEnd = closeNpcModal,
@@ -1677,9 +1749,8 @@ function init()
 end
 
 function terminate()
-	if sellAllPendingEvent then
-		sellAllPendingEvent:cancel()
-		sellAllPendingEvent = nil
+	if cancelSellAll then
+		cancelSellAll()
 	end
 
 	saveSellAllIgnoreList()
@@ -1711,6 +1782,10 @@ function terminate()
 end
 
 function closeNpcModal()
+	if cancelSellAll then
+		cancelSellAll()
+	end
+
 	saveSellAllIgnoreList()
 
 	if modules.game_console and modules.game_console.detachConsoleTextEditFromNpcModal then
@@ -1885,6 +1960,10 @@ function sendNpcModal(data)
 end
 
 local function onCloseNpcTrade()
+	if cancelSellAll then
+		cancelSellAll()
+	end
+
 	if not npcModalTrade then
 		npcTradeCurrencyId = nil
 
@@ -1989,6 +2068,10 @@ function sendNpcTrade(items, currencyId)
 		sellButton:setOn(false)
 	end
 
+	if isGoldenBuyerTrade() and npcNameLabel and not npcNameLabel:isDestroyed() then
+		npcNameLabel:setText("Golden Buyer")
+	end
+
 	refreshNpcTradeItemList()
 	showTradeWindow()
 	refreshNpcTradeCurrencyState()
@@ -2063,6 +2146,13 @@ function onPlayerGoods(money, items, lootPouch)
 	end
 
 	refreshSellAllButtonVisibility()
+
+	-- A player-goods packet is the server acknowledgement that the previous
+	-- NPC sale was processed. Advance the queue from that acknowledgement
+	-- instead of guessing the shop cooldown with a fixed delay.
+	if continueSellAllAfterPlayerGoods then
+		continueSellAllAfterPlayerGoods()
+	end
 end
 
 local function handleSearchField()
@@ -2186,6 +2276,11 @@ local function createSellAllItemBox(panel, itemId, amount, panelKind)
 	icon:setItemCount(amount)
 
 	if panelKind == "sell" then
+		local selectedMark = box:recursiveGetChildById("selectedMark")
+		if selectedMark then
+			selectedMark:show()
+			selectedMark:raise()
+		end
 		local function onDc()
 			if not box.sellAllItemId then
 				return false
@@ -2201,8 +2296,8 @@ local function createSellAllItemBox(panel, itemId, amount, panelKind)
 			return true
 		end
 
-		box.onDoubleClick = onDc
-		icon.onDoubleClick = onDc
+		box.onClick = onDc
+		icon.onClick = onDc
 	elseif panelKind == "ignore" then
 		local border = box:recursiveGetChildById("ignoredBorder")
 
@@ -2228,9 +2323,17 @@ local function createSellAllItemBox(panel, itemId, amount, panelKind)
 			return true
 		end
 
-		box.onDoubleClick = onDc
-		icon.onDoubleClick = onDc
+		box.onClick = onDc
+		icon.onClick = onDc
 	end
+end
+
+function setSellAllTab(tab)
+	sellAllActiveTab = tab == "blacklist" and "blacklist" or "sell"
+	FilterText2 = ""
+	local search = sellAllModal and sellAllModal:recursiveGetChildById("search2")
+	if search then search:clearText() end
+	refreshSellAllModalLists()
 end
 
 function refreshSellAllModalLists()
@@ -2239,25 +2342,39 @@ function refreshSellAllModalLists()
 	end
 
 	local sellItemsPanel = sellAllModal:recursiveGetChildById("npcSellItemsPanel")
-	local ignorePanel = sellAllModal:recursiveGetChildById("npcIgnoreItemsPanel")
 
-	if not sellItemsPanel or not ignorePanel then
+	if not sellItemsPanel then
 		return
 	end
 
 	sellItemsPanel:destroyChildren()
-	ignorePanel:destroyChildren()
+	local sellTab = sellAllModal:recursiveGetChildById("sellTab")
+	local blacklistTab = sellAllModal:recursiveGetChildById("blacklistTab")
+	local sellTabIcon = sellAllModal:recursiveGetChildById("sellTabIcon")
+	local blacklistTabIcon = sellAllModal:recursiveGetChildById("blacklistTabIcon")
+	if sellTab then sellTab:setChecked(sellAllActiveTab == "sell") end
+	if blacklistTab then blacklistTab:setChecked(sellAllActiveTab == "blacklist") end
+	if sellTabIcon then sellTabIcon:setMarginTop(sellAllActiveTab == "sell" and 3 or 0) end
+	if blacklistTabIcon then blacklistTabIcon:setMarginTop(sellAllActiveTab == "blacklist" and 3 or 0) end
 
 	local tempSellAllItems = {}
 
-	for itemId, amount in pairs(lootPouchItems) do
-		if sellAllIgnoredItems[itemId] == nil or sellAllIgnoredItems[itemId] == false then
-			tempSellAllItems[itemId] = lootPouchItems[itemId]
+	-- RubinOT builds Quick Sell from the regular player-goods packet. That
+	-- packet already contains the sellable items from backpacks/loot pouch in
+	-- this server, while the optional third lootPouch argument is not emitted.
+	for _, entry in ipairs(SellNpcTradeItems or {}) do
+		if entry.item then
+			local itemId = entry.item:getId()
+			local amount = getSellablePlayerItemCount(itemId)
+			if amount > 0 and sellAllIgnoredItems[itemId] ~= true then
+				tempSellAllItems[itemId] = amount
+			end
 		end
 	end
 
 	table.sort(tempSellAllItems)
 
+	if sellAllActiveTab == "sell" then
 	for itemId, total in pairs(tempSellAllItems) do
 		local thing = g_things.getThingType(itemId, ThingCategoryItem)
 		local itemName = thing:getName()
@@ -2270,7 +2387,7 @@ function refreshSellAllModalLists()
 			createSellAllItemBox(sellItemsPanel, itemId, total, "sell")
 		end
 	end
-
+	else
 	for itemId, active in pairs(sellAllIgnoredItems) do
 		if active == true then
 			local thing = g_things.getThingType(itemId, ThingCategoryItem)
@@ -2278,16 +2395,40 @@ function refreshSellAllModalLists()
 
 			itemName = tostring(itemName):lower()
 
-			local filter3 = tostring(FilterText3 or ""):lower()
+			local filter3 = tostring(FilterText2 or ""):lower()
 
 			if filter3 == "" or itemName:find(filter3, 1, true) then
-				createSellAllItemBox(ignorePanel, itemId, 0, "ignore")
+				createSellAllItemBox(sellItemsPanel, itemId, 0, "ignore")
 			end
 		end
 	end
+	end
+
+	local totalValue = 0
+	for _, entry in ipairs(SellNpcTradeItems or {}) do
+		if entry.item and sellAllIgnoredItems[entry.item:getId()] ~= true then
+			totalValue = totalValue + (getSellablePlayerItemCount(entry.item:getId()) * (entry.sellPrice or 0))
+		end
+	end
+	local value = sellAllModal:recursiveGetChildById("value")
+	if value then value:setText(formatNumberWithCommas(totalValue)) end
 end
 
 function closeSellAllWindow()
+	if cancelSellAll then
+		cancelSellAll()
+	end
+
+	if quickSellWindow then
+		quickSellWindow:destroy()
+		quickSellWindow = nil
+	end
+
+	if quickSellBlacklistWindow then
+		quickSellBlacklistWindow:destroy()
+		quickSellBlacklistWindow = nil
+	end
+
 	if sellAllModal then
 		sellAllModal:hide()
 	end
@@ -2299,9 +2440,111 @@ function closeSellAllWindow()
 	setWindowOpacity(1)
 end
 
+local function getGoldenBuyerQuickSellItems(includeIgnored)
+	local result = {}
+	local added = {}
+
+	for _, entry in ipairs(SellNpcTradeItems or {}) do
+		if entry.item then
+			local itemId = entry.item:getId()
+			local amount = getSellablePlayerItemCount(itemId)
+			if amount > 0 and not added[itemId] and (includeIgnored or sellAllIgnoredItems[itemId] ~= true) then
+				added[itemId] = true
+				table.insert(result, {
+					item = entry.item,
+					itemId = itemId,
+					amount = amount,
+					name = entry.name or tostring(g_things.getThingType(itemId, ThingCategoryItem):getName()),
+					price = entry.sellPrice or 0
+				})
+			end
+		end
+	end
+
+	table.sort(result, function(a, b)
+		return tostring(a.name):lower() < tostring(b.name):lower()
+	end)
+	return result
+end
+
+local function openGoldenBuyerBlacklist(reopenQuickSell)
+	if quickSellBlacklistWindow then
+		quickSellBlacklistWindow:destroy()
+	end
+
+	quickSellBlacklistWindow = g_ui.createWidget("BlackListWindow", rootWidget)
+	local window = quickSellBlacklistWindow
+	local list = window and window:recursiveGetChildById("itemsList")
+	local closeButton = window and window:recursiveGetChildById("closeButton")
+
+	if not window or not list then
+		return
+	end
+
+	for itemId, ignored in pairs(sellAllIgnoredItems) do
+		if ignored == true then
+			local row = g_ui.createWidget("QuickSellItemBox", list)
+			local thing = g_things.getThingType(itemId, ThingCategoryItem)
+			row:recursiveGetChildById("itemName"):setText(tostring(thing:getName()))
+			row:recursiveGetChildById("itemId"):setItemId(itemId)
+			row:recursiveGetChildById("buttonItemClear").onClick = function()
+				sellAllIgnoredItems[itemId] = false
+				saveSellAllIgnoreList()
+				row:destroy()
+			end
+		end
+	end
+
+	local function closeBlacklist()
+		if quickSellBlacklistWindow then
+			quickSellBlacklistWindow:destroy()
+			quickSellBlacklistWindow = nil
+		end
+		if reopenQuickSell then
+			addEvent(openSellAllWindow)
+		end
+	end
+
+	if closeButton then
+		closeButton.onClick = closeBlacklist
+	end
+	window.onEscape = closeBlacklist
+	window:show()
+	window:raise()
+	window:focus()
+end
+
 function openSellAllWindow()
-	-- One click sells the complete loot pouch through the NPC's special offer.
-	sendSellAll()
+	if quickSellWindow then
+		quickSellWindow:destroy()
+		quickSellWindow = nil
+	end
+	if quickSellBlacklistWindow then
+		quickSellBlacklistWindow:destroy()
+		quickSellBlacklistWindow = nil
+	end
+
+	if not sellAllModal then
+		return
+	end
+
+	loadSellAllIgnoreList()
+	FilterText2 = ""
+	FilterText3 = ""
+	sellAllActiveTab = "sell"
+
+	local searchSell = sellAllModal:recursiveGetChildById("search2")
+	if searchSell then searchSell:clearText() end
+
+	refreshSellAllModalLists()
+	mainNpcModal:hide()
+	if npcOutfit then npcOutfit:hide() end
+	if npcNameLabel then npcNameLabel:hide() end
+	setWindowOpacity(1)
+
+	sellAllModal:show()
+	sellAllModal:raise()
+	sellAllModal:focus()
 end
 
 function sendSellAll()
@@ -2313,51 +2556,163 @@ function sendSellAll()
 		return
 	end
 
-	local pouchOffer = nil
+	local sellQueue = {}
+	local queuedItemIds = {}
+	local maxAmountPerRequest = 100
+
+	if g_game.getFeature and g_game.getFeature(GameDoubleShopSellAmount) then
+		maxAmountPerRequest = 10000
+	end
+
 	for _, entry in ipairs(SellNpcTradeItems or {}) do
-		if entry.item and entry.item:getId() == LOOT_POUCH_ITEM_ID then
-			pouchOffer = entry.item
-			break
-		end
-	end
+		if entry.item then
+			local itemId = entry.item:getId()
+			local amount = getSellablePlayerItemCount(itemId)
+			if amount > 0 and sellAllIgnoredItems[itemId] ~= true and not queuedItemIds[itemId] then
+				queuedItemIds[itemId] = true
 
-	if not pouchOffer and g_game.findPlayerItem then
-		pouchOffer = g_game.findPlayerItem(LOOT_POUCH_ITEM_ID, -1, 0)
-	end
-
-	if not pouchOffer then
-		local player = g_game.getLocalPlayer()
-
-		if player then
-			for slot = InventorySlotFirst or 1, InventorySlotLast or 10 do
-				local inventoryItem = player:getInventoryItem(slot)
-
-				if inventoryItem and inventoryItem:getId() == LOOT_POUCH_ITEM_ID then
-					pouchOffer = inventoryItem
-					break
-				end
+				-- Keep one queue entry per item. Expanding a large loot-pouch amount
+				-- into thousands of Lua table entries here freezes the UI before the
+				-- first sale is even sent. Chunks are calculated lazily below.
+				table.insert(sellQueue, { item = entry.item, remaining = amount })
 			end
 		end
 	end
 
-	if not pouchOffer then
+	if #sellQueue == 0 then
 		return
 	end
 
-	if sellAllButton and not sellAllButton:isDestroyed() then
-		sellAllButton:setEnabled(false)
+	local function setSellAllButtonsEnabled(enabled)
+		if sellAllButton and not sellAllButton:isDestroyed() then
+			sellAllButton:setEnabled(enabled)
+		end
+
+		local modalButton = sellAllModal and sellAllModal:recursiveGetChildById("sellAllButton")
+		if modalButton and not modalButton:isDestroyed() then
+			modalButton:setEnabled(enabled)
+		end
 	end
 
-	-- NPC chat/trade opening shares the action cooldown. Waiting one interval
-	-- prevents an immediate click from being rejected as "objects too fast".
-	sellAllPendingEvent = scheduleEvent(function()
+	setSellAllButtonsEnabled(false)
+	sellAllQueue = sellQueue
+	sellAllQueueIndex = 0
+	sellAllRunId = sellAllRunId + 1
+	local thisRunId = sellAllRunId
+
+	local function finishSale()
+		if thisRunId ~= sellAllRunId then
+			return
+		end
+
 		sellAllPendingEvent = nil
-		if g_game.isOnline() then
-			g_game.sellItem(pouchOffer, 1, true)
+		sellAllQueue = {}
+		sellAllQueueIndex = 0
+		continueSellAllAfterPlayerGoods = nil
+		setSellAllButtonsEnabled(true)
+
+		if sellAllModal and not sellAllModal:isDestroyed() and sellAllModal:isVisible() then
+			refreshSellAllModalLists()
 		end
-		if sellAllButton and not sellAllButton:isDestroyed() then
-			sellAllButton:setEnabled(true)
+	end
+
+	local function sellNextChunk()
+		sellAllPendingEvent = nil
+
+		-- Closing the NPC trade, logging out, dying or starting another run makes
+		-- every previously scheduled callback harmless.
+		if thisRunId ~= sellAllRunId or not g_game.isOnline() or not npcModalTrade then
+			finishSale()
+			return
 		end
-		closeSellAllWindow()
-	end, 450)
+
+		if sellAllQueueIndex < 1 then
+			sellAllQueueIndex = 1
+		end
+
+		local sale = sellAllQueue[sellAllQueueIndex]
+
+		if not sale then
+			finishSale()
+			return
+		end
+
+		local chunk = math.min(tonumber(sale.remaining) or 0, maxAmountPerRequest, 65535)
+
+		local sent = false
+
+		if sale.item and sale.item:getId() > 0 and chunk > 0 then
+			g_game.sellItem(sale.item, chunk, true)
+			sale.remaining = sale.remaining - chunk
+			sent = true
+		else
+			sale.remaining = 0
+		end
+
+		if sale.remaining <= 0 then
+			sellAllQueueIndex = sellAllQueueIndex + 1
+		end
+
+		if sent then
+			local waitingRunId = thisRunId
+			local acknowledged = false
+
+			continueSellAllAfterPlayerGoods = function()
+				if acknowledged or waitingRunId ~= sellAllRunId then
+					return
+				end
+
+				acknowledged = true
+				continueSellAllAfterPlayerGoods = nil
+
+				if sellAllPendingEvent then
+					removeEvent(sellAllPendingEvent)
+					sellAllPendingEvent = nil
+				end
+
+				-- A short gap prevents the acknowledgement and the next request from
+				-- being handled in the same network tick.
+				sellAllPendingEvent = scheduleEvent(sellNextChunk, 100)
+			end
+
+			-- Some servers do not resend player goods for every sale. This fallback
+			-- keeps the queue moving, but uses the proven safe RubinOT interval.
+			sellAllPendingEvent = scheduleEvent(function()
+				if acknowledged or waitingRunId ~= sellAllRunId then
+					return
+				end
+
+				acknowledged = true
+				continueSellAllAfterPlayerGoods = nil
+				sellNextChunk()
+			end, 1100)
+		else
+			sellAllPendingEvent = scheduleEvent(sellNextChunk, 50)
+		end
+	end
+
+	-- Start quickly so the button gives immediate feedback.
+	sellAllPendingEvent = scheduleEvent(sellNextChunk, 200)
+end
+
+cancelSellAll = function()
+	sellAllRunId = sellAllRunId + 1
+
+	if sellAllPendingEvent then
+		removeEvent(sellAllPendingEvent)
+		sellAllPendingEvent = nil
+	end
+
+	sellAllQueue = {}
+	sellAllQueueIndex = 0
+	continueSellAllAfterPlayerGoods = nil
+
+	if sellAllButton and not sellAllButton:isDestroyed() then
+		sellAllButton:setEnabled(true)
+	end
+
+	local modalButton = sellAllModal and not sellAllModal:isDestroyed() and sellAllModal:recursiveGetChildById("sellAllButton")
+	if modalButton and not modalButton:isDestroyed() then
+		modalButton:setEnabled(true)
+	end
 end

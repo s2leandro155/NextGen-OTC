@@ -171,8 +171,8 @@ function openWindow(deathType, penalty)
 		cancelButton.onClick = cancelFunc
 	end
 
-	-- Avoid an immediate-relog race: let the death packet and UI settle, then
-	-- perform the same respawn request as the Ok button.
+	-- Avoid the old immediate-relog race: give the death packet and UI time to
+	-- settle, then request the same respawn action as the Ok button.
 	autoRespawnEvent = scheduleEvent(function()
 		autoRespawnEvent = nil
 

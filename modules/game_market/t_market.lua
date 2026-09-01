@@ -72,6 +72,55 @@ local enableClassification = {1, 3, 7, 8, 13, 15, 17, 18, 19, 20, 21, 24, 25, 27
                               MarketCategoryWeaponsClubs, MarketCategoryWeaponsDistance, MarketCategoryWeaponsSwords,
                               MarketCategoryWeaponsWands, MarketCategoryWeaponsAll}
 
+local MARKET_ITEM_ROW_HEIGHT = 36
+
+local function resetMarketItemListOffset(itemList)
+    if itemList then
+        itemList:setVirtualOffset({x = 0, y = 0})
+    end
+end
+
+local function getMarketItemListFit(itemList)
+    if not itemList then
+        return 8
+    end
+    return math.max(1, math.floor(itemList:getHeight() / MARKET_ITEM_ROW_HEIGHT) + 1)
+end
+
+local function setupMarketItemScrollbar(itemList)
+    local scrollbar = marketWindow:recursiveGetChildById("itemListScroll")
+    if not scrollbar or not itemList then
+        return
+    end
+
+    resetMarketItemListOffset(itemList)
+
+    cache.SCROLL_MARKET_ITEMS.listMin = 0
+    cache.SCROLL_MARKET_ITEMS.listMax = #cache.SCROLL_MARKET_ITEMS.listData
+
+    scrollbar:setValue(0)
+    scrollbar:setMinimum(0)
+    scrollbar:setMaximum(math.max(0,
+        cache.SCROLL_MARKET_ITEMS.listMax - #cache.SCROLL_MARKET_ITEMS.listPool))
+    scrollbar.onValueChange = function(self, value, delta)
+        onItemListValueChange(self, value, delta)
+    end
+
+    itemList.onMouseWheel = function(self, mousePos, direction)
+        if direction == MouseWheelUp then
+            scrollbar:setValue(math.max(scrollbar:getMinimum(), scrollbar:getValue() - scrollbar:getStep()))
+        elseif direction == MouseWheelDown then
+            scrollbar:setValue(math.min(scrollbar:getMaximum(), scrollbar:getValue() + scrollbar:getStep()))
+        end
+        return true
+    end
+
+    addEvent(function()
+        local list = marketWindow and marketWindow:recursiveGetChildById("itemList")
+        resetMarketItemListOffset(list)
+    end)
+end
+
 function onMarketErrorMessage(messageMode, message)
     displayInfoBox("Error", message)
 end
@@ -674,9 +723,7 @@ function onMarketEnter(offerCount, items, balance, vocation)
     -- Disable automatic scrollbar updates for itemList since we use virtual scrolling
     local itemList = marketWindow:recursiveGetChildById("itemList")
     if itemList then
-        -- Override updateScrollBars to prevent automatic range calculation
-        itemList.updateScrollBars = function()
-        end
+        itemList:setKeepScrollRange(true)
     end
 
     show()
@@ -1060,44 +1107,22 @@ function onSellListValueChange(scroll, value, delta)
 end
 
 function onItemListValueChange(scroll, value, delta)
-    -- Ensure we have a valid pool
     if #cache.SCROLL_MARKET_ITEMS.listPool == 0 or #cache.SCROLL_MARKET_ITEMS.listData == 0 then
         return
-    end
-
-    local startLabel = math.max(1, value)
-    local endLabel = startLabel + #cache.SCROLL_MARKET_ITEMS.listPool - 1
-
-    if endLabel > cache.SCROLL_MARKET_ITEMS.listMax then
-        endLabel = cache.SCROLL_MARKET_ITEMS.listMax
-        startLabel = math.max(1, endLabel - #cache.SCROLL_MARKET_ITEMS.listPool + 1)
-    end
-
-    -- Calculate virtual offset for smooth scrolling
-    local maxScrollValue = cache.SCROLL_MARKET_ITEMS.listMax - #cache.SCROLL_MARKET_ITEMS.listPool + 1
-
-    if value == 0 or value == 1 then
-        cache.SCROLL_MARKET_ITEMS.offset = 0
-    elseif value >= maxScrollValue - 1 then
-        cache.SCROLL_MARKET_ITEMS.offset = 28
-    else
-        cache.SCROLL_MARKET_ITEMS.offset = cache.SCROLL_MARKET_ITEMS.offset + ((value % 5) * 2)
-        if cache.SCROLL_MARKET_ITEMS.offset > 20 then
-            cache.SCROLL_MARKET_ITEMS.offset = 0
-        end
     end
 
     local list = marketWindow:recursiveGetChildById("itemList")
     list:setVirtualOffset({
         x = 0,
-        y = cache.SCROLL_MARKET_ITEMS.offset
+        y = 0
     })
 
+    local startLabel = value + 1
     for i, widget in ipairs(cache.SCROLL_MARKET_ITEMS.listPool) do
         local index = startLabel + i - 1
         local data = cache.SCROLL_MARKET_ITEMS.listData[index]
         if data and widget.item then
-
+            widget:setVisible(true)
             local isSelected = lastSelectedItem.itemId == data.thingType:getId()
             if data.tier then
                 isSelected = lastSelectedItem.itemId == data.thingType:getId() and data.tier == (lastSelectedItem.tier or 0)
@@ -1138,13 +1163,9 @@ function onItemListValueChange(scroll, value, delta)
 
             -- Update opacity based on depot availability
             widget.grayHover:setOpacity(count > 0 and '0.0' or '0.5')
+        else
+            widget:setVisible(false)
         end
-    end
-
-    -- Ensure scrollbar range stays correct
-    local correctMax = math.max(1, cache.SCROLL_MARKET_ITEMS.listMax - #cache.SCROLL_MARKET_ITEMS.listPool + 1)
-    if scroll:getMaximum() ~= correctMax then
-        scroll:setMaximum(correctMax)
     end
 end
 
@@ -1169,7 +1190,7 @@ function onSelectChildCategory(widget, selected, keepFilter)
 
     isRebuildingCategory = true
 
-    cache.SCROLL_MARKET_ITEMS.listFit = math.floor(itemList:getHeight() / 36) + 1
+    cache.SCROLL_MARKET_ITEMS.listFit = getMarketItemListFit(itemList)
     cache.SCROLL_MARKET_ITEMS.listMin = 1
     cache.SCROLL_MARKET_ITEMS.listPool = {}
     cache.SCROLL_MARKET_ITEMS.listData = {}
@@ -1274,22 +1295,7 @@ function onSelectChildCategory(widget, selected, keepFilter)
         table.insert(cache.SCROLL_MARKET_ITEMS.listPool, widget)
     end
 
-    cache.SCROLL_MARKET_ITEMS.listMin = #cache.SCROLL_MARKET_ITEMS.listData > 0 and 1 or 0
-    cache.SCROLL_MARKET_ITEMS.listMax = #cache.SCROLL_MARKET_ITEMS.listData
-
-    local itemListScroll = marketWindow:recursiveGetChildById("itemListScroll")
-    itemListScroll:setValue(cache.SCROLL_MARKET_ITEMS.listMin)
-    itemListScroll:setMinimum(cache.SCROLL_MARKET_ITEMS.listMin)
-    itemListScroll:setMaximum(math.max(cache.SCROLL_MARKET_ITEMS.listMin,
-        cache.SCROLL_MARKET_ITEMS.listMax - #cache.SCROLL_MARKET_ITEMS.listPool + 1))
-    itemListScroll.onValueChange = function(self, value, delta)
-        onItemListValueChange(self, value, delta)
-    end
-
-    itemList:setVirtualOffset({
-        x = 0,
-        y = 0
-    })
+    setupMarketItemScrollbar(itemList)
 
     if selected.categoryId == 10 then
         marketWindow.contentPanel.mainMarket.getPotionsButton:setVisible(true)
@@ -1297,16 +1303,6 @@ function onSelectChildCategory(widget, selected, keepFilter)
 
     isRebuildingCategory = false
 
-    -- Force scrollbar range after UI initialization
-    scheduleEvent(function()
-        local scroll = marketWindow:recursiveGetChildById("itemListScroll")
-        if scroll and #cache.SCROLL_MARKET_ITEMS.listData > 0 then
-            local correctMin = 1
-            local correctMax = math.max(1, cache.SCROLL_MARKET_ITEMS.listMax - #cache.SCROLL_MARKET_ITEMS.listPool + 1)
-            scroll:setMinimum(correctMin)
-            scroll:setMaximum(correctMax)
-        end
-    end, 50)
 end
 
 function onUpdateChildItem(itemID, tier)
@@ -1366,31 +1362,6 @@ function onSelectChildItem(widget, selected, oldFocus)
         tier = itemTier,
         lastWidget = selected
     }
-
-    -- itemList is virtualized: only the visible row pool exists as children.
-    -- Focusing a row can make TextList recalculate the scrollbar from that
-    -- small pool and collapse its range. Restore the range from the complete
-    -- virtual data set after the focus event has finished.
-    scheduleEvent(function()
-        if not marketWindow or marketWindow:isDestroyed() then
-            return
-        end
-
-        local scrollbar = marketWindow:recursiveGetChildById("itemListScroll")
-        if not scrollbar then
-            return
-        end
-
-        local minimum = cache.SCROLL_MARKET_ITEMS.listMin or 0
-        local poolSize = #cache.SCROLL_MARKET_ITEMS.listPool
-        local maximum = math.max(minimum, (cache.SCROLL_MARKET_ITEMS.listMax or 0) - poolSize + 1)
-        local value = math.max(minimum, math.min(scrollbar:getValue(), maximum))
-
-        scrollbar:setMinimum(minimum)
-        scrollbar:setMaximum(maximum)
-        scrollbar:setValue(value)
-        scrollbar:setVisible(true)
-    end, 1)
 
     if itemID == 22118 then
         marketWindow.contentPanel.selectedItem:getItem():setCount(getTransferableTibiaCoins())
@@ -2004,7 +1975,7 @@ function onSearchItem(textField)
         y = 0
     })
 
-    cache.SCROLL_MARKET_ITEMS.listFit = math.floor(itemList:getHeight() / 36) + 1
+    cache.SCROLL_MARKET_ITEMS.listFit = getMarketItemListFit(itemList)
     cache.SCROLL_MARKET_ITEMS.listMin = 0
     cache.SCROLL_MARKET_ITEMS.listPool = {}
     cache.SCROLL_MARKET_ITEMS.listData = {}
@@ -2097,22 +2068,7 @@ function onSearchItem(textField)
         table.insert(cache.SCROLL_MARKET_ITEMS.listPool, widget)
     end
 
-    cache.SCROLL_MARKET_ITEMS.listMin = #cache.SCROLL_MARKET_ITEMS.listData > 0 and 1 or 0
-    cache.SCROLL_MARKET_ITEMS.listMax = #cache.SCROLL_MARKET_ITEMS.listData
-
-    local sellScrollbar = marketWindow:recursiveGetChildById("itemListScroll")
-    sellScrollbar:setValue(cache.SCROLL_MARKET_ITEMS.listMin)
-    sellScrollbar:setMinimum(cache.SCROLL_MARKET_ITEMS.listMin)
-    sellScrollbar:setMaximum(math.max(cache.SCROLL_MARKET_ITEMS.listMin,
-        cache.SCROLL_MARKET_ITEMS.listMax - #cache.SCROLL_MARKET_ITEMS.listPool + 1))
-
-    sellScrollbar.onValueChange = function(self, value, delta)
-        onItemListValueChange(self, value, delta)
-    end
-    itemList:setVirtualOffset({
-        x = 0,
-        y = 0
-    })
+    setupMarketItemScrollbar(itemList)
 
     isSearching = false
 end
@@ -2143,7 +2099,7 @@ function onShowRedirect(item)
         y = 0
     })
 
-    cache.SCROLL_MARKET_ITEMS.listFit = math.floor(itemList:getHeight() / 36) + 1
+    cache.SCROLL_MARKET_ITEMS.listFit = getMarketItemListFit(itemList)
     cache.SCROLL_MARKET_ITEMS.listMin = 0
     cache.SCROLL_MARKET_ITEMS.listPool = {}
     cache.SCROLL_MARKET_ITEMS.listData = {}
@@ -2240,22 +2196,7 @@ function onShowRedirect(item)
         table.insert(cache.SCROLL_MARKET_ITEMS.listPool, widget)
     end
 
-    cache.SCROLL_MARKET_ITEMS.listMin = #cache.SCROLL_MARKET_ITEMS.listData > 0 and 1 or 0
-    cache.SCROLL_MARKET_ITEMS.listMax = #cache.SCROLL_MARKET_ITEMS.listData
-
-    local sellScrollbar = marketWindow:recursiveGetChildById("itemListScroll")
-    sellScrollbar:setValue(cache.SCROLL_MARKET_ITEMS.listMin)
-    sellScrollbar:setMinimum(cache.SCROLL_MARKET_ITEMS.listMin)
-    sellScrollbar:setMaximum(math.max(cache.SCROLL_MARKET_ITEMS.listMin,
-        cache.SCROLL_MARKET_ITEMS.listMax - #cache.SCROLL_MARKET_ITEMS.listPool + 1))
-
-    sellScrollbar.onValueChange = function(self, value, delta)
-        onItemListValueChange(self, value, delta)
-    end
-    itemList:setVirtualOffset({
-        x = 0,
-        y = 0
-    })
+    setupMarketItemScrollbar(itemList)
 
     itemList:focusChild(itemList:getFirstChild())
 end
@@ -2472,18 +2413,12 @@ function focusPrevItemWidget(list)
         return
     end
     local cIndex = list:getChildIndex(c)
-    local scrollbar = marketWindow:recursiveGetChildById('itemListScroll')
+    local scrollbar = marketWindow:recursiveGetChildById("itemListScroll")
     if scrollbar:getMaximum() > 0 and cIndex == 1 and scrollbar:getValue() == scrollbar:getMinimum() then
         return
     end
 
     if cIndex > 1 then
-        if cIndex < 3 then
-            list:setVirtualOffset({
-                x = 0,
-                y = 0
-            })
-        end
         list:focusPreviousChild(KeyboardFocusReason)
     else
         scrollbar:setValue(scrollbar:getValue() - 1)
@@ -2494,13 +2429,10 @@ function focusPrevItemWidget(list)
                 list:focusChild(nextChild)
             end
             list:focusChild(a)
-            list:setVirtualOffset({
-                x = 0,
-                y = 0
-            })
         end
     end
 
+    resetMarketItemListOffset(list)
     cache.SCROLL_MARKET_ITEMS.scrollDelay = g_clock.millis() + 30
 end
 
@@ -2512,44 +2444,20 @@ function focusNextItemWidget(list)
     local c = list:getFocusedChild()
     local cIndex = list:getChildIndex(c)
     local cCount = list:getChildCount()
-    local scrollbar = marketWindow:recursiveGetChildById('itemListScroll')
-
-    -- Force correct scrollbar range
-    if #cache.SCROLL_MARKET_ITEMS.listData > 0 and #cache.SCROLL_MARKET_ITEMS.listPool > 0 then
-        local correctMax = math.max(1, cache.SCROLL_MARKET_ITEMS.listMax - #cache.SCROLL_MARKET_ITEMS.listPool + 1)
-        if scrollbar:getMaximum() ~= correctMax then
-            scrollbar:setMaximum(correctMax)
-        end
-    end
+    local scrollbar = marketWindow:recursiveGetChildById("itemListScroll")
 
     if scrollbar:getMaximum() > 0 and cIndex == cCount and scrollbar:getValue() == scrollbar:getMaximum() then
         return
     end
 
-    if cIndex < (cCount - 1) then
+    if cIndex < cCount - 1 then
         list:focusNextChild(KeyboardFocusReason)
     else
-        -- Force correct max before incrementing
-        local correctMax = math.max(1, cache.SCROLL_MARKET_ITEMS.listMax - #cache.SCROLL_MARKET_ITEMS.listPool + 1)
-        scrollbar:setMaximum(correctMax)
         scrollbar:setValue(scrollbar:getValue() + 1)
 
-        if cIndex == (cCount - 1) then
+        if cIndex == cCount - 1 then
             list:focusNextChild(KeyboardFocusReason)
-            if scrollbar:getMaximum() > 0 then
-                list:setVirtualOffset({
-                    x = 0,
-                    y = 28
-                })
-            end
         elseif cIndex == cCount then
-            if scrollbar:getMaximum() > 0 then
-                list:setVirtualOffset({
-                    x = 0,
-                    y = 28
-                })
-            end
-
             local prevChild = list:getChildByIndex(cIndex - 1)
             if prevChild then
                 list:focusChild(prevChild)
@@ -2558,6 +2466,7 @@ function focusNextItemWidget(list)
         end
     end
 
+    resetMarketItemListOffset(list)
     cache.SCROLL_MARKET_ITEMS.scrollDelay = g_clock.millis() + 30
 end
 

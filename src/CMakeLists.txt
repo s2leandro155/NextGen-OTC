@@ -441,6 +441,7 @@ if (TOGGLE_FRAMEWORK_GRAPHICS)
           framework/graphics/shaderprogram.cpp
           framework/graphics/texture.cpp
           framework/graphics/texturemanager.cpp
+          framework/graphics/xbrz.cpp
           framework/graphics/shadermanager.cpp
           framework/platform/win32window.cpp
           framework/platform/x11window.cpp

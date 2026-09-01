@@ -1,0 +1,13 @@
+# Legacy Market module disabled.
+#
+# The active implementation is /mods/game_tibia_market/t_market.otmod.
+# Keeping two manifests named "game_market" makes module discovery overwrite
+# one implementation with the other depending on resource search order.
+# The legacy Lua/OTUI files remain here as a local reference and rollback aid.
+
+Module
+  name: game_market_legacy_disabled
+  description: Disabled legacy Market implementation
+  author: R!ck && Christianlb, BeniS, libergod
+  sandboxed: true
+  scripts: []

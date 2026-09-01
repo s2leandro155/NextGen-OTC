@@ -4,6 +4,10 @@ SidebarPersistence = {
 	FILE_NAME = "sidebars.json",
 	lastSessionActive = false,
 	savedOnLogout = false,
+	liveSaveEnabled = false,
+	liveSaveEvent = nil,
+	liveSaveEnableEvent = nil,
+	lastEncodedDocument = nil,
 	active = false,
 	providers = {},
 	document = {}
@@ -102,11 +106,18 @@ local function writeDocumentToDisk(document)
 		return false
 	end
 
+	-- Layout snapshots run periodically while the player is online. Avoid
+	-- rewriting the same file when no window, panel or backpack has changed.
+	if encoded == SidebarPersistence.lastEncodedDocument then
+		return true
+	end
+
 	if not SidebarPersistence.ensureCharacterDir() then
 		return false
 	end
 
 	g_resources.writeFileContents(path, encoded)
+	SidebarPersistence.lastEncodedDocument = encoded
 
 	return true
 end
@@ -124,6 +135,7 @@ function SidebarPersistence.load()
 
 	SidebarPersistence.playerId = playerId
 	SidebarPersistence.document = readDocumentFromDisk()
+	SidebarPersistence.lastEncodedDocument = nil
 	SidebarPersistence.active = true
 
 	return true
@@ -155,9 +167,16 @@ local function copySection(source)
 	return copy
 end
 
-function SidebarPersistence.saveNow()
+function SidebarPersistence.saveNow(finalSave)
 	if not SidebarPersistence.active or not SidebarPersistence.playerId then
 		return false
+	end
+
+	-- Read the real, current panel order before pruning the tracked state. This
+	-- also catches windows moved by drag-and-drop paths that did not emit a
+	-- placement notification.
+	if SidebarLayoutState and SidebarLayoutState.syncFromPanels then
+		SidebarLayoutState.syncFromPanels()
 	end
 
 	if SidebarLayoutState and SidebarLayoutState.pruneUntrackedWidgets then
@@ -183,26 +202,50 @@ function SidebarPersistence.saveNow()
 	end
 
 	SidebarPersistence.document = document
-	SidebarPersistence.savedOnLogout = true
+	local saved = writeDocumentToDisk(document)
 
-	return writeDocumentToDisk(document)
+	if saved and finalSave then
+		SidebarPersistence.savedOnLogout = true
+	end
+
+	return saved
+end
+
+local function saveLiveSnapshot()
+	if SidebarPersistence.liveSaveEnabled and SidebarPersistence.active and g_game and g_game.isOnline() then
+		SidebarPersistence.saveNow(false)
+	end
 end
 
 function SidebarPersistence.onGameStart()
 	SidebarPersistence.savedOnLogout = false
+	SidebarPersistence.liveSaveEnabled = false
 
 	SidebarPersistence.load()
 
 	SidebarPersistence.lastSessionActive = SidebarPersistence.active
+
+	if SidebarPersistence.liveSaveEnableEvent then
+		removeEvent(SidebarPersistence.liveSaveEnableEvent)
+	end
+
+	-- Late-loaded modules and reopened containers need time to consume the
+	-- stored layout. Enabling snapshots afterwards prevents an incomplete
+	-- startup layout from replacing the good saved file.
+	SidebarPersistence.liveSaveEnableEvent = scheduleEvent(function()
+		SidebarPersistence.liveSaveEnableEvent = nil
+		SidebarPersistence.liveSaveEnabled = SidebarPersistence.active and g_game.isOnline()
+	end, 7000)
 end
 
 function SidebarPersistence.onGameEnd()
 	SidebarPersistence.lastSessionActive = SidebarPersistence.active
 
 	if SidebarPersistence.active and not SidebarPersistence.savedOnLogout then
-		SidebarPersistence.saveNow()
+		SidebarPersistence.saveNow(true)
 	end
 
+	SidebarPersistence.liveSaveEnabled = false
 	SidebarPersistence.active = false
 	SidebarPersistence.playerId = nil
 	SidebarPersistence.document = {}
@@ -211,7 +254,7 @@ end
 
 function SidebarPersistence.onLogout()
 	if SidebarPersistence.active and not SidebarPersistence.savedOnLogout then
-		SidebarPersistence.saveNow()
+		SidebarPersistence.saveNow(true)
 	end
 end
 
@@ -231,9 +274,21 @@ function SidebarPersistence.init()
 		onClose = onAppCloseSaveSidebars,
 		onExit = onAppCloseSaveSidebars
 	})
+
+	SidebarPersistence.liveSaveEvent = cycleEvent(saveLiveSnapshot, 3000)
 end
 
 function SidebarPersistence.terminate()
+	if SidebarPersistence.liveSaveEvent then
+		removeEvent(SidebarPersistence.liveSaveEvent)
+		SidebarPersistence.liveSaveEvent = nil
+	end
+
+	if SidebarPersistence.liveSaveEnableEvent then
+		removeEvent(SidebarPersistence.liveSaveEnableEvent)
+		SidebarPersistence.liveSaveEnableEvent = nil
+	end
+
 	disconnect(g_game, {
 		onGameStart = SidebarPersistence.onGameStart,
 		onGameEnd = SidebarPersistence.onGameEnd,

@@ -15,6 +15,10 @@ local var_0_13 = 0
 local var_0_14 = 0
 local var_0_15 = 180
 local antiParalyzeLastCast = 0
+local protectionEquipLastCheck = 0
+local STONE_SKIN_AMULET_ID = 3081
+local MIGHT_RING_ID = 3048
+local ACTIVE_MIGHT_RING_ID = 3049
 local shooterPriorityCursor = 1
 local shooterPrioritySignature = ""
 local var_0_16 = {
@@ -6150,6 +6154,16 @@ function toggleAutoEat(arg_269_0)
 	helperConfig.autoEatFood = arg_269_0
 end
 
+function toggleAutoSSA(arg_269_1)
+	g_settings.set("helperAutoSSAEnabled", arg_269_1 == true)
+	protectionEquipLastCheck = 0
+end
+
+function toggleAutoMightRing(arg_269_2)
+	g_settings.set("helperAutoMightRingEnabled", arg_269_2 == true)
+	protectionEquipLastCheck = 0
+end
+
 function toggleAutoHaste(arg_270_0)
 	if helperConfig.training[1].enabled then
 		var_0_2:recursiveGetChildById("enableTraining0"):setChecked(false)
@@ -6397,6 +6411,57 @@ function routineChecks()
 			autoEatFood()
 		end
 	end
+
+	autoEquipProtectionItems()
+end
+
+function autoEquipProtectionItems()
+	if not g_game.isOnline() or not var_0_0 then
+		return
+	end
+
+	local var_287_0 = g_clock.millis()
+
+	if var_287_0 < protectionEquipLastCheck + 1000 then
+		return
+	end
+
+	protectionEquipLastCheck = var_287_0
+
+	local var_287_1 = var_0_0:getInventoryItem(InventorySlotNeck)
+	local var_287_2 = var_0_0:getInventoryItem(InventorySlotFinger)
+	local var_287_3 = var_287_1 and var_287_1:getId() == STONE_SKIN_AMULET_ID
+	local var_287_4 = var_287_2 and (var_287_2:getId() == MIGHT_RING_ID or var_287_2:getId() == ACTIVE_MIGHT_RING_ID)
+	local var_287_5
+	local var_287_6
+
+	if g_settings.getBoolean("helperAutoSSAEnabled", false) and not var_287_3 then
+		var_287_5 = STONE_SKIN_AMULET_ID
+		var_287_6 = InventorySlotNeck
+	elseif g_settings.getBoolean("helperAutoMightRingEnabled", false) and not var_287_4 then
+		var_287_5 = MIGHT_RING_ID
+		var_287_6 = InventorySlotFinger
+	end
+
+	if not var_287_5 then
+		return
+	end
+
+	for iter_287_0, iter_287_1 in pairs(g_game.getContainers()) do
+		for iter_287_2, iter_287_3 in ipairs(iter_287_1:getItems()) do
+			if iter_287_3:getId() == var_287_5 then
+				g_game.move(iter_287_3, {
+					x = 65535,
+					y = var_287_6,
+					z = 0
+				}, 1)
+
+				return
+			end
+		end
+	end
+
+	g_game.equipItemId(var_287_5, 0)
 end
 
 local function var_0_144()
@@ -8659,21 +8724,19 @@ function onLoadHelperData()
 
 	local var_344_15 = var_0_91()
 
-	if var_344_15.id > 0 then
-		var_0_92(var_344_15.id)
-	else
-		var_0_92(0)
-	end
+
+	-- These two legacy configurable slots are now fixed protection items.
+	var_0_92(STONE_SKIN_AMULET_ID)
 
 	local var_344_16 = var_0_2:recursiveGetChildById("autoTrainingCheck")
 
 	if var_344_16 then
-		var_344_16:setChecked(var_344_15.enabled)
+		var_344_16:setChecked(g_settings.getBoolean("helperAutoSSAEnabled", false))
 	end
 
 	local var_344_17 = var_0_93()
 
-	var_0_94(var_344_17.id)
+	var_0_94(MIGHT_RING_ID)
 
 	local var_344_18 = var_0_2:recursiveGetChildById("foodTimeBox")
 
@@ -8684,7 +8747,7 @@ function onLoadHelperData()
 	local var_344_19 = var_0_2:recursiveGetChildById("autoFoodCheck")
 
 	if var_344_19 then
-		var_344_19:setChecked(helperConfig.autoEatFood)
+		var_344_19:setChecked(g_settings.getBoolean("helperAutoMightRingEnabled", false))
 	end
 
 	loadShooterProfileByName(helperConfig.selectedShooterProfile)

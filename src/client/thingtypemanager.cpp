@@ -92,6 +92,16 @@ void ThingTypeManager::terminate()
 #endif
 }
 
+void ThingTypeManager::unloadTextures()
+{
+    for (auto& thingTypes : m_thingTypes) {
+        for (const auto& thingType : thingTypes) {
+            if (thingType)
+                thingType->unload();
+        }
+    }
+}
+
 bool ThingTypeManager::loadDat(std::string file)
 {
     m_datLoaded = false;

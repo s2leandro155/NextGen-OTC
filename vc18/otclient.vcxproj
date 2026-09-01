@@ -32,43 +32,43 @@
     <RootNamespace>otclient</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
     <SourcePath>$(OutDirFullPath)../src/</SourcePath>
-    <VCToolsVersion>14.44.35207</VCToolsVersion>
+    <VCToolsVersion>14.51.36231</VCToolsVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <EnableUnitySupport>true</EnableUnitySupport>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <EnableUnitySupport>true</EnableUnitySupport>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='OpenGL|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <EnableUnitySupport>true</EnableUnitySupport>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DirectX|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <EnableUnitySupport>true</EnableUnitySupport>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='OpenGL|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <EnableUnitySupport>true</EnableUnitySupport>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DirectX|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <EnableUnitySupport>true</EnableUnitySupport>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
@@ -135,7 +135,7 @@
     </VcpkgHostTriplet>
     <VcpkgTriplet>x86-windows-static</VcpkgTriplet>
     <VcpkgConfiguration>Release</VcpkgConfiguration>
-    <VcpkgInstalledDir>vcpkg_installed</VcpkgInstalledDir>
+    <VcpkgInstalledDir>$(ProjectDir)..\vcpkg_installed</VcpkgInstalledDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DirectX|Win32'" Label="Vcpkg">
     <VcpkgHostTriplet />
@@ -155,11 +155,11 @@
   <PropertyGroup Label="Vcpkg">
     <VcpkgEnableManifest>true</VcpkgEnableManifest>
     <VcpkgAutoLink>true</VcpkgAutoLink>
-    <VcpkgInstalledDir>vcpkg_installed</VcpkgInstalledDir>
+    <VcpkgInstalledDir>$(ProjectDir)..\vcpkg_installed</VcpkgInstalledDir>
   </PropertyGroup>
   <PropertyGroup Label="Vcpkg" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <VcpkgTriplet>x86-windows-static</VcpkgTriplet>
-    <VcpkgInstalledDir>vcpkg_installed</VcpkgInstalledDir>
+    <VcpkgInstalledDir>$(ProjectDir)..\vcpkg_installed</VcpkgInstalledDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Vcpkg">
     <VcpkgTriplet>x64-windows-static</VcpkgTriplet>
@@ -386,6 +386,7 @@
     <ClCompile Include="..\src\client\thing.cpp" />
     <ClCompile Include="..\src\client\thingtype.cpp" />
     <ClCompile Include="..\src\client\thingtypemanager.cpp" />
+    <ClCompile Include="..\src\framework\graphics\xbrz.cpp" />
     <ClCompile Include="..\src\client\tile.cpp" />
     <ClCompile Include="..\src\client\towns.cpp" />
     <ClCompile Include="..\src\client\uicreature.cpp" />
@@ -516,6 +517,7 @@
     <ClCompile Include="..\src\framework\ui\uiwidgettext.cpp" />
     <ClCompile Include="..\src\framework\util\color.cpp" />
     <ClCompile Include="..\src\framework\util\crypt.cpp" />
+    <ClCompile Include="..\src\framework\util\profiler.cpp" />
     <ClCompile Include="..\src\framework\util\stats.cpp" />
     <ClCompile Include="..\src\main.cpp" />
     <ClCompile Include="..\src\tools\datdump.cpp" />
@@ -719,6 +721,7 @@
     <ClInclude Include="..\src\framework\ui\uiwidget.h" />
     <ClInclude Include="..\src\framework\util\color.h" />
     <ClInclude Include="..\src\framework\util\crypt.h" />
+    <ClInclude Include="..\src\framework\util\profiler.h" />
     <ClInclude Include="..\src\framework\util\stats.h" />
     <ClInclude Include="..\src\framework\util\matrix.h" />
     <ClInclude Include="..\src\framework\util\point.h" />
@@ -757,7 +760,7 @@
     <ProtoFiles Include="$(ProtoPath)\*.proto" />
   </ItemGroup>
   <Target Name="ProtoCompile" BeforeTargets="PrepareForBuild" DependsOnTargets="VcpkgInstallManifestDependencies" Condition="'$(RunProtoCompile)'=='true'">
-    <Exec Command="$(ProtocPath) --proto_path=$(ProtoPath) --cpp_out=generated %(ProtoFiles.Identity)" />
+    <Exec Command="&quot;$(ProtocPath)&quot; --proto_path=&quot;$(ProtoPath)&quot; --cpp_out=&quot;$(ProjectDir)generated&quot; &quot;%(ProtoFiles.Identity)&quot;" />
     <ItemGroup>
       <ClCompile Include="generated\%(ProtoFiles.Filename).pb.cc">
         <IncludeInUnityFile>false</IncludeInUnityFile>

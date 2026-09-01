@@ -61,6 +61,9 @@ public:
 
     uint32_t getSignature() { return m_signature; }
     int getSpritesCount() { return m_spritesCount; }
+    void setScaleFactor(int factor);
+    int getScaleFactor() const { return m_scaleFactor; }
+    ImagePtr upscaleSprite(const ImagePtr& sprite, int scaleFactor = 0) const;
 
     ImagePtr getSpriteImage(int id) {
         bool isLoading = false;
@@ -98,6 +101,8 @@ private:
 
     bool m_spritesHd{ false };
     bool m_loaded{ false };
+    uint8_t m_baseSpriteSize{ 32 };
+    int m_scaleFactor{ 1 };
     uint32_t m_signature{ 0 };
     uint32_t m_spritesCount{ 0 };
     uint32_t m_spritesOffset{ 0 };

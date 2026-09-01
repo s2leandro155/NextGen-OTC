@@ -21,6 +21,7 @@
  */
 
 #include "spriteappearances.h"
+#include "spritemanager.h"
 
 #include <nlohmann/json_fwd.hpp>
 #include "lzma.h"
@@ -364,7 +365,7 @@ ImagePtr SpriteAppearances::getSpriteImage(const int id, bool& isLoading)
             }
         }
 
-        return image;
+        return g_sprites.upscaleSprite(image);
     } catch (const stdext::exception& e) {
         g_logger.error("Failed to get sprite id {}: {}", id, e.what());
         return nullptr;
