@@ -99,15 +99,132 @@ jobs:
             throw 'The main otclient.exe was not generated.'
           }
 
-          Copy-Item -LiteralPath $exe -Destination "$artifact/CrystalOTC-WindowsServer.exe"
+          # Keep the public executable name identical to the regular Windows
+          # package. This build uses x64-windows-static + BUILD_STATIC_LIBRARY,
+          # therefore CMake selects the static MSVC runtime (/MT) in Release.
+          $packagedExe = "$artifact/CrystalOTC.exe"
+          Copy-Item -LiteralPath $exe -Destination $packagedExe
 
-          Get-ChildItem -LiteralPath (Split-Path $exe) -Filter '*.dll' -ErrorAction SilentlyContinue |
-            Copy-Item -Destination $artifact
+          # Resolve PE imports recursively. System DLLs stay provided by
+          # Windows; every non-system DLL must be copied beside CrystalOTC.exe.
+          # This catches dynamically loaded dependencies without blindly
+          # shipping the complete vcpkg or Visual Studio runtime directories.
+          $searchDirs = @(
+            (Split-Path $exe),
+            "$env:GITHUB_WORKSPACE/build/windows-server/bin",
+            "$env:GITHUB_WORKSPACE/build/windows-server/vcpkg_installed/x64-windows-static/bin"
+          ) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -Unique
+
+          function Get-PeImports([string]$binary) {
+            $imports = & dumpbin.exe /nologo /dependents $binary
+            if ($LASTEXITCODE -ne 0) {
+              throw "dumpbin failed while inspecting $binary"
+            }
+            @($imports | ForEach-Object {
+              if ($_ -match '^\s+([A-Za-z0-9_.+-]+\.dll)\s*$') {
+                $matches[1]
+              }
+            } | Sort-Object -Unique)
+          }
+
+          $systemDirectories = @(
+            "$env:SystemRoot/System32",
+            "$env:SystemRoot/SysWOW64"
+          )
+          $pending = [System.Collections.Generic.Queue[string]]::new()
+          $pending.Enqueue($packagedExe)
+          $visited = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+          $bundled = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+          $system = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+          $missing = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+
+          while ($pending.Count -gt 0) {
+            $binary = $pending.Dequeue()
+            if (-not $visited.Add((Resolve-Path -LiteralPath $binary).Path)) { continue }
+
+            foreach ($dll in Get-PeImports $binary) {
+              $systemPath = $systemDirectories |
+                ForEach-Object { Join-Path $_ $dll } |
+                Where-Object { Test-Path -LiteralPath $_ } |
+                Select-Object -First 1
+              if ($systemPath) {
+                $system.Add($dll) | Out-Null
+                continue
+              }
+
+              $packagedDll = Join-Path $artifact $dll
+              if (-not (Test-Path -LiteralPath $packagedDll)) {
+                $sourceDll = $searchDirs |
+                  ForEach-Object { Join-Path $_ $dll } |
+                  Where-Object { Test-Path -LiteralPath $_ } |
+                  Select-Object -First 1
+                if (-not $sourceDll) {
+                  $missing.Add($dll) | Out-Null
+                  continue
+                }
+                Copy-Item -LiteralPath $sourceDll -Destination $packagedDll
+              }
+
+              $bundled.Add($dll) | Out-Null
+              $pending.Enqueue($packagedDll)
+            }
+          }
+
+          if ($missing.Count -gt 0) {
+            throw "Missing redistributable DLLs: $($missing -join ', ')"
+          }
+
+          $dynamicMsvcRuntime = (@($bundled) + @($system)) |
+            Where-Object { $_ -match '^(vcruntime|msvcp|concrt)[0-9_]*\.dll$' }
+          if ($dynamicMsvcRuntime.Count -gt 0) {
+            throw "The /MT package unexpectedly imports dynamic MSVC runtime DLLs: $($dynamicMsvcRuntime -join ', ')"
+          }
 
           foreach ($item in @('init.lua', 'server_config.lua', 'data', 'modules', 'mods')) {
             if (Test-Path -LiteralPath $item) {
               Copy-Item -LiteralPath $item -Destination $artifact -Recurse -Force
             }
+          }
+
+          @(
+            'CrystalOTC Windows x64 dependency report'
+            'Target: Windows 10/11 x64'
+            'Configuration: Release'
+            'MSVC runtime: static (/MT)'
+            ''
+            'Bundled non-system DLLs:'
+            $(if ($bundled.Count) { $bundled | Sort-Object } else { '(none; dependencies are statically linked)' })
+            ''
+            'Windows system DLLs:'
+            $system | Sort-Object
+          ) | Set-Content -LiteralPath "$artifact/dependency-report.txt" -Encoding UTF8
+
+      - name: Validate clean redistributable package
+        shell: pwsh
+        run: |
+          $artifact = "$env:GITHUB_WORKSPACE/artifacts/windows-server"
+          $exe = "$artifact/CrystalOTC.exe"
+
+          foreach ($required in @('CrystalOTC.exe', 'init.lua', 'data', 'modules', 'mods', 'dependency-report.txt')) {
+            if (-not (Test-Path -LiteralPath (Join-Path $artifact $required))) {
+              throw "Required runtime file is missing from package: $required"
+            }
+          }
+
+          $headers = & dumpbin.exe /nologo /headers $exe
+          if ($LASTEXITCODE -ne 0 -or @($headers -match 'machine \(x64\)').Count -eq 0) {
+            throw 'Packaged executable is not a valid x64 PE image.'
+          }
+
+          # Run only from the clean package directory. If the process remains
+          # alive, startup succeeded; terminate it after the smoke-test window.
+          $process = Start-Process -FilePath $exe -WorkingDirectory $artifact -PassThru
+          if ($process.WaitForExit(15000)) {
+            if ($process.ExitCode -ne 0) {
+              throw "CrystalOTC exited during clean-folder smoke test with code $($process.ExitCode)."
+            }
+          } else {
+            Stop-Process -Id $process.Id -Force
           }
 
       - name: Upload Windows Server package
