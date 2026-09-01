@@ -54,7 +54,13 @@ void UIItem::drawSelf(const DrawPoolType drawPane)
         m_item->setColor(m_color);
         m_item->draw(Point(exactSize - g_gameConfig.getSpriteSize()) + m_item->getDisplacement());
         Rect itemDest = getPaddingRect();
-        const int nativeSide = std::min<int>(exactSize, std::min<int>(itemDest.width(), itemDest.height()));
+        // xBRZ enlarges the backing sprite texture, but UI slots must keep the
+        // original logical sprite size. Using the physical texture size here
+        // made Store and Weekly Task icons grow from 32x32 to 64x64 whenever
+        // HD Graphics was enabled.
+        const int spriteScale = std::max<int>(1, g_gameConfig.getSpriteScaleFactor());
+        const int logicalExactSize = std::max<int>(1, (exactSize + spriteScale - 1) / spriteScale);
+        const int nativeSide = std::min<int>(logicalExactSize, std::min<int>(itemDest.width(), itemDest.height()));
         if (nativeSide < itemDest.width() || nativeSide < itemDest.height()) {
             itemDest = Rect(itemDest.x() + (itemDest.width() - nativeSide) / 2,
                             itemDest.y() + (itemDest.height() - nativeSide) / 2,

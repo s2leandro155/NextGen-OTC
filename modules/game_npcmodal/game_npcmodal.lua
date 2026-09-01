@@ -23,6 +23,7 @@ local NPC_MODAL_TRADE_EXTRA_W = 204
 local npcModalTrade = false
 local LOOT_POUCH_ITEM_ID = 23721
 local GOLD_COIN_ITEM_ID = 3031
+local SELL_ALL_BLACKLIST_OPCODE = 145
 local npcTradeCurrencyId, menuButton, sep1, label1, currencyName, item, buyButton, sellButton, itemsSelling, searchEdit, clearSearch, countScrollBar, label3, label4, label5, labelPrice, playerBalance, userInput, item2, BuySellButton
 local npcTradeFilterText = ""
 local NPC_MODAL_SETTINGS_FILE = "/settings/npc_modal.json"
@@ -430,6 +431,34 @@ local function sellAllGetCharacterName()
 	return nil
 end
 
+-- Keep the server-side Sell All filter in sync with the list shown by the
+-- client. The NPC handles the actual pouch sale in one request, avoiding the
+-- long client-side queue that could freeze or disconnect the player.
+local function sendSellAllIgnoreListToServer()
+	if not g_game.isOnline() then
+		return
+	end
+
+	local protocolGame = g_game.getProtocolGame()
+	if not protocolGame then
+		return
+	end
+
+	local ids = {}
+	for itemId, active in pairs(sellAllIgnoredItems) do
+		local id = tonumber(itemId)
+		if id and active == true then
+			ids[#ids + 1] = id
+		end
+	end
+	table.sort(ids)
+
+	local payload = string.format('{"ids":[%s],"rar":0}', table.concat(ids, ","))
+	pcall(function()
+		protocolGame:sendExtendedOpcode(SELL_ALL_BLACKLIST_OPCODE, payload)
+	end)
+end
+
 local function saveSellAllIgnoreList()
 	pcall(function()
 		if not g_resources.directoryExists("/settings/") then
@@ -500,6 +529,8 @@ local function saveSellAllIgnoreList()
 			g_resources.writeFileContents(NPC_MODAL_SETTINGS_FILE, serialized)
 		end)
 	end
+
+	sendSellAllIgnoreListToServer()
 end
 
 local function loadSellAllIgnoreList()
@@ -2556,143 +2587,46 @@ function sendSellAll()
 		return
 	end
 
-	local sellQueue = {}
-	local queuedItemIds = {}
-	local maxAmountPerRequest = 100
+	sendSellAllIgnoreListToServer()
 
-	if g_game.getFeature and g_game.getFeature(GameDoubleShopSellAmount) then
-		maxAmountPerRequest = 10000
-	end
-
+	local pouchItem
 	for _, entry in ipairs(SellNpcTradeItems or {}) do
-		if entry.item then
-			local itemId = entry.item:getId()
-			local amount = getSellablePlayerItemCount(itemId)
-			if amount > 0 and sellAllIgnoredItems[itemId] ~= true and not queuedItemIds[itemId] then
-				queuedItemIds[itemId] = true
-
-				-- Keep one queue entry per item. Expanding a large loot-pouch amount
-				-- into thousands of Lua table entries here freezes the UI before the
-				-- first sale is even sent. Chunks are calculated lazily below.
-				table.insert(sellQueue, { item = entry.item, remaining = amount })
-			end
+		if entry.item and entry.item:getId() == LOOT_POUCH_ITEM_ID then
+			pouchItem = entry.item
+			break
 		end
 	end
 
-	if #sellQueue == 0 then
+	if not pouchItem and g_game.findPlayerItem then
+		pouchItem = g_game.findPlayerItem(LOOT_POUCH_ITEM_ID, -1, 0)
+	end
+
+	if not pouchItem then
 		return
 	end
 
-	local function setSellAllButtonsEnabled(enabled)
+	local modalButton = sellAllModal and sellAllModal:recursiveGetChildById("sellAllButton")
+	if sellAllButton and not sellAllButton:isDestroyed() then
+		sellAllButton:setEnabled(false)
+	end
+	if modalButton and not modalButton:isDestroyed() then
+		modalButton:setEnabled(false)
+	end
+
+	-- One request starts the server-side batched sale. This prevents hundreds
+	-- of shop requests from accumulating in the client/network queue.
+	sellAllPendingEvent = scheduleEvent(function()
+		sellAllPendingEvent = nil
+		if g_game.isOnline() and npcModalTrade then
+			g_game.sellItem(pouchItem, 1, true)
+		end
 		if sellAllButton and not sellAllButton:isDestroyed() then
-			sellAllButton:setEnabled(enabled)
+			sellAllButton:setEnabled(true)
 		end
-
-		local modalButton = sellAllModal and sellAllModal:recursiveGetChildById("sellAllButton")
 		if modalButton and not modalButton:isDestroyed() then
-			modalButton:setEnabled(enabled)
+			modalButton:setEnabled(true)
 		end
-	end
-
-	setSellAllButtonsEnabled(false)
-	sellAllQueue = sellQueue
-	sellAllQueueIndex = 0
-	sellAllRunId = sellAllRunId + 1
-	local thisRunId = sellAllRunId
-
-	local function finishSale()
-		if thisRunId ~= sellAllRunId then
-			return
-		end
-
-		sellAllPendingEvent = nil
-		sellAllQueue = {}
-		sellAllQueueIndex = 0
-		continueSellAllAfterPlayerGoods = nil
-		setSellAllButtonsEnabled(true)
-
-		if sellAllModal and not sellAllModal:isDestroyed() and sellAllModal:isVisible() then
-			refreshSellAllModalLists()
-		end
-	end
-
-	local function sellNextChunk()
-		sellAllPendingEvent = nil
-
-		-- Closing the NPC trade, logging out, dying or starting another run makes
-		-- every previously scheduled callback harmless.
-		if thisRunId ~= sellAllRunId or not g_game.isOnline() or not npcModalTrade then
-			finishSale()
-			return
-		end
-
-		if sellAllQueueIndex < 1 then
-			sellAllQueueIndex = 1
-		end
-
-		local sale = sellAllQueue[sellAllQueueIndex]
-
-		if not sale then
-			finishSale()
-			return
-		end
-
-		local chunk = math.min(tonumber(sale.remaining) or 0, maxAmountPerRequest, 65535)
-
-		local sent = false
-
-		if sale.item and sale.item:getId() > 0 and chunk > 0 then
-			g_game.sellItem(sale.item, chunk, true)
-			sale.remaining = sale.remaining - chunk
-			sent = true
-		else
-			sale.remaining = 0
-		end
-
-		if sale.remaining <= 0 then
-			sellAllQueueIndex = sellAllQueueIndex + 1
-		end
-
-		if sent then
-			local waitingRunId = thisRunId
-			local acknowledged = false
-
-			continueSellAllAfterPlayerGoods = function()
-				if acknowledged or waitingRunId ~= sellAllRunId then
-					return
-				end
-
-				acknowledged = true
-				continueSellAllAfterPlayerGoods = nil
-
-				if sellAllPendingEvent then
-					removeEvent(sellAllPendingEvent)
-					sellAllPendingEvent = nil
-				end
-
-				-- A short gap prevents the acknowledgement and the next request from
-				-- being handled in the same network tick.
-				sellAllPendingEvent = scheduleEvent(sellNextChunk, 100)
-			end
-
-			-- Some servers do not resend player goods for every sale. This fallback
-			-- keeps the queue moving, but uses the proven safe RubinOT interval.
-			sellAllPendingEvent = scheduleEvent(function()
-				if acknowledged or waitingRunId ~= sellAllRunId then
-					return
-				end
-
-				acknowledged = true
-				continueSellAllAfterPlayerGoods = nil
-				sellNextChunk()
-			end, 1100)
-		else
-			sellAllPendingEvent = scheduleEvent(sellNextChunk, 50)
-		end
-	end
-
-	-- Start quickly so the button gives immediate feedback.
-	sellAllPendingEvent = scheduleEvent(sellNextChunk, 200)
+	end, 450)
 end
 
 cancelSellAll = function()
