@@ -59,6 +59,7 @@ jobs:
             -DCMAKE_TOOLCHAIN_FILE="$env:GITHUB_WORKSPACE/vcpkg/scripts/buildsystems/vcpkg.cmake" `
             -DVCPKG_TARGET_TRIPLET=x64-windows-static `
             -DOTCLIENT_WINDOWS_TARGET=0x0A00 `
+            -DBUILD_STATIC_LIBRARY=ON `
             -DBUILD_TESTING=OFF
 
       - name: Build client
@@ -81,6 +82,7 @@ jobs:
           }
 
           Copy-Item -LiteralPath $exe -Destination "$artifact/CrystalOTC-WindowsServer.exe"
+
           Get-ChildItem -LiteralPath (Split-Path $exe) -Filter '*.dll' -ErrorAction SilentlyContinue |
             Copy-Item -Destination $artifact
 
