@@ -8,8 +8,27 @@ Services = {
     --websites = "http://localhost/?subtopic=accountmanagement", --./client_entergame "Forgot password and/or email"
     --createAccount = "http://localhost/clientcreateaccount.php", --./client_entergame -- createAccount.lua
     --getCoinsUrl = "http://localhost/?subtopic=shop&step=terms", --./game_market
-    minimap = "http://127.0.0.1/minimap.otmm", --./game_minimap
 }
+
+-- Keep the public endpoint outside the executable so the same build can be
+-- distributed to other computers and the server address can be changed
+-- without recompiling the client.
+local serverConfig = {}
+if g_resources.fileExists("/server_config.lua") then
+    local configChunk, configError = loadstring(g_resources.readFileContents("/server_config.lua"), "@/server_config.lua")
+    if not configChunk then
+        error("Invalid server_config.lua: " .. tostring(configError))
+    end
+
+    serverConfig = configChunk() or {}
+end
+
+local useLocalServer = g_resources.fileExists("/devserver.flag")
+local activeServer = useLocalServer and serverConfig.localServer or serverConfig.public
+
+if activeServer and activeServer.webUrl and activeServer.webUrl ~= "" then
+    Services.minimap = activeServer.webUrl:gsub("/$", "") .. "/minimap.otmm"
+end
 
 --- Enables or disables the entire server configuration block.
 -- Set to `false` to disable all configuration below.
@@ -51,25 +70,18 @@ if ENABLE_SERVERS then
     --
     -- DEV (devserver.flag next to the exe): localhost ONLY - no background requests to the
     -- release endpoint. Release (no flag) = the production login below.
-    if g_resources.fileExists("/devserver.flag") then
-        Servers_init = {
-            ["http://127.0.0.1/login.php"] = {
-                port = 80,
-                protocol = 1530,
-                httpLogin = true,
-                useAuthenticator = false
-            }
-        }
-    else
-        Servers_init = {
-            ["http://127.0.0.1/login.php"] = {
-                port = 80,
-                protocol = 1530,
-                httpLogin = true,
-                useAuthenticator = false
-            }
-        }
+    if not activeServer or not activeServer.loginUrl or activeServer.loginUrl == "" then
+        error("server_config.lua must define loginUrl for the selected server profile")
     end
+
+    Servers_init = {
+        [activeServer.loginUrl] = {
+            port = activeServer.loginPort,
+            protocol = activeServer.protocol or 1530,
+            httpLogin = true,
+            useAuthenticator = false
+        }
+    }
 end
 
 g_app.setName("CrystalOTC");

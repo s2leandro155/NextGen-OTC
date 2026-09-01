@@ -190,7 +190,7 @@ jobs:
 
           # Include all tracked runtime files so the artifact is ready to run.
           # The large data/things assets remain separate from the repository.
-          foreach ($item in @("init.lua", "data", "modules", "mods")) {
+          foreach ($item in @("init.lua", "server_config.lua", "data", "modules", "mods")) {
             $src = Join-Path $env:GITHUB_WORKSPACE $item
             if (Test-Path $src) {
               Copy-Item $src -Destination $artifactDir -Recurse -Force

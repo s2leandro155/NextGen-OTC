@@ -21,23 +21,21 @@ local function buildLoginBody(token)
 	return body
 end
 
-local function buildLoginUrl(useHttps)
-	local scheme = useHttps and "https" or "http"
-
-	return string.format("%s://%s:%d%s", scheme, G.loginHost, G.port, G.loginPath)
+local function buildLoginUrl(scheme, port)
+	return string.format("%s://%s:%d%s", scheme, G.loginHost, port, G.loginPath)
 end
 
-local function sendHttpLoginRequest(httpLogin, token, useHttps)
+local function sendHttpLoginRequest(httpLogin, token, scheme, port)
 	local requestId = G.requestId
-	local url = buildLoginUrl(useHttps)
+	local url = buildLoginUrl(scheme, port)
 
 	G.httpOperationId = HTTP.postJSON(url, buildLoginBody(token), function(data, err)
 		if G.requestId ~= requestId then
 			return
 		end
 
-		if err and useHttps and httpLogin then
-			sendHttpLoginRequest(httpLogin, token, false)
+		if err and scheme == "https" and httpLogin then
+			sendHttpLoginRequest(httpLogin, token, "http", G.httpFallbackPort or 80)
 
 			return
 		end
@@ -612,21 +610,19 @@ function EnterGame.tryHttpLogin(clientVersion, httpLogin, token)
 		return
 	end
 
-	local host, path = G.host:match("([^/]+)/([^/].*)")
-
-	if not G.port then
-		local isHttps, _ = string.find(host, "https")
-
-		if not isHttps then
-			G.port = 443
-		else
-			G.port = 80
-		end
+	local scheme, authority, path = G.host:match("^(https?)://([^/]+)(/.*)$")
+	if not authority then
+		authority, path = G.host:match("^([^/]+)(/.*)$")
 	end
 
-	path = not path and "" or "/" .. path
+	scheme = scheme or ((G.port == 443) and "https" or "http")
+	local host, urlPort = authority and authority:match("^([^:]+):(%d+)$")
+	host = host or authority
+	G.port = tonumber(urlPort) or G.port or (scheme == "https" and 443 or 80)
+	path = path or ""
 	G.loginHost = host
 	G.loginPath = path
+	G.loginScheme = scheme
 
 	if not host then
 		loadBox = displayCancelBox(tr("Please wait"), tr("ERROR , try adding \n- ip/login.php \n- Enable HTTP login"))
@@ -652,7 +648,7 @@ function EnterGame.tryHttpLogin(clientVersion, httpLogin, token)
 
 	G.requestId = math.random(1)
 
-	sendHttpLoginRequest(httpLogin, token or "", true)
+	sendHttpLoginRequest(httpLogin, token or "", G.loginScheme, G.port)
 end
 
 function EnterGame.destroyTwoFactorWindow()

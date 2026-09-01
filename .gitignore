@@ -220,6 +220,7 @@ tags
 *.otbm
 *.spr
 *.dat
+!data/sounds/1530/sounds-ce31d979f9894dc453f296820bcfe7183b992fc08e0a8da3fb8eeb1bb0dfd654.dat
 *.pic
 config.otml
 *.patch

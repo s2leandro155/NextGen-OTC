@@ -16,7 +16,10 @@ local mapReadyEvent
 local mapTransitionStartedAt = 0
 local mapTransitionActive = false
 local MAP_READY_POLL_MS = 16
-local MAP_READY_TIMEOUT_MS = 3000
+-- Large 15.30 maps and cold texture caches can legitimately need more than
+-- three seconds on another computer. Keep the loading art visible instead of
+-- declaring a false timeout while the map is still preparing its first frame.
+local MAP_READY_TIMEOUT_MS = 10000
 
 local function cancelMapReadyEvent()
 	if mapReadyEvent then

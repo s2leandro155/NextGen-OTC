@@ -139,7 +139,10 @@ local function load(version)
 	loaded = #errorList == 0
 
 	if loaded then
-		g_sounds.loadClientFiles(resolvepath("/sounds/"))
+		local versionedSoundsPath = "/sounds/" .. version .. "/"
+		local soundsPath = g_resources.fileExists(versionedSoundsPath .. "catalog-sound.json") and versionedSoundsPath or "/sounds/"
+
+		g_sounds.loadClientFiles(resolvepath(soundsPath))
 
 		return
 	end

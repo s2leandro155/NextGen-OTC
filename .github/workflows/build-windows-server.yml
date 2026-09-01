@@ -97,7 +97,7 @@ jobs:
           Get-ChildItem -LiteralPath (Split-Path $exe) -Filter '*.dll' -ErrorAction SilentlyContinue |
             Copy-Item -Destination $artifact
 
-          foreach ($item in @('init.lua', 'data', 'modules', 'mods')) {
+          foreach ($item in @('init.lua', 'server_config.lua', 'data', 'modules', 'mods')) {
             if (Test-Path -LiteralPath $item) {
               Copy-Item -LiteralPath $item -Destination $artifact -Recurse -Force
             }
