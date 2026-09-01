@@ -347,7 +347,6 @@ crashdump/
 # SEKRETY (bez hasel/kluczy paka backup)
 ASSET_CRYPTO_KEY_BACKUP.txt
 config.ini
-devserver.flag
 # Scratch/tymczasowe
 __pycache__/
 _wip_stance_icons/
@@ -385,7 +384,6 @@ assets.pak.*
 *.log.*
 logs/
 crashdumps/
-devserver.flag
 
 # Secrets - never commit
 ASSET_CRYPTO_KEY_BACKUP.txt

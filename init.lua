@@ -23,11 +23,8 @@ if g_resources.fileExists("/server_config.lua") then
     serverConfig = configChunk() or {}
 end
 
-local useLocalServer = g_resources.fileExists("/devserver.flag")
-local activeServer = useLocalServer and serverConfig.localServer or serverConfig.public
-
-if activeServer and activeServer.webUrl and activeServer.webUrl ~= "" then
-    Services.minimap = activeServer.webUrl:gsub("/$", "") .. "/minimap.otmm"
+if serverConfig.webUrl and serverConfig.webUrl ~= "" then
+    Services.minimap = serverConfig.webUrl:gsub("/$", "") .. "/minimap.otmm"
 end
 
 --- Enables or disables the entire server configuration block.
@@ -68,16 +65,14 @@ if ENABLE_SERVERS then
     -- Each entry defines port, protocol, and authentication options.
     -- @table Servers_init
     --
-    -- DEV (devserver.flag next to the exe): localhost ONLY - no background requests to the
-    -- release endpoint. Release (no flag) = the production login below.
-    if not activeServer or not activeServer.loginUrl or activeServer.loginUrl == "" then
-        error("server_config.lua must define loginUrl for the selected server profile")
+    if not serverConfig.loginUrl or serverConfig.loginUrl == "" then
+        error("server_config.lua must define loginUrl")
     end
 
     Servers_init = {
-        [activeServer.loginUrl] = {
-            port = activeServer.loginPort,
-            protocol = activeServer.protocol or 1530,
+        [serverConfig.loginUrl] = {
+            port = serverConfig.loginPort,
+            protocol = serverConfig.protocol or 1530,
             httpLogin = true,
             useAuthenticator = false
         }
