@@ -47,6 +47,7 @@ void SatelliteMap::clear()
     m_poiDoneTex.reset();
     m_poiTodoTex.reset();
     m_indexLoaded = false;
+    m_drawFrame = 0;
     m_dir.clear();
 }
 
@@ -170,21 +171,24 @@ bool SatelliteMap::loadFloors(const std::string& assetsDir, int /*minFloor*/, in
 
 bool SatelliteMap::hasChunksForView(const int floor)
 {
-    if (!m_indexLoaded || floor < 0 || floor > 7 || floor >= static_cast<int>(m_placements.size()))
+    if (!m_indexLoaded || floor < 0 || floor >= static_cast<int>(m_placements.size()))
         return false;
-    // Surface view stacks the current floor over everything down to ground (7),
-    // so it is available if any floor in [floor..7] carries chunks.
-    for (int f = floor; f <= 7 && f < static_cast<int>(m_placements.size()); ++f)
-        if (!m_placements[f].empty())
-            return true;
-    return false;
+
+    if (floor > 7)
+        return !m_placements[floor].empty();
+
+    // Surface view stacks the current floor over everything down to ground (7).
+    return std::any_of(m_placements.begin() + floor, m_placements.begin() + 8,
+                       [](const auto& placements) { return !placements.empty(); });
 }
 
 const TexturePtr& SatelliteMap::getTile(const uint16_t pngId)
 {
-    const auto it = m_textures.find(pngId);
-    if (it != m_textures.end())
-        return it->second;
+    auto it = m_textures.find(pngId);
+    if (it != m_textures.end()) {
+        it->second.lastUsedFrame = m_drawFrame;
+        return it->second.texture;
+    }
 
     TexturePtr tex;
     const std::string file = m_dir + "/satellite/" + std::to_string(pngId); // guessFilePath appends .png
@@ -201,7 +205,32 @@ const TexturePtr& SatelliteMap::getTile(const uint16_t pngId)
     } else {
         g_logger.warning("SatelliteMap: failed to load tile {} ({})", pngId, file);
     }
-    return m_textures.emplace(pngId, tex).first->second;
+    return m_textures.emplace(pngId, CachedTexture{ tex, m_drawFrame }).first->second.texture;
+}
+
+void SatelliteMap::pruneTextureCache()
+{
+    // A small minimap normally needs only a handful of chunks. Keep a short grace
+    // period for panning, then cap the cache so travelling never retains the world.
+    constexpr uint64_t maxIdleFrames = 180;
+    constexpr size_t maxCachedChunks = 48;
+
+    for (auto it = m_textures.begin(); it != m_textures.end();) {
+        if (m_drawFrame > it->second.lastUsedFrame + maxIdleFrames)
+            it = m_textures.erase(it);
+        else
+            ++it;
+    }
+
+    while (m_textures.size() > maxCachedChunks) {
+        const auto oldest = std::min_element(m_textures.begin(), m_textures.end(),
+            [](const auto& lhs, const auto& rhs) {
+                return lhs.second.lastUsedFrame < rhs.second.lastUsedFrame;
+            });
+        if (oldest == m_textures.end())
+            break;
+        m_textures.erase(oldest);
+    }
 }
 
 const TexturePtr& SatelliteMap::getMask(const int maskId)
@@ -234,6 +263,8 @@ void SatelliteMap::draw(const Rect& screenRect, const Position& mapCenter, const
     if (curZ < 0 || curZ >= static_cast<int>(m_placements.size()))
         return;
 
+    ++m_drawFrame;
+
     const auto& oldClip = g_drawPool.getClipRect();
     g_drawPool.setClipRect(screenRect);
 
@@ -260,8 +291,8 @@ void SatelliteMap::draw(const Rect& screenRect, const Position& mapCenter, const
     // Stack floors from the ground (7) up to the current floor, so lower floors show
     // through the transparent gaps of the floors above (surface "0+1" view). Ground is
     // drawn first (bottom), the current floor last (on top).
-    const int groundFloor = std::min(7, static_cast<int>(m_placements.size()) - 1);
-    for (int f = groundFloor; f >= curZ; --f) {
+    const int firstFloor = curZ <= 7 ? 7 : curZ;
+    for (int f = firstFloor; f >= curZ; --f) {
         // Draw only the LOD level matching the zoom, so detail is uniform (no low-detail base
         // showing through). Each level is a full grid, so coverage stays complete.
         for (const auto& p : m_placements[f]) {
@@ -285,6 +316,11 @@ void SatelliteMap::draw(const Rect& screenRect, const Position& mapCenter, const
             g_drawPool.addTexturedRect(dest, tex, Rect(0, 0, ts.width(), ts.height()), tint);
         }
     }
+
+
+    // Pruning once per second is enough and keeps it out of the hot draw path.
+    if ((m_drawFrame % 60) == 0)
+        pruneTextureCache();
 
     // Discovery-zone highlight: draw each subarea mask tinted so the highlight follows the
     // coastline (the mask is a white land shape with transparent water). The alpha breathes

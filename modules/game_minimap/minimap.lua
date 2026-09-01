@@ -5,10 +5,9 @@ local virtualFloor = 7
 local dragStartMouseY = 0
 local dragStartMargin = 0
 local persistentMinimapDataLoaded = false
-local hdMinimapEnabled = true
+local hdMinimapEnabled = false
 local loadedSatelliteDir
-local normalMinimapZoom
-local HD_MINIMAP_ZOOM = 4
+local satelliteDataAvailable
 local findMinimapWidget
 local currentDayTime = {
 	m = 0,
@@ -31,6 +30,22 @@ local BUNDLED_MARKERS_PATH = "/minimap/markers.json"
 -- would be SHADOWED on read by the prebuilt map from the bundle and would never get loaded.
 local USER_MINIMAP_OTMM_PATH = "/user_minimap.otmm"
 
+local function updateHdMinimapButtons()
+	if not mapController or not mapController.ui then
+		return
+	end
+
+	for _, id in ipairs({ "hdMinimapButton", "hdMinimapButtonHorizontal" }) do
+		local button = mapController.ui:recursiveGetChildById(id)
+		if button and not button:isDestroyed() then
+			button:setChecked(hdMinimapEnabled and satelliteDataAvailable ~= false)
+			button:setTooltip(satelliteDataAvailable == false and
+				tr("HD minimap files are not available for this client version.") or
+				tr("Toggle classic / HD minimap"))
+		end
+	end
+end
+
 local function refreshHdMinimap()
 	if not mapController or not mapController.ui then
 		return
@@ -48,29 +63,30 @@ local function refreshHdMinimap()
 
 	if not hdMinimapEnabled or not g_game.isOnline() then
 		mini:setSatelliteMode(false)
-		if normalMinimapZoom and mini.setZoom then
-			mini:setZoom(normalMinimapZoom)
-			normalMinimapZoom = nil
-		end
+		updateHdMinimapButtons()
 		return
 	end
 
 	local satelliteDir = "/things/" .. g_game.getClientVersion()
 	if loadedSatelliteDir ~= satelliteDir and g_satelliteMap and g_satelliteMap.loadFloors then
-		g_satelliteMap.loadFloors(satelliteDir, 0, 15)
-		loadedSatelliteDir = satelliteDir
+		satelliteDataAvailable = g_satelliteMap.loadFloors(satelliteDir, 0, 15) == true
+		if satelliteDataAvailable then
+			loadedSatelliteDir = satelliteDir
+		end
 	end
 
-	mini:setSatelliteMode(true)
-	if mini.getZoom and mini.setZoom and normalMinimapZoom == nil then
-		normalMinimapZoom = mini:getZoom()
-		mini:setZoom(HD_MINIMAP_ZOOM)
-	end
+	mini:setSatelliteMode(satelliteDataAvailable == true)
+	updateHdMinimapButtons()
 end
 
 function setHdMinimapEnabled(enabled)
 	hdMinimapEnabled = enabled == true
+	g_settings.set("hdMinimap", hdMinimapEnabled)
 	refreshHdMinimap()
+end
+
+function toggleHdMinimap()
+	setHdMinimapEnabled(not hdMinimapEnabled)
 end
 
 local function normalizeFsPath(path)
@@ -922,12 +938,16 @@ function onChangeWorldTime(hour, minute)
 end
 
 function mapController:onInit()
-	if not g_settings.getBoolean("hdMinimapSatelliteInitialized") then
-		hdMinimapEnabled = true
-		g_settings.set("hdMinimap", true)
-		g_settings.set("hdMinimapSatelliteInitialized", true)
+	-- Classic OTMM remains the default. HD is opt-in and persisted per client.
+	if not g_settings.getBoolean("hdMinimapModeConfigured") then
+		hdMinimapEnabled = false
+		g_settings.set("hdMinimap", false)
+		g_settings.set("hdMinimapModeConfigured", true)
+	else
+		hdMinimapEnabled = g_settings.getBoolean("hdMinimap")
 	end
 	syncMinimapLayoutAliases(getLayoutRoot(self.ui, false))
+	updateHdMinimapButtons()
 
 	local mini = findMinimapWidget(self.ui)
 
@@ -1016,12 +1036,12 @@ function mapController:onGameEnd()
 	minimap:save()
 	minimap:clearPartyMembers()
 	minimap:setSatelliteMode(false)
-	normalMinimapZoom = nil
 end
 
 function mapController:onTerminate()
 	persistentMinimapDataLoaded = false
 	loadedSatelliteDir = nil
+	satelliteDataAvailable = nil
 end
 
 function zoomIn()

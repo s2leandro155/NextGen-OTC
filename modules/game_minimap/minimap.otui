@@ -40,6 +40,17 @@ PhantomMiniWindow
       height: 18
       @onClick: modules.game_minimap.downloadFullMap()
 
+    Button
+      id: hdMinimapButton
+      !text: tr('HD')
+      anchors.top: minimapBorder.top
+      anchors.left: minimapBorder.left
+      margin-top: 3
+      margin-left: 3
+      size: 24 18
+      checkable: true
+      @onClick: modules.game_minimap.toggleHdMinimap()
+
     UIWidget
       id: layersPanel
       size: 20 68
@@ -362,6 +373,17 @@ PhantomMiniWindow
       width: 90
       height: 20
       @onClick: modules.game_minimap.downloadFullMap()
+
+    Button
+      id: hdMinimapButtonHorizontal
+      !text: tr('HD')
+      anchors.top: minimapBorder.top
+      anchors.left: minimapBorder.left
+      margin-top: 3
+      margin-left: 3
+      size: 24 18
+      checkable: true
+      @onClick: modules.game_minimap.toggleHdMinimap()
 
     UIWidget
       id: minimapControls

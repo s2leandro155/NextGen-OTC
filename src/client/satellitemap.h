@@ -28,6 +28,7 @@
 #include <framework/util/color.h>
 #include <framework/util/rect.h>
 #include <array>
+#include <cstdint>
 #include <vector>
 #include <unordered_map>
 
@@ -79,12 +80,18 @@ public:
 private:
     bool ensureIndex(const std::string& assetsDir);
     const TexturePtr& getTile(uint16_t pngId);
+    void pruneTextureCache();
 
     std::string m_dir;                                             // e.g. "/data/things/1530"
     bool m_indexLoaded{ false };
     Color m_ocean{ Color::black };
     std::array<std::vector<SatellitePlacement>, 16> m_placements;  // indexed by floor (z)
-    std::unordered_map<uint16_t, TexturePtr> m_textures;          // cached by pngId
+    struct CachedTexture {
+        TexturePtr texture;
+        uint64_t lastUsedFrame{ 0 };
+    };
+    std::unordered_map<uint16_t, CachedTexture> m_textures;       // bounded, demand-loaded chunk cache
+    uint64_t m_drawFrame{ 0 };
     struct HighlightMask { Rect rect; int maskId; };
     const TexturePtr& getMask(int maskId);
     const ImagePtr& getMaskImage(int maskId);                     // CPU-side mask (for hit-testing)
