@@ -79,7 +79,7 @@ if ENABLE_SERVERS then
     }
 end
 
-g_app.setName("CrystalOTC");
+g_app.setName("NextGen-OTC");
 g_app.setCompactName("crystalotc");
 g_app.setOrganizationName("Crystal");
 

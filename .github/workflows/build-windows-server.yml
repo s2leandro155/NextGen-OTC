@@ -1,7 +1,16 @@
 name: Build - Windows Server OpenGL
+run-name: Build - Windows Server OpenGL${{ github.ref_type == 'tag' && format(' - {0}', github.ref_name) || (inputs.build_label != '' && format(' - {0}', inputs.build_label) || '') }}
 
 on:
   workflow_dispatch:
+    inputs:
+      build_label:
+        description: Optional test/fix label (for example, Sound Fix or Minimap HD)
+        required: false
+        type: string
+  push:
+    tags:
+      - "v*.*.*"
   workflow_run:
     workflows: ["Build - Windows"]
     types: [completed]
@@ -16,15 +25,54 @@ env:
 
 jobs:
   build-windows-server:
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'push' || github.event.workflow_run.conclusion == 'success' }}
     name: windows-server-opengl-x64
     runs-on: windows-2022
+    outputs:
+      version: ${{ steps.build-version.outputs.version }}
+      display-version: ${{ steps.build-version.outputs.display-version }}
+      artifact-name: ${{ steps.build-version.outputs.artifact-name }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Resolve build version
+        id: build-version
+        shell: pwsh
+        env:
+          BUILD_LABEL: ${{ inputs.build_label }}
+        run: |
+          $cmake = Get-Content 'src/CMakeLists.txt' -Raw
+          if ($cmake -notmatch 'set\(VERSION\s+"([0-9]+\.[0-9]+\.[0-9]+)"\)') {
+            throw 'src/CMakeLists.txt must define set(VERSION "X.Y.Z").'
+          }
+
+          $version = $matches[1]
+          if ($env:GITHUB_REF_TYPE -eq 'tag') {
+            if ($env:GITHUB_REF_NAME -notmatch '^v([0-9]+\.[0-9]+\.[0-9]+)$') {
+              throw "Tag $env:GITHUB_REF_NAME is not valid SemVer (expected vX.Y.Z)."
+            }
+            $version = $matches[1]
+          }
+
+          $label = ([string]$env:BUILD_LABEL).Trim()
+          $labelSlug = $label -replace '[^A-Za-z0-9._-]+', '-'
+          $labelSlug = $labelSlug.Trim('-')
+          $artifactName = "NextGen-OTC-Windows-v$version"
+          $displayVersion = "v$version"
+          if ($labelSlug) {
+            $artifactName += "-$labelSlug"
+            $displayVersion += " - $label"
+          }
+
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "display-version=$displayVersion" >> $env:GITHUB_OUTPUT
+          "artifact-name=$artifactName" >> $env:GITHUB_OUTPUT
+          "### NextGen-OTC $displayVersion" >> $env:GITHUB_STEP_SUMMARY
+          "Artifact: ``$artifactName``" >> $env:GITHUB_STEP_SUMMARY
 
       - name: Read vcpkg baseline
         id: vcpkg
@@ -102,11 +150,11 @@ jobs:
           # Keep the public executable name identical to the regular Windows
           # package. This build uses x64-windows-static + BUILD_STATIC_LIBRARY,
           # therefore CMake selects the static MSVC runtime (/MT) in Release.
-          $packagedExe = "$artifact/CrystalOTC.exe"
+          $packagedExe = "$artifact/NextGen-OTC.exe"
           Copy-Item -LiteralPath $exe -Destination $packagedExe
 
           # Resolve PE imports recursively. System DLLs stay provided by
-          # Windows; every non-system DLL must be copied beside CrystalOTC.exe.
+          # Windows; every non-system DLL must be copied beside NextGen-OTC.exe.
           # This catches dynamically loaded dependencies without blindly
           # shipping the complete vcpkg or Visual Studio runtime directories.
           $searchDirs = @(
@@ -187,7 +235,7 @@ jobs:
           }
 
           @(
-            'CrystalOTC Windows x64 dependency report'
+            'NextGen-OTC Windows x64 dependency report'
             'Target: Windows 10/11 x64'
             'Configuration: Release'
             'MSVC runtime: static (/MT)'
@@ -203,9 +251,9 @@ jobs:
         shell: pwsh
         run: |
           $artifact = "$env:GITHUB_WORKSPACE/artifacts/windows-server"
-          $exe = "$artifact/CrystalOTC.exe"
+          $exe = "$artifact/NextGen-OTC.exe"
 
-          foreach ($required in @('CrystalOTC.exe', 'init.lua', 'data', 'modules', 'mods', 'dependency-report.txt')) {
+          foreach ($required in @('NextGen-OTC.exe', 'init.lua', 'data', 'modules', 'mods', 'dependency-report.txt')) {
             if (-not (Test-Path -LiteralPath (Join-Path $artifact $required))) {
               throw "Required runtime file is missing from package: $required"
             }
@@ -221,7 +269,7 @@ jobs:
           $process = Start-Process -FilePath $exe -WorkingDirectory $artifact -PassThru
           if ($process.WaitForExit(15000)) {
             if ($process.ExitCode -ne 0) {
-              throw "CrystalOTC exited during clean-folder smoke test with code $($process.ExitCode)."
+              throw "NextGen-OTC exited during clean-folder smoke test with code $($process.ExitCode)."
             }
           } else {
             Stop-Process -Id $process.Id -Force
@@ -230,7 +278,7 @@ jobs:
       - name: Upload Windows Server package
         uses: actions/upload-artifact@v4
         with:
-          name: CrystalOTC-WindowsServer-OpenGL-x64
+          name: ${{ steps.build-version.outputs.artifact-name }}
           path: artifacts/windows-server
           if-no-files-found: error
 
@@ -245,16 +293,30 @@ jobs:
       - name: Download Windows Server package
         uses: actions/download-artifact@v4
         with:
-          name: CrystalOTC-WindowsServer-OpenGL-x64
+          name: ${{ needs.build-windows-server.outputs.artifact-name }}
           path: artifacts
 
       - name: Zip Windows Server package
-        run: cd artifacts && zip -r ../CrystalOTC-WindowsServer-OpenGL-x64.zip .
+        env:
+          ARTIFACT_NAME: ${{ needs.build-windows-server.outputs.artifact-name }}
+        run: cd artifacts && zip -r "../${ARTIFACT_NAME}.zip" .
 
-      - name: Add package to "latest" release
+      - name: Publish versioned package
         env:
           GH_TOKEN: ${{ github.token }}
+          ARTIFACT_NAME: ${{ needs.build-windows-server.outputs.artifact-name }}
+          DISPLAY_VERSION: ${{ needs.build-windows-server.outputs.display-version }}
         run: |
-          gh release upload latest CrystalOTC-WindowsServer-OpenGL-x64.zip \
-            -R "$GITHUB_REPOSITORY" \
-            --clobber
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            gh release view "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+              gh release create "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" \
+                --target "$GITHUB_SHA" \
+                --title "NextGen-OTC $DISPLAY_VERSION" \
+                --notes "Stable NextGen-OTC build $DISPLAY_VERSION."
+            RELEASE="$GITHUB_REF_NAME"
+          else
+            RELEASE="latest"
+          fi
+
+          gh release upload "$RELEASE" "${ARTIFACT_NAME}.zip" \
+            -R "$GITHUB_REPOSITORY" --clobber
