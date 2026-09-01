@@ -2,6 +2,10 @@ name: Build - Windows Server OpenGL
 
 on:
   workflow_dispatch:
+  workflow_run:
+    workflows: ["Build - Windows"]
+    types: [completed]
+    branches: [main]
 
 permissions:
   contents: read
@@ -12,12 +16,15 @@ env:
 
 jobs:
   build-windows-server:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     name: windows-server-opengl-x64
     runs-on: windows-2022
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
       - name: Read vcpkg baseline
         id: vcpkg
@@ -109,3 +116,28 @@ jobs:
           name: CrystalOTC-WindowsServer-OpenGL-x64
           path: artifacts/windows-server
           if-no-files-found: error
+
+  release:
+    name: Update Windows Server package in "latest"
+    needs: build-windows-server
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download Windows Server package
+        uses: actions/download-artifact@v4
+        with:
+          name: CrystalOTC-WindowsServer-OpenGL-x64
+          path: artifacts
+
+      - name: Zip Windows Server package
+        run: cd artifacts && zip -r ../CrystalOTC-WindowsServer-OpenGL-x64.zip .
+
+      - name: Add package to "latest" release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload latest CrystalOTC-WindowsServer-OpenGL-x64.zip \
+            -R "$GITHUB_REPOSITORY" \
+            --clobber
