@@ -145,6 +145,8 @@ void ProtocolGame::sendLogout()
 
 void ProtocolGame::sendPing()
 {
+    g_logger.traceDebug("[PROTO_TRACE] ProtocolGame::sendPing: extended={}",
+        g_game.getFeature(Otc::GameExtendedClientPing));
     if (g_game.getFeature(Otc::GameExtendedClientPing))
         sendExtendedOpcode(2, "");
     else {
@@ -156,6 +158,7 @@ void ProtocolGame::sendPing()
 
 void ProtocolGame::sendPingBack()
 {
+    g_logger.traceDebug("[PROTO_TRACE] ProtocolGame::sendPingBack");
     const auto& msg = std::make_shared<OutputMessage>();
     msg->addU8(Proto::ClientPingBack);
     send(msg);

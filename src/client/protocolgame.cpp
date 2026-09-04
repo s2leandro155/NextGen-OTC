@@ -62,12 +62,16 @@ void ProtocolGame::onRecv(const InputMessagePtr& inputMessage)
 {
     m_recivedPackeds += 1;
     m_recivedPackedsSize += inputMessage->getMessageSize();
+    g_logger.traceDebug("[PROTO_TRACE] ProtocolGame::onRecv begin: packet={}, size={}, readPos={}, unread={}",
+        m_recivedPackeds, inputMessage->getMessageSize(),
+        inputMessage->getReadPos(), inputMessage->getUnreadSize());
 
     if (m_firstRecv) {
         m_firstRecv = false;
 
         if (g_game.getClientVersion() >= 1405) {
             const int padding = inputMessage->getU8();
+            g_logger.traceDebug("[PROTO_TRACE] first packet padding={}", padding);
         } else if (g_game.getFeature(Otc::GameMessageSizeCheck)) {
             const int size = inputMessage->getU16();
             if (size != inputMessage->getUnreadSize()) {
@@ -78,7 +82,10 @@ void ProtocolGame::onRecv(const InputMessagePtr& inputMessage)
     }
 
     parseMessage(inputMessage);
+    g_logger.traceDebug("[PROTO_TRACE] ProtocolGame::onRecv parsed: packet={}, readPos={}, unread={}",
+        m_recivedPackeds, inputMessage->getReadPos(), inputMessage->getUnreadSize());
     recv();
+    g_logger.traceDebug("[PROTO_TRACE] ProtocolGame::onRecv rearmed recv: packet={}", m_recivedPackeds);
 }
 
 void ProtocolGame::onError(const std::error_code& error)

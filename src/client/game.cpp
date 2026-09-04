@@ -255,6 +255,7 @@ void Game::processPlayerModes(const Otc::FightModes fightMode, const Otc::ChaseM
 
 void Game::processPing()
 {
+    g_logger.traceDebug("[PROTO_TRACE] Game::processPing: received server ping");
     g_lua.callGlobalField("g_game", "onPing");
     m_protocolGame->sendPingBack();
 }
@@ -262,6 +263,7 @@ void Game::processPing()
 void Game::processPingBack()
 {
     ++m_pingReceived;
+    g_logger.traceDebug("[PROTO_TRACE] Game::processPingBack: received={}, sent={}", m_pingReceived, m_pingSent);
 
     if (m_pingReceived == m_pingSent) {
         const ticks_t oldPing = m_ping;
@@ -1662,6 +1664,7 @@ void Game::ping()
     m_protocolGame->sendPing();
     ++m_pingSent;
     m_pingTimer.restart();
+    g_logger.traceDebug("[PROTO_TRACE] Game::ping sent: sent={}, received={}", m_pingSent, m_pingReceived);
 }
 
 void Game::changeMapAwareRange(const uint8_t xrange, const uint8_t yrange)

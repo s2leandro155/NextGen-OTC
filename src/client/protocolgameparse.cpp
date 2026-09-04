@@ -49,10 +49,20 @@ void ProtocolGame::parseMessage(const InputMessagePtr& msg)
 {
     int opcode = -1;
     int prevOpcode = -1;
+    uint32_t opcodeCount = 0;
+
+    g_logger.traceDebug("[PROTO_TRACE] parseMessage begin: size={}, readPos={}, unread={}",
+        msg->getMessageSize(), msg->getReadPos(), msg->getUnreadSize());
 
     try {
         while (!msg->eof()) {
+            const int opcodeStart = msg->getReadPos();
             opcode = msg->getU8();
+            const int bodyStart = msg->getReadPos();
+            ++opcodeCount;
+
+            g_logger.traceDebug("[PROTO_TRACE] opcode #{}, 0x{:02X}: start={}, bodyStart={}, unread={}",
+                opcodeCount, opcode, opcodeStart, bodyStart, msg->getUnreadSize());
             AUTO_STAT(STATS_PACKETS, fmt::format("{} (0x{:02X})", opcode, opcode));
 
             // must be > so extended will be enabled before GameStart.
@@ -65,7 +75,20 @@ void ProtocolGame::parseMessage(const InputMessagePtr& msg)
 
             // try to parse in lua first
             const int readPos = msg->getReadPos();
-            if (callLuaField<bool>("onOpcode", opcode, msg)) {
+            const bool handledByLua = callLuaField<bool>("onOpcode", opcode, msg);
+            const int luaReadPos = msg->getReadPos();
+            if (handledByLua) {
+                g_logger.traceDebug("[PROTO_TRACE] opcode 0x{:02X} handled by Lua: {} -> {}, consumed={}, unread={}",
+                    opcode, readPos, luaReadPos, luaReadPos - readPos, msg->getUnreadSize());
+                if (luaReadPos == readPos && msg->getUnreadSize() > 0) {
+                    g_logger.warning("[PROTO_TRACE] Lua handled opcode 0x{:02X} without consuming payload at pos {}; remaining={}",
+                        opcode, readPos, msg->getUnreadSize());
+                }
+                if (luaReadPos < opcodeStart) {
+                    g_logger.error("[PROTO_TRACE] Lua rewound message at opcode 0x{:02X}: {} -> {}; aborting frame",
+                        opcode, opcodeStart, luaReadPos);
+                    msg->setReadPos(msg->getMessageSize());
+                }
                 continue;
             }
             msg->setReadPos(readPos);
@@ -687,8 +710,18 @@ void ProtocolGame::parseMessage(const InputMessagePtr& msg)
                     break;
                 }
             }
+            const int handlerReadPos = msg->getReadPos();
+            g_logger.traceDebug("[PROTO_TRACE] opcode 0x{:02X} finished: {} -> {}, consumed={}, unread={}",
+                opcode, bodyStart, handlerReadPos, handlerReadPos - bodyStart, msg->getUnreadSize());
+            if (handlerReadPos < opcodeStart) {
+                g_logger.error("[PROTO_TRACE] parser rewound message at opcode 0x{:02X}: {} -> {}; aborting frame",
+                    opcode, opcodeStart, handlerReadPos);
+                msg->setReadPos(msg->getMessageSize());
+            }
             prevOpcode = opcode;
         }
+        g_logger.traceDebug("[PROTO_TRACE] parseMessage end: opcodes={}, readPos={}, unread={}",
+            opcodeCount, msg->getReadPos(), msg->getUnreadSize());
     } catch (const stdext::exception& e) {
         const auto unread = msg->getUnreadSize();
         const auto readPos = msg->getReadPos();
@@ -3484,55 +3517,26 @@ void ProtocolGame::parseBestiaryOverview(const InputMessagePtr& msg)
     const auto& raceName = msg->getString();
 
     const uint16_t raceSize = msg->getU16();
-    const auto entriesReadPos = msg->getReadPos();
     std::vector<BestiaryOverviewMonsters> data;
     uint16_t animusMasteryPoints = 0;
 
-    // Some 15.x servers still answer 0xD6 using the pre-Animus layout. Parse the
-    // current layout transactionally and fall back without consuming the next
-    // opcode when an old-layout entry makes the current layout implausible.
-    const auto parseEntries = [&](const bool hasAnimusFields) {
-        std::vector<BestiaryOverviewMonsters> parsed;
-        parsed.reserve(raceSize);
+    for (auto i = 0; i < raceSize; ++i) {
+        BestiaryOverviewMonsters monster;
+        monster.id = msg->getU16();
+        monster.currentLevel = msg->getU8();
 
-        for (auto i = 0; i < raceSize; ++i) {
-            BestiaryOverviewMonsters monster;
-            monster.id = msg->getU16();
-            monster.currentLevel = msg->getU8();
-            if (monster.id == 0 || monster.currentLevel > 4) {
-                throw std::runtime_error("invalid bestiary overview entry");
-            }
-            if (monster.currentLevel > 0) {
-                monster.occurrence = msg->getU8();
-                if (monster.occurrence > 3) {
-                    throw std::runtime_error("invalid bestiary occurrence");
-                }
-            }
-            if (hasAnimusFields) {
-                monster.creatureAnimusMasteryBonus = msg->getU16();
-            }
-            parsed.emplace_back(monster);
-        }
+        // 15.30 can include occurrence even when currentLevel is zero.
+        // Animus Mastery was added in 13.40 and is present after every entry
+        // from that version.
+        monster.occurrence = msg->getU8();
+        if (g_game.getClientVersion() >= 1340)
+            monster.creatureAnimusMasteryBonus = msg->getU16();
 
-        const uint16_t points = hasAnimusFields ? msg->getU16() : 0;
-        return std::pair { std::move(parsed), points };
-    };
-
-    const bool expectsAnimusFields = g_game.getClientVersion() >= 1340;
-    try {
-        auto parsed = parseEntries(expectsAnimusFields);
-        data = std::move(parsed.first);
-        animusMasteryPoints = parsed.second;
-    } catch (const std::exception&) {
-        if (!expectsAnimusFields) {
-            throw;
-        }
-        msg->setReadPos(entriesReadPos);
-        auto parsed = parseEntries(false);
-        data = std::move(parsed.first);
-        animusMasteryPoints = parsed.second;
-        g_logger.warning("Bestiary overview used legacy layout for race '{}'", raceName);
+        data.emplace_back(monster);
     }
+
+    if (g_game.getClientVersion() >= 1340)
+        animusMasteryPoints = msg->getU16();
 
     g_game.processParseBestiaryOverview(raceName, data, animusMasteryPoints);
 }
@@ -3557,24 +3561,23 @@ void ProtocolGame::parseBestiaryMonsterData(const InputMessagePtr& msg)
     data.secondUnlock = msg->getU16();
     data.lastProgressKillCount = msg->getU16();
     data.difficulty = msg->getU8();
-    data.ocorrence = 0; // level-0 monsters (15.25) don't carry occurrence on the wire
-    // 15.25: everything past the stars byte is gated on currentLevel != 0
-    if (g_game.getClientVersion() < 1530 || data.currentLevel != 0) {
-        data.ocorrence = msg->getU8();
-        const uint8_t lootCount = msg->getU8();
-        for (auto i = 0; i < lootCount; ++i) {
-            LootItem lootItem;
-            lootItem.itemId = msg->getU16();
-            lootItem.diffculty = msg->getU8();
-            lootItem.specialEvent = msg->getU8();
+    // Unlike 0xD6, 0xD7 always carries occurrence and loot count, including
+    // monsters whose current level is zero. There is no extra 15.30 byte here.
+    data.ocorrence = msg->getU8();
 
-            const bool shouldAddItem = lootItem.itemId != 0;
-            if (shouldAddItem) {
-                lootItem.name = msg->getString();
-                lootItem.amount = msg->getU8();
-            }
-            data.loot.emplace_back(lootItem);
+    const uint8_t lootCount = msg->getU8();
+    for (auto i = 0; i < lootCount; ++i) {
+        LootItem lootItem;
+        lootItem.itemId = msg->getU16();
+        lootItem.diffculty = msg->getU8();
+        lootItem.specialEvent = msg->getU8();
+
+        const bool shouldAddItem = lootItem.itemId != 0;
+        if (shouldAddItem) {
+            lootItem.name = msg->getString();
+            lootItem.amount = msg->getU8();
         }
+        data.loot.emplace_back(lootItem);
     }
 
     if (data.currentLevel > 1) {

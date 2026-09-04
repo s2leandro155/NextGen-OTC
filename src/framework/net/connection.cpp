@@ -123,6 +123,7 @@ void Connection::write(const uint8_t* buffer, const size_t size)
 {
     if (!m_connected)
         return;
+    g_logger.traceDebug("[PROTO_TRACE] Connection::write queued: {} bytes", size);
 
     // we can't send the data right away, otherwise we could create tcp congestion
     if (!m_outputStream) {
@@ -151,6 +152,7 @@ void Connection::internal_write()
 
     std::shared_ptr<asio::streambuf> outputStream = m_outputStream;
     m_outputStream = nullptr;
+    g_logger.traceDebug("[PROTO_TRACE] Connection::internal_write socket write: {} bytes", outputStream->size());
 
     async_write(m_socket,
                 *outputStream,
@@ -169,6 +171,7 @@ void Connection::read(const uint16_t bytes, const RecvCallback& callback)
 {
     if (!m_connected)
         return;
+    g_logger.traceDebug("[PROTO_TRACE] Connection::read arm: {} bytes", bytes);
 
     m_recvCallback = callback;
 
@@ -293,6 +296,8 @@ void Connection::onRecv(const std::error_code& error, const size_t recvSize)
 {
     m_readTimer.cancel();
     m_activityTimer.restart();
+    g_logger.traceDebug("[PROTO_TRACE] Connection::onRecv: error={}, bytes={}, connected={}, callback={}",
+        error ? error.message() : "none", recvSize, m_connected, static_cast<bool>(m_recvCallback));
 
     if (error == asio::error::operation_aborted)
         return;
@@ -302,6 +307,7 @@ void Connection::onRecv(const std::error_code& error, const size_t recvSize)
             if (m_recvCallback) {
                 const auto* header = asio::buffer_cast<const char*>(m_inputStream.data());
                 m_recvCallback((uint8_t*)header, recvSize);
+                g_logger.traceDebug("[PROTO_TRACE] Connection::onRecv callback complete: {} bytes", recvSize);
             }
         } else
             handleError(error);

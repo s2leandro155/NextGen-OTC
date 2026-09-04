@@ -191,6 +191,8 @@ void Protocol::recv()
         headerSize += 2; // 2 bytes for XTEA encrypted message size
     }
     m_inputMessage->setHeaderSize(headerSize);
+    g_logger.traceDebug("[PROTO_TRACE] Protocol::recv arm header: headerSize={}, version={}, checksum={}, sequenced={}",
+        headerSize, g_game.getClientVersion(), m_checksumEnabled, m_sequencedPackets);
 
     // read the first 2 bytes which contain the message size
     if (m_connection)
@@ -205,6 +207,8 @@ void Protocol::internalRecvHeader(const uint8_t* buffer, const uint16_t size)
     // read message size
     m_inputMessage->fillBuffer(buffer, size);
     uint16_t remainingSize = m_inputMessage->readSize();
+    g_logger.traceDebug("[PROTO_TRACE] Protocol::internalRecvHeader: rawSize={}, headerBytes={}",
+        remainingSize, size);
     if (g_game.getClientVersion() >= 1405) {
         remainingSize = remainingSize * 8 + 4;
     }
@@ -214,6 +218,7 @@ void Protocol::internalRecvHeader(const uint8_t* buffer, const uint16_t size)
         g_logger.error(fmt::format("invalid packet size = {}", remainingSize));
         return;
     }
+    g_logger.traceDebug("[PROTO_TRACE] Protocol::internalRecvHeader payload scheduled: {} bytes", remainingSize);
 
     // read remaining message data
     if (m_connection)
@@ -225,6 +230,8 @@ void Protocol::internalRecvHeader(const uint8_t* buffer, const uint16_t size)
 
 void Protocol::internalRecvData(const uint8_t* buffer, const uint16_t size)
 {
+    g_logger.traceDebug("[PROTO_TRACE] Protocol::internalRecvData begin: received={}, connected={}, headerSize={}",
+        size, isConnected(), m_inputMessage->getHeaderSize());
     // process data only if really connected
     if (!isConnected()) {
         g_logger.traceError("received data while disconnected");
@@ -232,6 +239,8 @@ void Protocol::internalRecvData(const uint8_t* buffer, const uint16_t size)
     }
 
     m_inputMessage->fillBuffer(buffer, size);
+    g_logger.traceDebug("[PROTO_TRACE] Protocol::internalRecvData filled: messageSize={}, readPos={}, unread={}",
+        m_inputMessage->getMessageSize(), m_inputMessage->getReadPos(), m_inputMessage->getUnreadSize());
 
     bool decompress = false;
     if (m_sequencedPackets) {
@@ -313,7 +322,10 @@ void Protocol::internalRecvData(const uint8_t* buffer, const uint16_t size)
     if (m_recorder) {
         m_recorder->addInputPacket(m_inputMessage);
     }
+    g_logger.traceDebug("[PROTO_TRACE] Protocol::internalRecvData dispatch onRecv: messageSize={}, unread={}",
+        m_inputMessage->getMessageSize(), m_inputMessage->getUnreadSize());
     onRecv(m_inputMessage);
+    g_logger.traceDebug("[PROTO_TRACE] Protocol::internalRecvData end");
 }
 
 void Protocol::generateXteaKey()
