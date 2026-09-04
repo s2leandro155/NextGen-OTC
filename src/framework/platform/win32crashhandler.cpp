@@ -129,7 +129,10 @@ void Stacktrace(LPEXCEPTION_POINTERS e, std::stringstream& ss)
             ss << fmt::format("    {}: {} [0x%016lX]\n", count, modname, sf.AddrPC.Offset);
         ++count;
     }
-    GlobalFree(pSym);
+    // pSym points to symBuffer, which is stack storage owned by this function.
+    // It must not be passed to GlobalFree; doing so corrupts the process heap
+    // while handling another exception and masks the original crash as
+    // STATUS_HEAP_CORRUPTION (0xC0000374).
 }
 
 LONG CALLBACK ExceptionHandler(const LPEXCEPTION_POINTERS e)
