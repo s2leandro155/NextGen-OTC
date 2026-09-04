@@ -29,7 +29,6 @@
 // vulkan-headers dependency is marked windows-only in vcpkg.json - without this guard
 // a Linux build already fails on the mere #include <vulkan/vulkan.h>.
 #include "framework/graphics/vulkan/vkcontext.h"
-#include "framework/graphics/vulkan/vkloader.h"
 #include "framework/graphics/graphics.h"
 #include "framework/platform/platformwindow.h"
 #endif
@@ -207,13 +206,6 @@ void printHelp(const std::string& executableName)
             g_logger.info("[vulkan] backend available only on Windows, rendering with OpenGL");
 #endif
         }
-#ifdef WIN32
-        else {
-            // foundation test alone - confirms in the log that Vulkan works on this machine
-            VkLoader::instance().probeDevices();
-        }
-#endif
-
         // the run application main loop
         g_app.run();
 
