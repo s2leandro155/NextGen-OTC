@@ -1,4 +1,5 @@
 name: Build - Windows Server OpenGL
+
 run-name: Build - Windows Server OpenGL${{ github.ref_type == 'tag' && format(' - {0}', github.ref_name) || (inputs.build_label != '' && format(' - {0}', inputs.build_label) || '') }}
 
 on:
@@ -8,13 +9,16 @@ on:
         description: Optional test/fix label (for example, Sound Fix or Minimap HD)
         required: false
         type: string
+
   push:
     tags:
       - "v*.*.*"
+
   workflow_run:
     workflows: ["Build - Windows"]
     types: [completed]
-    branches: [main]
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -26,18 +30,39 @@ env:
 jobs:
   build-windows-server:
     if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'push' || github.event.workflow_run.conclusion == 'success' }}
+
     name: windows-server-opengl-x64
     runs-on: windows-2022
+
     outputs:
       version: ${{ steps.build-version.outputs.version }}
       display-version: ${{ steps.build-version.outputs.display-version }}
       artifact-name: ${{ steps.build-version.outputs.artifact-name }}
+      source-sha: ${{ steps.source-info.outputs.source-sha }}
 
     steps:
+      - name: Resolve source commit
+        id: source-info
+        shell: pwsh
+        run: |
+          if ("${{ github.event_name }}" -eq "workflow_run") {
+            $sourceSha = "${{ github.event.workflow_run.head_sha }}"
+          } else {
+            $sourceSha = "${{ github.sha }}"
+          }
+
+          if (-not $sourceSha) {
+            throw "Could not resolve source commit SHA."
+          }
+
+          "source-sha=$sourceSha" >> $env:GITHUB_OUTPUT
+          Write-Host "Source commit: $sourceSha"
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+          ref: ${{ steps.source-info.outputs.source-sha }}
+          fetch-depth: 0
 
       - name: Resolve build version
         id: build-version
@@ -46,23 +71,28 @@ jobs:
           BUILD_LABEL: ${{ inputs.build_label }}
         run: |
           $cmake = Get-Content 'src/CMakeLists.txt' -Raw
+
           if ($cmake -notmatch 'set\(VERSION\s+"([0-9]+\.[0-9]+\.[0-9]+)"\)') {
             throw 'src/CMakeLists.txt must define set(VERSION "X.Y.Z").'
           }
 
           $version = $matches[1]
+
           if ($env:GITHUB_REF_TYPE -eq 'tag') {
             if ($env:GITHUB_REF_NAME -notmatch '^v([0-9]+\.[0-9]+\.[0-9]+)$') {
               throw "Tag $env:GITHUB_REF_NAME is not valid SemVer (expected vX.Y.Z)."
             }
+
             $version = $matches[1]
           }
 
           $label = ([string]$env:BUILD_LABEL).Trim()
           $labelSlug = $label -replace '[^A-Za-z0-9._-]+', '-'
           $labelSlug = $labelSlug.Trim('-')
+
           $artifactName = "NextGen-OTC-Windows-v$version"
           $displayVersion = "v$version"
+
           if ($labelSlug) {
             $artifactName += "-$labelSlug"
             $displayVersion += " - $label"
@@ -71,6 +101,7 @@ jobs:
           "version=$version" >> $env:GITHUB_OUTPUT
           "display-version=$displayVersion" >> $env:GITHUB_OUTPUT
           "artifact-name=$artifactName" >> $env:GITHUB_OUTPUT
+
           "### NextGen-OTC $displayVersion" >> $env:GITHUB_STEP_SUMMARY
           "Artifact: ``$artifactName``" >> $env:GITHUB_STEP_SUMMARY
 
@@ -80,9 +111,11 @@ jobs:
         run: |
           $json = Get-Content vcpkg.json -Raw | ConvertFrom-Json
           $commit = $json.'builtin-baseline'
+
           if ($commit -notmatch '^[0-9a-f]{40}$') {
             throw 'vcpkg.json must contain a full 40-character builtin-baseline.'
           }
+
           "commit=$commit" >> $env:GITHUB_OUTPUT
 
       - name: Cache dependencies
@@ -120,12 +153,14 @@ jobs:
       - name: Build client
         shell: pwsh
         run: |
-          # Build and verify the generated protocol headers explicitly. The
-          # otclient_core target also depends on this target in CMake, so this
-          # step doubles as an early, clear diagnostic if protoc ever breaks.
+          # Build and verify the generated protocol headers explicitly.
+          # The otclient_core target also depends on this target in CMake,
+          # so this gives a clear diagnostic if protoc ever breaks.
+
           cmake --build build/windows-server --target protobuf
 
           $soundsHeader = "$env:GITHUB_WORKSPACE/build/windows-server/src/protobuf/sounds.pb.h"
+
           if (-not (Test-Path -LiteralPath $soundsHeader)) {
             throw "Protobuf generation did not create $soundsHeader"
           }
@@ -136,80 +171,115 @@ jobs:
         shell: pwsh
         run: |
           $artifact = "$env:GITHUB_WORKSPACE/artifacts/windows-server"
+
           New-Item -ItemType Directory -Force -Path $artifact | Out-Null
 
           $exe = @(
             "$env:GITHUB_WORKSPACE/otclient.exe",
             "$env:GITHUB_WORKSPACE/build/windows-server/bin/otclient.exe"
-          ) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+          ) |
+            Where-Object { Test-Path -LiteralPath $_ } |
+            Select-Object -First 1
 
           if (-not $exe) {
             throw 'The main otclient.exe was not generated.'
           }
 
-          # Keep the public executable name identical to the regular Windows
-          # package. This build uses x64-windows-static + BUILD_STATIC_LIBRARY,
+          # Keep the public executable name identical to the regular
+          # Windows package.
+          #
+          # This build uses x64-windows-static + BUILD_STATIC_LIBRARY,
           # therefore CMake selects the static MSVC runtime (/MT) in Release.
+
           $packagedExe = "$artifact/NextGen-OTC.exe"
+
           Copy-Item -LiteralPath $exe -Destination $packagedExe
 
-          # Resolve PE imports recursively. System DLLs stay provided by
-          # Windows; every non-system DLL must be copied beside NextGen-OTC.exe.
-          # This catches dynamically loaded dependencies without blindly
-          # shipping the complete vcpkg or Visual Studio runtime directories.
+          # Resolve PE imports recursively.
+          #
+          # System DLLs stay provided by Windows.
+          # Every non-system DLL must be copied beside NextGen-OTC.exe.
+
           $searchDirs = @(
             (Split-Path $exe),
             "$env:GITHUB_WORKSPACE/build/windows-server/bin",
             "$env:GITHUB_WORKSPACE/build/windows-server/vcpkg_installed/x64-windows-static/bin"
-          ) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -Unique
+          ) |
+            Where-Object { Test-Path -LiteralPath $_ } |
+            Select-Object -Unique
 
           function Get-PeImports([string]$binary) {
             $imports = & dumpbin.exe /nologo /dependents $binary
+
             if ($LASTEXITCODE -ne 0) {
               throw "dumpbin failed while inspecting $binary"
             }
-            @($imports | ForEach-Object {
-              if ($_ -match '^\s+([A-Za-z0-9_.+-]+\.dll)\s*$') {
-                $matches[1]
-              }
-            } | Sort-Object -Unique)
+
+            @(
+              $imports | ForEach-Object {
+                if ($_ -match '^\s+([A-Za-z0-9_.+-]+\.dll)\s*$') {
+                  $matches[1]
+                }
+              } | Sort-Object -Unique
+            )
           }
 
           $systemDirectories = @(
             "$env:SystemRoot/System32",
             "$env:SystemRoot/SysWOW64"
           )
+
           $pending = [System.Collections.Generic.Queue[string]]::new()
+
           $pending.Enqueue($packagedExe)
-          $visited = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
-          $bundled = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
-          $system = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
-          $missing = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+
+          $visited = [System.Collections.Generic.HashSet[string]]::new(
+            [System.StringComparer]::OrdinalIgnoreCase
+          )
+
+          $bundled = [System.Collections.Generic.HashSet[string]]::new(
+            [System.StringComparer]::OrdinalIgnoreCase
+          )
+
+          $system = [System.Collections.Generic.HashSet[string]]::new(
+            [System.StringComparer]::OrdinalIgnoreCase
+          )
+
+          $missing = [System.Collections.Generic.HashSet[string]]::new(
+            [System.StringComparer]::OrdinalIgnoreCase
+          )
 
           while ($pending.Count -gt 0) {
             $binary = $pending.Dequeue()
-            if (-not $visited.Add((Resolve-Path -LiteralPath $binary).Path)) { continue }
+
+            if (-not $visited.Add((Resolve-Path -LiteralPath $binary).Path)) {
+              continue
+            }
 
             foreach ($dll in Get-PeImports $binary) {
               $systemPath = $systemDirectories |
                 ForEach-Object { Join-Path $_ $dll } |
                 Where-Object { Test-Path -LiteralPath $_ } |
                 Select-Object -First 1
+
               if ($systemPath) {
                 $system.Add($dll) | Out-Null
                 continue
               }
 
               $packagedDll = Join-Path $artifact $dll
+
               if (-not (Test-Path -LiteralPath $packagedDll)) {
                 $sourceDll = $searchDirs |
                   ForEach-Object { Join-Path $_ $dll } |
                   Where-Object { Test-Path -LiteralPath $_ } |
                   Select-Object -First 1
+
                 if (-not $sourceDll) {
                   $missing.Add($dll) | Out-Null
                   continue
                 }
+
                 Copy-Item -LiteralPath $sourceDll -Destination $packagedDll
               }
 
@@ -222,15 +292,30 @@ jobs:
             throw "Missing redistributable DLLs: $($missing -join ', ')"
           }
 
-          $dynamicMsvcRuntime = (@($bundled) + @($system)) |
-            Where-Object { $_ -match '^(vcruntime|msvcp|concrt)[0-9_]*\.dll$' }
+          $dynamicMsvcRuntime = @(
+            (@($bundled) + @($system)) |
+              Where-Object {
+                $_ -match '^(vcruntime|msvcp|concrt)[0-9_]*\.dll$'
+              }
+          )
+
           if ($dynamicMsvcRuntime.Count -gt 0) {
             throw "The /MT package unexpectedly imports dynamic MSVC runtime DLLs: $($dynamicMsvcRuntime -join ', ')"
           }
 
-          foreach ($item in @('init.lua', 'server_config.lua', 'data', 'modules', 'mods')) {
+          foreach ($item in @(
+            'init.lua',
+            'server_config.lua',
+            'data',
+            'modules',
+            'mods'
+          )) {
             if (Test-Path -LiteralPath $item) {
-              Copy-Item -LiteralPath $item -Destination $artifact -Recurse -Force
+              Copy-Item `
+                -LiteralPath $item `
+                -Destination $artifact `
+                -Recurse `
+                -Force
             }
           }
 
@@ -241,11 +326,18 @@ jobs:
             'MSVC runtime: static (/MT)'
             ''
             'Bundled non-system DLLs:'
-            $(if ($bundled.Count) { $bundled | Sort-Object } else { '(none; dependencies are statically linked)' })
+            $(if ($bundled.Count) {
+              $bundled | Sort-Object
+            } else {
+              '(none; dependencies are statically linked)'
+            })
             ''
             'Windows system DLLs:'
             $system | Sort-Object
-          ) | Set-Content -LiteralPath "$artifact/dependency-report.txt" -Encoding UTF8
+          ) |
+            Set-Content `
+              -LiteralPath "$artifact/dependency-report.txt" `
+              -Encoding UTF8
 
       - name: Validate clean redistributable package
         shell: pwsh
@@ -253,20 +345,38 @@ jobs:
           $artifact = "$env:GITHUB_WORKSPACE/artifacts/windows-server"
           $exe = "$artifact/NextGen-OTC.exe"
 
-          foreach ($required in @('NextGen-OTC.exe', 'init.lua', 'data', 'modules', 'mods', 'dependency-report.txt')) {
+          foreach ($required in @(
+            'NextGen-OTC.exe',
+            'init.lua',
+            'data',
+            'modules',
+            'mods',
+            'dependency-report.txt'
+          )) {
             if (-not (Test-Path -LiteralPath (Join-Path $artifact $required))) {
               throw "Required runtime file is missing from package: $required"
             }
           }
 
           $headers = & dumpbin.exe /nologo /headers $exe
-          if ($LASTEXITCODE -ne 0 -or @($headers -match 'machine \(x64\)').Count -eq 0) {
+
+          if (
+            $LASTEXITCODE -ne 0 -or
+            @($headers -match 'machine \(x64\)').Count -eq 0
+          ) {
             throw 'Packaged executable is not a valid x64 PE image.'
           }
 
-          # Run only from the clean package directory. If the process remains
-          # alive, startup succeeded; terminate it after the smoke-test window.
-          $process = Start-Process -FilePath $exe -WorkingDirectory $artifact -PassThru
+          # Run only from the clean package directory.
+          #
+          # If the process remains alive, startup succeeded.
+          # Terminate it after the smoke-test window.
+
+          $process = Start-Process `
+            -FilePath $exe `
+            -WorkingDirectory $artifact `
+            -PassThru
+
           if ($process.WaitForExit(15000)) {
             if ($process.ExitCode -ne 0) {
               throw "NextGen-OTC exited during clean-folder smoke test with code $($process.ExitCode)."
@@ -282,10 +392,12 @@ jobs:
           path: artifacts/windows-server
           if-no-files-found: error
 
+
   release:
-    name: Update Windows Server package in "latest"
+    name: Publish Windows Server package
     needs: build-windows-server
     runs-on: ubuntu-latest
+
     permissions:
       contents: write
 
@@ -297,26 +409,103 @@ jobs:
           path: artifacts
 
       - name: Zip Windows Server package
+        shell: bash
         env:
           ARTIFACT_NAME: ${{ needs.build-windows-server.outputs.artifact-name }}
-        run: cd artifacts && zip -r "../${ARTIFACT_NAME}.zip" .
-
-      - name: Publish versioned package
-        env:
-          GH_TOKEN: ${{ github.token }}
-          ARTIFACT_NAME: ${{ needs.build-windows-server.outputs.artifact-name }}
-          DISPLAY_VERSION: ${{ needs.build-windows-server.outputs.display-version }}
         run: |
-          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
-            gh release view "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
-              gh release create "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" \
-                --target "$GITHUB_SHA" \
-                --title "NextGen-OTC $DISPLAY_VERSION" \
-                --notes "Stable NextGen-OTC build $DISPLAY_VERSION."
-            RELEASE="$GITHUB_REF_NAME"
-          else
-            RELEASE="latest"
+          set -euo pipefail
+
+          echo "Creating ${ARTIFACT_NAME}.zip..."
+
+          cd artifacts
+          zip -r "../${ARTIFACT_NAME}.zip" .
+
+          cd ..
+
+          if [[ ! -f "${ARTIFACT_NAME}.zip" ]]; then
+            echo "ERROR: ZIP file was not created."
+            exit 1
           fi
 
-          gh release upload "$RELEASE" "${ARTIFACT_NAME}.zip" \
-            -R "$GITHUB_REPOSITORY" --clobber
+          ls -lh "${ARTIFACT_NAME}.zip"
+
+      - name: Publish package
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+          ARTIFACT_NAME: ${{ needs.build-windows-server.outputs.artifact-name }}
+
+          DISPLAY_VERSION: ${{ needs.build-windows-server.outputs.display-version }}
+
+          SOURCE_SHA: ${{ needs.build-windows-server.outputs.source-sha }}
+
+        run: |
+          set -euo pipefail
+
+          echo "GitHub event: $GITHUB_EVENT_NAME"
+          echo "GitHub ref type: $GITHUB_REF_TYPE"
+          echo "GitHub ref name: $GITHUB_REF_NAME"
+          echo "Source SHA: $SOURCE_SHA"
+          echo "Artifact: ${ARTIFACT_NAME}.zip"
+
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+
+            RELEASE="$GITHUB_REF_NAME"
+            RELEASE_TITLE="NextGen-OTC $DISPLAY_VERSION"
+            RELEASE_NOTES="Stable NextGen-OTC build $DISPLAY_VERSION."
+
+          else
+
+            RELEASE="latest"
+            RELEASE_TITLE="NextGen-OTC Latest"
+            RELEASE_NOTES="Latest automated NextGen-OTC Windows Server OpenGL build."
+
+          fi
+
+          echo "Release: $RELEASE"
+
+          #
+          # Create the release if it does not exist.
+          #
+
+          if gh release view "$RELEASE" \
+            -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+
+            echo "Release '$RELEASE' already exists."
+
+          else
+
+            echo "Release '$RELEASE' does not exist."
+            echo "Creating release..."
+
+            gh release create "$RELEASE" \
+              -R "$GITHUB_REPOSITORY" \
+              --target "$SOURCE_SHA" \
+              --title "$RELEASE_TITLE" \
+              --notes "$RELEASE_NOTES"
+
+          fi
+
+          #
+          # Upload the new ZIP.
+          #
+          # --clobber replaces an asset with the same filename.
+          #
+
+          echo "Uploading ${ARTIFACT_NAME}.zip..."
+
+          gh release upload "$RELEASE" \
+            "${ARTIFACT_NAME}.zip" \
+            -R "$GITHUB_REPOSITORY" \
+            --clobber
+
+          echo ""
+          echo "=========================================="
+          echo "Release upload completed successfully."
+          echo "Release: $RELEASE"
+          echo "File: ${ARTIFACT_NAME}.zip"
+          echo "=========================================="
+
+          gh release view "$RELEASE" \
+            -R "$GITHUB_REPOSITORY"
