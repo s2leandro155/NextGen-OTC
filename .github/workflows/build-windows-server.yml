@@ -305,7 +305,6 @@ jobs:
 
           foreach ($item in @(
             'init.lua',
-            'server_config.lua',
             'data',
             'modules',
             'mods'

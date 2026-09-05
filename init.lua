@@ -8,24 +8,8 @@ Services = {
     --websites = "http://localhost/?subtopic=accountmanagement", --./client_entergame "Forgot password and/or email"
     --createAccount = "http://localhost/clientcreateaccount.php", --./client_entergame -- createAccount.lua
     --getCoinsUrl = "http://localhost/?subtopic=shop&step=terms", --./game_market
+    minimap = "http://127.0.0.1/minimap.otmm", --./game_minimap
 }
-
--- Keep the public endpoint outside the executable so the same build can be
--- distributed to other computers and the server address can be changed
--- without recompiling the client.
-local serverConfig = {}
-if g_resources.fileExists("/server_config.lua") then
-    local configChunk, configError = loadstring(g_resources.readFileContents("/server_config.lua"), "@/server_config.lua")
-    if not configChunk then
-        error("Invalid server_config.lua: " .. tostring(configError))
-    end
-
-    serverConfig = configChunk() or {}
-end
-
-if serverConfig.webUrl and serverConfig.webUrl ~= "" then
-    Services.minimap = serverConfig.webUrl:gsub("/$", "") .. "/minimap.otmm"
-end
 
 --- Enables or disables the entire server configuration block.
 -- Set to `false` to disable all configuration below.
@@ -65,14 +49,10 @@ if ENABLE_SERVERS then
     -- Each entry defines port, protocol, and authentication options.
     -- @table Servers_init
     --
-    if not serverConfig.loginUrl or serverConfig.loginUrl == "" then
-        error("server_config.lua must define loginUrl")
-    end
-
     Servers_init = {
-        [serverConfig.loginUrl] = {
-            port = serverConfig.loginPort,
-            protocol = serverConfig.protocol or 1530,
+        ["http://127.0.0.1/login.php"] = {
+            port = 80,
+            protocol = 1530,
             httpLogin = true,
             useAuthenticator = false
         }
