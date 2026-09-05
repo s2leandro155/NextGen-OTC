@@ -369,6 +369,7 @@ function init()
 		onPreyInactive = onPreyInactive,
 		onPreyActive = onPreyActive,
 		onPreySelection = onPreySelection,
+		onPreyListSelection = onPreyListSelection,
 		onPreySelectionChangeMonster = onPreySelectionChangeMonster
 	})
 
@@ -696,6 +697,7 @@ function terminate()
 		onPreyInactive = onPreyInactive,
 		onPreyActive = onPreyActive,
 		onPreySelection = onPreySelection,
+		onPreyListSelection = onPreyListSelection,
 		onPreySelectionChangeMonster = onPreySelectionChangeMonster
 	})
 
@@ -1970,6 +1972,12 @@ function onPreySelectionChangeMonster(slot, names, outfits, bonusType, bonusValu
 		prey.bonusValue = bonusValue
 		prey.bonusGrade = bonusGrade
 	end
+end
+
+function onPreyListSelection(slot, races, timeUntilFreeReroll, wildcards)
+	-- The server sends the complete creature list in this state after the player
+	-- spends wildcards. Reuse the wildcard picker with no preselected bonus.
+	return onPreyWildcard(slot, races, timeUntilFreeReroll, wildcards, 0, 0, 0)
 end
 
 function updateSearchWildcard(prey)
