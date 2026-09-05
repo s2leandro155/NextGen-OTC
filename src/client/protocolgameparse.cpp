@@ -3517,26 +3517,56 @@ void ProtocolGame::parseBestiaryOverview(const InputMessagePtr& msg)
     const auto& raceName = msg->getString();
 
     const uint16_t raceSize = msg->getU16();
+    const auto entriesReadPos = msg->getReadPos();
     std::vector<BestiaryOverviewMonsters> data;
     uint16_t animusMasteryPoints = 0;
 
-    for (auto i = 0; i < raceSize; ++i) {
-        BestiaryOverviewMonsters monster;
-        monster.id = msg->getU16();
-        monster.currentLevel = msg->getU8();
+    // The occurrence byte exists only for entries with progress. Reading it
+    // unconditionally shifts all following entries and makes 0xD6 reach EOF.
+    // Some 15.x servers also retain the legacy layout without Animus fields,
+    // so retry that layout transactionally when the current one is implausible.
+    const auto parseEntries = [&](const bool hasAnimusFields) {
+        std::vector<BestiaryOverviewMonsters> parsed;
+        parsed.reserve(raceSize);
 
-        // 15.30 can include occurrence even when currentLevel is zero.
-        // Animus Mastery was added in 13.40 and is present after every entry
-        // from that version.
-        monster.occurrence = msg->getU8();
-        if (g_game.getClientVersion() >= 1340)
-            monster.creatureAnimusMasteryBonus = msg->getU16();
+        for (auto i = 0; i < raceSize; ++i) {
+            BestiaryOverviewMonsters monster;
+            monster.id = msg->getU16();
+            monster.currentLevel = msg->getU8();
+            if (monster.id == 0 || monster.currentLevel > 4)
+                throw std::runtime_error("invalid bestiary overview entry");
 
-        data.emplace_back(monster);
+            if (monster.currentLevel > 0) {
+                monster.occurrence = msg->getU8();
+                if (monster.occurrence > 3)
+                    throw std::runtime_error("invalid bestiary occurrence");
+            }
+
+            if (hasAnimusFields)
+                monster.creatureAnimusMasteryBonus = msg->getU16();
+
+            parsed.emplace_back(monster);
+        }
+
+        const uint16_t points = hasAnimusFields ? msg->getU16() : 0;
+        return std::pair { std::move(parsed), points };
+    };
+
+    const bool expectsAnimusFields = g_game.getClientVersion() >= 1340;
+    try {
+        auto parsed = parseEntries(expectsAnimusFields);
+        data = std::move(parsed.first);
+        animusMasteryPoints = parsed.second;
+    } catch (const std::exception&) {
+        if (!expectsAnimusFields)
+            throw;
+
+        msg->setReadPos(entriesReadPos);
+        auto parsed = parseEntries(false);
+        data = std::move(parsed.first);
+        animusMasteryPoints = parsed.second;
+        g_logger.warning("Bestiary overview used legacy layout for race '{}'", raceName);
     }
-
-    if (g_game.getClientVersion() >= 1340)
-        animusMasteryPoints = msg->getU16();
 
     g_game.processParseBestiaryOverview(raceName, data, animusMasteryPoints);
 }

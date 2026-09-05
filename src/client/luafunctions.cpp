@@ -1239,6 +1239,9 @@ void Client::registerLuaFunctions()
     g_lua.registerClass<UIMap, UIWidget>();
     g_lua.bindClassStaticFunction<UIMap>("create", [] { return std::make_shared<UIMap>(); });
     g_lua.bindClassMemberFunction<UIMap>("drawSelf", &UIMap::drawSelf);
+    g_lua.bindClassMemberFunction<UIMap>("isReadyToDisplay", &UIMap::isReadyToDisplay);
+    g_lua.bindClassMemberFunction<UIMap>("resetReadyToDisplay", &UIMap::resetReadyToDisplay);
+    g_lua.bindClassMemberFunction<UIMap>("resetDisplayReady", &UIMap::resetReadyToDisplay);
     g_lua.bindClassMemberFunction<UIMap>("movePixels", &UIMap::movePixels);
     g_lua.bindClassMemberFunction<UIMap>("setZoom", &UIMap::setZoom);
     g_lua.bindClassMemberFunction<UIMap>("setFloatZoom", &UIMap::setFloatZoom);

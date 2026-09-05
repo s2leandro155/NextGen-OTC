@@ -84,6 +84,15 @@ local function beginMapTransition()
 	mapTransitionStartedAt = g_clock.realMillis()
 	mapTransitionActive = true
 
+	-- Start this login with a fresh frame counter. The curtain is removed as
+	-- soon as three real map frames have been drawn instead of waiting 10 s.
+	local gameInterface = modules.game_interface
+	local mapPanel = gameInterface and gameInterface.getMapPanel and gameInterface.getMapPanel()
+
+	if mapPanel and not mapPanel:isDestroyed() and mapPanel.resetReadyToDisplay then
+		mapPanel:resetReadyToDisplay()
+	end
+
 	background:show()
 
 	if modules.client_topmenu then

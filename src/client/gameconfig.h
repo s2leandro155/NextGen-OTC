@@ -37,6 +37,7 @@ public:
     uint8_t getSpriteSize() const { return m_spriteSize; }
     uint8_t getBaseSpriteSize() const { return m_baseSpriteSize; }
     uint8_t getSpriteScaleFactor() const { return m_spriteScaleFactor; }
+    uint16_t getTextureSpriteSize() const { return static_cast<uint16_t>(m_baseSpriteSize) * m_spriteScaleFactor; }
     void setBaseSpriteSize(uint8_t size) { m_baseSpriteSize = size == 0 ? 1 : size; updateSpriteSize(); }
     void setSpriteScaleFactor(uint8_t factor) { m_spriteScaleFactor = factor == 0 ? 1 : factor; updateSpriteSize(); }
     uint16_t getLastSupportedVersion() const { return m_lastSupportedVersion; }
@@ -98,8 +99,10 @@ private:
     void loadRenderNode(const OTMLNodePtr& node);
 
     void updateSpriteSize() {
-        const int scaledSize = m_baseSpriteSize * m_spriteScaleFactor;
-        m_spriteSize = static_cast<uint8_t>(std::min(scaledSize, 255));
+        // The sprite size is part of the logical game coordinate system. HD
+        // filters increase only the backing texture resolution; changing this
+        // value also doubles creature offsets, outfit bounds and UI item sizes.
+        m_spriteSize = m_baseSpriteSize;
     }
 
     // Game

@@ -818,10 +818,14 @@ void ThingType::draw(const Point& dest, const int layer, const int xPattern, con
         return;
     }
 
-    const auto& textureOffset = textureData.pos[frameIndex].offsets;
+    const auto& physicalTextureOffset = textureData.pos[frameIndex].offsets;
     const auto& textureRect = textureData.pos[frameIndex].rects;
+    const int textureScale = std::max<int>(1, g_gameConfig.getSpriteScaleFactor());
+    const Point textureOffset(physicalTextureOffset.x / textureScale, physicalTextureOffset.y / textureScale);
+    const Size logicalTextureSize((textureRect.width() + textureScale - 1) / textureScale,
+                                  (textureRect.height() + textureScale - 1) / textureScale);
 
-    const Rect screenRect(dest + (textureOffset - m_displacement - (m_size.toPoint() - Point(1)) * g_gameConfig.getSpriteSize()) * g_drawPool.getScaleFactor(), textureRect.size() * g_drawPool.getScaleFactor());
+    const Rect screenRect(dest + (textureOffset - m_displacement - (m_size.toPoint() - Point(1)) * g_gameConfig.getSpriteSize()) * g_drawPool.getScaleFactor(), logicalTextureSize * g_drawPool.getScaleFactor());
 
     if (drawThings && texture) {
         const auto& newColor = m_opacity < 1.0f ? Color(color, m_opacity) : color;
@@ -894,7 +898,8 @@ void ThingType::loadTexture(const int animationPhase)
     const bool useCustomImage = animationPhase == 0 && !m_customImage.empty();
     const int indexSize = textureLayers * m_numPatternX * m_numPatternY * m_numPatternZ;
     const auto& textureSize = getBestTextureDimension(m_size.width(), m_size.height(), indexSize);
-    const auto& fullImage = useCustomImage ? Image::load(m_customImage) : std::make_shared<Image>(textureSize * g_gameConfig.getSpriteSize());
+    const int textureSpriteSize = g_gameConfig.getTextureSpriteSize();
+    const auto& fullImage = useCustomImage ? Image::load(m_customImage) : std::make_shared<Image>(textureSize * textureSpriteSize);
     const bool protobufSupported = g_game.isUsingProtobuf();
 
     static Color maskColors[] = { Color::red, Color::green, Color::blue, Color::yellow };
@@ -908,7 +913,7 @@ void ThingType::loadTexture(const int animationPhase)
                     const int frameIndex = getTextureIndex(l % textureLayers, x, y, z);
 
                     const auto& framePos = Point(frameIndex % (textureSize.width() / m_size.width()) * m_size.width(),
-                        frameIndex / (textureSize.width() / m_size.width()) * m_size.height()) * g_gameConfig.getSpriteSize();
+                        frameIndex / (textureSize.width() / m_size.width()) * m_size.height()) * textureSpriteSize;
 
                     if (!useCustomImage) {
                         if (protobufSupported) {
@@ -934,9 +939,9 @@ void ThingType::loadTexture(const int animationPhase)
                                 spriteImage->overwriteMask(maskColors[(l - 1)]);
                             }
 
-                            auto spriteSize = spriteImage->getSize() / g_gameConfig.getSpriteSize();
+                            auto spriteSize = spriteImage->getSize() / textureSpriteSize;
 
-                            const Point& spritePos = Point(m_size.width() - spriteSize.width(), m_size.height() - spriteSize.height()) * g_gameConfig.getSpriteSize();
+                            const Point& spritePos = Point(m_size.width() - spriteSize.width(), m_size.height() - spriteSize.height()) * textureSpriteSize;
                             fullImage->blit(framePos + spritePos, spriteImage);
                         } else {
                             for (int h = 0; h < m_size.height(); ++h) {
@@ -963,7 +968,7 @@ void ThingType::loadTexture(const int animationPhase)
                                         spriteImage->overwriteMask(maskColors[(l - 1)]);
                                     }
 
-                                    const Point& spritePos = Point(m_size.width() - w - 1, m_size.height() - h - 1) * g_gameConfig.getSpriteSize();
+                                    const Point& spritePos = Point(m_size.width() - w - 1, m_size.height() - h - 1) * textureSpriteSize;
                                     fullImage->blit(framePos + spritePos, spriteImage);
                                 }
                             }
@@ -971,9 +976,9 @@ void ThingType::loadTexture(const int animationPhase)
                     }
 
                     auto& posData = textureData.pos[frameIndex];
-                    posData.rects = { framePos + Point(m_size.width(), m_size.height()) * g_gameConfig.getSpriteSize() - Point(1), framePos };
-                    for (int fx = framePos.x; fx < framePos.x + m_size.width() * g_gameConfig.getSpriteSize(); ++fx) {
-                        for (int fy = framePos.y; fy < framePos.y + m_size.height() * g_gameConfig.getSpriteSize(); ++fy) {
+                    posData.rects = { framePos + Point(m_size.width(), m_size.height()) * textureSpriteSize - Point(1), framePos };
+                    for (int fx = framePos.x; fx < framePos.x + m_size.width() * textureSpriteSize; ++fx) {
+                        for (int fy = framePos.y; fy < framePos.y + m_size.height() * textureSpriteSize; ++fy) {
                             const uint8_t* p = fullImage->getPixel(fx, fy);
                             if (p[3] == 0x00)
                                 continue;
@@ -985,7 +990,7 @@ void ThingType::loadTexture(const int animationPhase)
                         }
                     }
 
-                    posData.originRects = Rect(framePos, Size(m_size.width(), m_size.height()) * g_gameConfig.getSpriteSize());
+                    posData.originRects = Rect(framePos, Size(m_size.width(), m_size.height()) * textureSpriteSize);
                     posData.offsets = posData.rects.topLeft() - framePos;
                 }
             }
@@ -1097,7 +1102,8 @@ int ThingType::getExactSize(const int layer, const int xPattern, const int yPatt
 
     const auto& textureDataPos = pos[std::min<int>(frameIndex, pos.size() - 1)];
     const auto& size = textureDataPos.originRects.size() - textureDataPos.offsets.toSize();
-    return std::max<int>(size.width(), size.height());
+    const int textureScale = std::max<int>(1, g_gameConfig.getSpriteScaleFactor());
+    return (std::max<int>(size.width(), size.height()) + textureScale - 1) / textureScale;
 }
 
 void ThingType::setPathable(const bool var)

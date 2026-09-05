@@ -164,7 +164,11 @@ function UICreatureButton:updateOutfitPreview(outfit)
 
 	-- Keep the widget dimensions intact. The old setCreatureSize(0) call
 	-- collapsed this UICreature to 0x0, leaving only the name and health bar.
-	creatureWidget:setAutoFit(true)
+	-- New executables expose auto-fit directly. Keep the module compatible
+	-- with older packaged executables instead of breaking the battle list.
+	if creatureWidget.setAutoFit then
+		creatureWidget:setAutoFit(true)
+	end
 
 	local mountId = tonumber(outfit and outfit.mount) or 0
 	local mounted = mountId > 0
