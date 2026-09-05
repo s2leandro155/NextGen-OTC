@@ -9,6 +9,11 @@ end
 openedWindows = {}
 
 local MISC_PROC_OPCODE = 204
+local pendingExperienceFallbackEvent
+local pendingExperienceGain = 0
+local lastTrackerExperience = 0
+local lastTrackerExperienceAt = 0
+local EXPERIENCE_TRACKER_GRACE_MS = 150
 
 local ANALYSER_CHAR_MINIWINDOW_IDS = {
 	lootAnalyserMiniWindow = true,
@@ -916,6 +921,11 @@ function init()
 end
 
 function terminate()
+	if pendingExperienceFallbackEvent then
+		pendingExperienceFallbackEvent:cancel()
+		pendingExperienceFallbackEvent = nil
+	end
+
 	pcall(function()
 		ProtocolGame.unregisterExtendedOpcode(MISC_PROC_OPCODE)
 	end)
@@ -981,6 +991,14 @@ function terminate()
 end
 
 function startNewSession(login)
+	if pendingExperienceFallbackEvent then
+		pendingExperienceFallbackEvent:cancel()
+		pendingExperienceFallbackEvent = nil
+	end
+	pendingExperienceGain = 0
+	lastTrackerExperience = 0
+	lastTrackerExperienceAt = 0
+
 	AnalyserSession:reset()
 	HuntingAnalyser:reset()
 
@@ -1009,6 +1027,20 @@ function startNewSession(login)
 	InputAnalyser:updateWindow(true)
 	XPAnalyser:reset()
 	XPAnalyser:updateWindow(true)
+
+	-- onGameStart can run before the initial onExperienceChange callback. Seed
+	-- the baseline from LocalPlayer when it is already available; otherwise the
+	-- callback below will establish it when the first valid value arrives.
+	local player = g_game.getLocalPlayer()
+	if player then
+		local experience = tonumber(player:getExperience()) or 0
+		if experience > 0 then
+			HuntingAnalyser:setupStartExp(experience)
+			XPAnalyser:setupStartExp(experience)
+		end
+		XPAnalyser:setupLevel(player:getLevel(), player:getLevelPercent())
+		XPAnalyser:checkExpHour()
+	end
 	DropTrackerAnalyser:reset(login)
 
 	if login then
@@ -1174,26 +1206,78 @@ function toggleAnalysers(buttonId)
 end
 
 function onExperienceChange(localPlayer, value, oldValue)
-	HuntingAnalyser:setupStartExp(value)
-	XPAnalyser:setupStartExp(value)
-
-	-- Regular monster XP is reported by onUpdateExperience. A death loss only
-	-- arrives through LocalPlayer:onExperienceChange, so account for decreases
-	-- here without duplicating positive gains.
 	value = tonumber(value)
 	oldValue = tonumber(oldValue)
 
-	if value and oldValue and oldValue > 0 and value < oldValue then
+	if not value then
+		return
+	end
+
+	HuntingAnalyser:setupStartExp(value)
+	XPAnalyser:setupStartExp(value)
+
+	if not oldValue or oldValue <= 0 or value == oldValue then
+		return
+	end
+
+	if value < oldValue then
 		local lostExperience = value - oldValue
 
 		HuntingAnalyser:addRawXPGain(lostExperience, false)
 		HuntingAnalyser:addXpGain(lostExperience, false)
 		XPAnalyser:addRawXPGain(lostExperience, false)
 		XPAnalyser:addXpGain(lostExperience, false)
+		return
 	end
+
+	-- Protocol 15.30 normally reports the exact raw/final gain through the
+	-- experience-tracker packet. Some login sequences do not enable that packet
+	-- until the analyser is reset manually. Keep the LocalPlayer delta as a
+	-- short delayed fallback, and discard it when the tracker packet arrives.
+	local gainedExperience = value - oldValue
+	local now = g_clock.millis()
+	if lastTrackerExperience == gainedExperience and now - lastTrackerExperienceAt <= EXPERIENCE_TRACKER_GRACE_MS then
+		lastTrackerExperience = 0
+		lastTrackerExperienceAt = 0
+		return
+	end
+
+	pendingExperienceGain = pendingExperienceGain + gainedExperience
+	if pendingExperienceFallbackEvent then
+		pendingExperienceFallbackEvent:cancel()
+	end
+	pendingExperienceFallbackEvent = scheduleEvent(function()
+		local fallbackGain = pendingExperienceGain
+		pendingExperienceGain = 0
+		pendingExperienceFallbackEvent = nil
+		if fallbackGain <= 0 or not g_game.isOnline() then
+			return
+		end
+		HuntingAnalyser:addRawXPGain(fallbackGain)
+		HuntingAnalyser:addXpGain(fallbackGain)
+		XPAnalyser:addRawXPGain(fallbackGain)
+		XPAnalyser:addXpGain(fallbackGain)
+	end, EXPERIENCE_TRACKER_GRACE_MS)
 end
 
 function onUpdateExperience(rawExp, exp)
+	rawExp = tonumber(rawExp) or 0
+	exp = tonumber(exp) or 0
+	if exp <= 0 then
+		return
+	end
+
+	if pendingExperienceGain > 0 then
+		pendingExperienceGain = math.max(0, pendingExperienceGain - exp)
+		if pendingExperienceGain == 0 and pendingExperienceFallbackEvent then
+			pendingExperienceFallbackEvent:cancel()
+			pendingExperienceFallbackEvent = nil
+		end
+	else
+		lastTrackerExperience = exp
+		lastTrackerExperienceAt = g_clock.millis()
+	end
+
 	HuntingAnalyser:addRawXPGain(rawExp)
 	HuntingAnalyser:addXpGain(exp)
 	XPAnalyser:addRawXPGain(rawExp)

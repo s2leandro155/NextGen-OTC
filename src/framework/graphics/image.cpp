@@ -28,6 +28,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <limits>
 #include <map>
 #include <mutex>
 
@@ -183,14 +184,47 @@ void Image::overwriteMask(const Color& maskedColor, const Color& insideColor, co
 {
     assert(m_bpp == 4);
 
+    // Outfit masks normally contain the four exact Tibia palette colors.
+    // Texture upscalers (for example xBRZ) interpolate their edge pixels,
+    // though, so an exact comparison drops those pixels and corrupts the
+    // outfit colors. Classify interpolated pixels by the nearest mask color
+    // while ignoring transparent and neutral (black/grey/white) pixels.
+    static constexpr uint8_t MASK_CHROMA_TOLERANCE = 8;
+    const Color maskPalette[] = { Color::red, Color::green, Color::blue, Color::yellow };
+
     for (int p = 0; p < getPixelCount(); ++p) {
         uint8_t& r = m_pixels[p * 4 + 0];
         uint8_t& g = m_pixels[p * 4 + 1];
         uint8_t& b = m_pixels[p * 4 + 2];
         uint8_t& a = m_pixels[p * 4 + 3];
 
-        Color pixelColor(r, g, b, a);
-        Color writeColor = (pixelColor == maskedColor) ? insideColor : outsideColor;
+        const Color pixelColor(r, g, b, a);
+        bool matchesMask = pixelColor == maskedColor;
+
+        if (!matchesMask && a != 0) {
+            const uint8_t minChannel = std::min({ r, g, b });
+            const uint8_t maxChannel = std::max({ r, g, b });
+
+            if (maxChannel - minChannel >= MASK_CHROMA_TOLERANCE) {
+                int nearestDistance = std::numeric_limits<int>::max();
+                Color nearestMask = Color::alpha;
+
+                for (const auto& candidate : maskPalette) {
+                    const int dr = static_cast<int>(r) - candidate.r();
+                    const int dg = static_cast<int>(g) - candidate.g();
+                    const int db = static_cast<int>(b) - candidate.b();
+                    const int distance = dr * dr + dg * dg + db * db;
+                    if (distance < nearestDistance) {
+                        nearestDistance = distance;
+                        nearestMask = candidate;
+                    }
+                }
+
+                matchesMask = nearestMask == maskedColor;
+            }
+        }
+
+        const Color writeColor = matchesMask ? insideColor : outsideColor;
 
         r = writeColor.r();
         g = writeColor.g();
