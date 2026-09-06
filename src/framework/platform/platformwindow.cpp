@@ -44,6 +44,11 @@ PlatformWindow& g_window = window;
 
 int PlatformWindow::loadMouseCursor(const std::string& file, const Point& hotSpot)
 {
+    return loadMouseCursor(file, hotSpot, 1);
+}
+
+int PlatformWindow::loadMouseCursor(const std::string& file, const Point& hotSpot, const int scale)
+{
     const auto& image = Image::load(file);
     if (!image) {
         g_logger.traceError("unable to load cursor image file {}", file);
@@ -55,7 +60,16 @@ int PlatformWindow::loadMouseCursor(const std::string& file, const Point& hotSpo
         return -1;
     }
 
-    return internalLoadMouseCursor(image, hotSpot);
+    if (scale <= 1)
+        return internalLoadMouseCursor(image, hotSpot);
+
+    const Size scaledSize(image->getWidth() * scale, image->getHeight() * scale);
+    const auto scaledImage = std::make_shared<Image>(scaledSize, image->getBpp());
+    for (int y = 0; y < scaledSize.height(); ++y) {
+        for (int x = 0; x < scaledSize.width(); ++x)
+            scaledImage->setPixel(x, y, image->getPixel(x / scale, y / scale));
+    }
+    return internalLoadMouseCursor(scaledImage, hotSpot * scale);
 }
 
 void PlatformWindow::setTitleBarColor(int r, int g, int b)

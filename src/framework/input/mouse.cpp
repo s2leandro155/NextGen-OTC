@@ -33,6 +33,7 @@ void Mouse::init() {}
 void Mouse::terminate()
 {
     m_cursors.clear();
+    m_cursorDefinitions.clear();
 }
 
 void Mouse::loadCursors(const std::string& filename)
@@ -62,7 +63,8 @@ void Mouse::loadCursors(const std::string& filename)
 
 void Mouse::addCursor(const std::string& name, const std::string& file, const Point& hotSpot)
 {
-    const int cursorId = g_window.loadMouseCursor(file, hotSpot);
+    m_cursorDefinitions[name] = { file, hotSpot };
+    const int cursorId = g_window.loadMouseCursor(file, hotSpot, m_cursorDisplayScale);
     if (cursorId >= 0) {
         m_cursors[name] = cursorId;
     } else
@@ -76,8 +78,8 @@ bool Mouse::pushCursor(const std::string& name)
         return false;
 
     const int cursorId = it->second;
-    g_window.setMouseCursor(cursorId);
     m_cursorStack.push_back(cursorId);
+    applyCurrentCursor();
     return true;
 }
 
@@ -101,17 +103,54 @@ void Mouse::popCursor(const std::string& name)
             return;
     }
 
-    if (!m_cursorStack.empty()) {
-        g_window.setMouseCursor(m_cursorStack.back());
-    } else {
+    applyCurrentCursor();
+}
 
-        if (m_cursors.contains("default")) {
-            const int defaultCursorId = m_cursors["default"];
-            g_window.setMouseCursor(defaultCursorId);
-        } else {
-            g_window.restoreMouseCursor();
-        }
+void Mouse::setUseNativeCursor(const bool useNative)
+{
+    if (m_useNativeCursor == useNative)
+        return;
+
+    m_useNativeCursor = useNative;
+    applyCurrentCursor();
+}
+
+void Mouse::setCursorDisplayScale(const int scale)
+{
+    const int normalizedScale = scale > 1 ? 2 : 1;
+    if (m_cursorDisplayScale == normalizedScale)
+        return;
+
+    m_cursorDisplayScale = normalizedScale;
+    reloadCursors();
+}
+
+void Mouse::applyCurrentCursor()
+{
+    if (m_useNativeCursor) {
+        g_window.restoreMouseCursor();
+        return;
     }
+
+    if (!m_cursorStack.empty())
+        g_window.setMouseCursor(m_cursorStack.back());
+    else if (m_cursors.contains("default"))
+        g_window.setMouseCursor(m_cursors["default"]);
+    else
+        g_window.restoreMouseCursor();
+}
+
+void Mouse::reloadCursors()
+{
+    const auto definitions = m_cursorDefinitions;
+    m_cursors.clear();
+    m_cursorStack.clear();
+    for (const auto& [name, definition] : definitions) {
+        const int cursorId = g_window.loadMouseCursor(definition.file, definition.hotSpot, m_cursorDisplayScale);
+        if (cursorId >= 0)
+            m_cursors[name] = cursorId;
+    }
+    applyCurrentCursor();
 }
 
 bool Mouse::isCursorChanged()

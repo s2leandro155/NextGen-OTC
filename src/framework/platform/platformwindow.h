@@ -75,6 +75,7 @@ public:
     virtual void displayFatalError(const std::string_view /*message*/) {}
 
     virtual int loadMouseCursor(const std::string& file, const Point& hotSpot);
+    int loadMouseCursor(const std::string& file, const Point& hotSpot, int scale);
     virtual void setMouseCursor(int cursorId) = 0;
     virtual void restoreMouseCursor() = 0;
     virtual void setSystemCursor(const std::string& cursorName) {}
