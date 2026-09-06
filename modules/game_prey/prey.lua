@@ -94,7 +94,10 @@ function applyPreyCreaturePreview(spriteWidget)
 	local creature = spriteWidget:getCreature()
 
 	if creature then
-		creature:setStaticWalking(0)
+		-- Some custom creatures have a transparent/empty idle phase (phase 0).
+		-- Keep the preview animated, as the Prey tracker already does, so every
+		-- slot and the creature selection panel render a valid outfit frame.
+		creature:setStaticWalking(1000)
 	end
 end
 

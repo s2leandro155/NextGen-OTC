@@ -441,6 +441,12 @@
     <ClCompile Include="..\src\framework\graphics\particlesystem.cpp" />
     <ClCompile Include="..\src\framework\graphics\particletype.cpp" />
     <ClCompile Include="..\src\framework\graphics\drawpool.cpp" />
+    <ClCompile Include="..\src\framework\graphics\render\poolcompiler.cpp" />
+    <ClCompile Include="..\src\framework\graphics\render\frameassembler.cpp" />
+    <ClCompile Include="..\src\framework\graphics\render\recordingbackend.cpp" />
+    <ClCompile Include="..\src\framework\graphics\render\resourceregistry.cpp" />
+    <ClCompile Include="..\src\framework\graphics\render\materialregistry.cpp" />
+    <ClCompile Include="..\src\framework\graphics\render\glbackend.cpp" />
     <ClCompile Include="..\src\framework\graphics\shader.cpp" />
     <ClCompile Include="..\src\framework\graphics\shadermanager.cpp" />
     <ClCompile Include="..\src\framework\graphics\shaderprogram.cpp" />
