@@ -6,6 +6,21 @@ local loadBox, enterGame, motdWindow, enterGameButton, clientBox
 local motdEnabled = true
 local twoFactorWindow, hostInfos
 
+local function getStatusServiceUrl()
+	if Services and Services.status and Services.status ~= "" then
+		return Services.status
+	end
+
+	if Servers_init then
+		local loginUrl, server = next(Servers_init)
+		if server and server.httpLogin and type(loginUrl) == "string" and loginUrl:match("^https?://") then
+			return loginUrl
+		end
+	end
+
+	return nil
+end
+
 local function buildLoginBody(token)
 	local body = {
 		stayloggedin = true,
@@ -257,7 +272,7 @@ function EnterGame.showPanels()
 end
 
 function EnterGame.loadStartupData()
-	if Services and Services.status and g_modules.getModule("client_bottommenu"):isLoaded() then
+	if getStatusServiceUrl() and g_modules.getModule("client_bottommenu"):isLoaded() then
 		EnterGame.postCacheInfo()
 		EnterGame.postEventScheduler()
 		EnterGame.postShowCreatureBoost()
@@ -369,7 +384,7 @@ function EnterGame.postCacheInfo()
 		modules.client_topmenu.setPlayersOnline(response.playersonline)
 	end
 
-	HTTP.post(Services.status, json.encode({
+	HTTP.post(getStatusServiceUrl(), json.encode({
 		type = requestType
 	}), onRecvInfo, false)
 end
@@ -412,7 +427,7 @@ function EnterGame.postEventScheduler()
 		modules.client_bottommenu.setEventsSchedulerCalender(response.eventlist)
 	end
 
-	HTTP.post(Services.status, json.encode({
+	HTTP.post(getStatusServiceUrl(), json.encode({
 		type = requestType
 	}), onRecvInfo, false)
 end
@@ -454,7 +469,7 @@ function EnterGame.postShowOff()
 		modules.client_bottommenu.setShowOffData(response)
 	end
 
-	HTTP.post(Services.status, json.encode({
+	HTTP.post(getStatusServiceUrl(), json.encode({
 		type = requestType
 	}), onRecvInfo, false)
 end
@@ -496,7 +511,7 @@ function EnterGame.postShowCreatureBoost()
 		modules.client_bottommenu.setBoostedCreatureAndBoss(response)
 	end
 
-	HTTP.post(Services.status, json.encode({
+	HTTP.post(getStatusServiceUrl(), json.encode({
 		type = requestType
 	}), onRecvInfo, false)
 end
