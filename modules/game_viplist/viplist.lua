@@ -1027,7 +1027,24 @@ function onVipListLabelMousePress(widget, mousePos, mouseButton)
 				g_game.openPrivateChannel(widget:getText())
 			end)
 			menu:addOption(tr("Invite %s to Party", widget:getText()), function()
-				g_game.partyInvite(tonumber(widget:getId():sub(4)))
+				local player = g_game.getLocalPlayer()
+				local targetName = widget:getText()
+				local targetCreature
+
+				if player then
+					for _, creature in ipairs(g_map.getSpectators(player:getPosition(), false) or {}) do
+						if creature:isPlayer() and creature:getName():lower() == targetName:lower() then
+							targetCreature = creature
+							break
+						end
+					end
+				end
+
+				if targetCreature then
+					g_game.partyInvite(targetCreature:getId())
+				else
+					displayInfoBox(tr("Invite to Party"), tr("%s must be visible on your screen to be invited.", targetName))
+				end
 			end)
 		end
 	end
