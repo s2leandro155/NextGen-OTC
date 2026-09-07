@@ -426,7 +426,8 @@ local function cancelAnimationEvents()
 end
 
 local function scheduleBannerEvent(callback, delay)
-	local eventId = scheduleEvent(function()
+	local eventId
+	eventId = scheduleEvent(function()
 		for index, storedId in ipairs(animationEvents) do
 			if storedId == eventId then
 				table.remove(animationEvents, index)
